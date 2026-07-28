@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="AppSprint 2025 Banner" width="100%"/>
+  <img src="assets/banner.jpeg" alt="AppSprint 2025 Banner" width="100%"/>
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@
 
 | Date | Milestone |
 |---|---|
-| July 28 | ⏰ Registration|
+
 | July 29 – Aug 2 | 🔨 Week 1: Core feature sprint |
 | Aug 4 – Aug 10 | ✨ Week 2: Polish, test, record demo |
 | August 11 | 📦 Try to finish it by this day to avoid last minute rush |
