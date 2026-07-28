@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/Duration-15%20Days-0D9488?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Mode-Virtual-2563EB?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Status-Open-16A34A?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Framework-Flutter%20Recommended-06B6D4?style=for-the-badge&logo=flutter"/>x
+  <img src="https://img.shields.io/badge/any%20-06B6D4?style=for-the-badge&logo=flutter"/>
 </p>
 
 <h1 align="center">🏆 AppSprint Solution Challenge 2025</h1>
