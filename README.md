@@ -32,7 +32,7 @@
 |---|---|
 | 📅 Start Date | July 29, 2025 |
 | 🏁 Submission Deadline | August 12, 2025 at 11:59 PM |
-| 🎤 Project Expo | August 12, 2025 (Virtual) |
+| 🎤 Project Expo | offline |
 | 👥 Team Size | 2–4 members (solo allowed) |
 | 🛠️ Recommended Framework | Flutter (Any mobile framework allowed) |
 | 📍 Mode | Fully Virtual |
