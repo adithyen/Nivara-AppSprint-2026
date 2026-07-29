@@ -110,6 +110,43 @@ Using open-source libraries is allowed.
 Copying another team's project will result in disqualification.
 
 ---
+## ❌ Prohibited Activities
+
+To ensure a fair and enjoyable competition, participants **must not**:
+
+- Submit applications that were built **before the official hackathon start date**.
+- Present pre-built templates, starter projects, or existing applications as original work.
+- Plagiarize another team's idea, design, code, or other intellectual property.
+- Submit private repositories or repositories that cannot be accessed by the judges.
+- Include sensitive information such as API keys, passwords, or secrets in your repository.
+- Engage in any form of cheating, misrepresentation, or unfair collaboration.
+
+Failure to comply with these rules may result in **point deductions or disqualification**, at the discretion of the organizing team.
+
+---
+
+## 🤖 AI Usage Policy
+
+The use of AI-assisted development tools is **permitted and encouraged** when used responsibly.
+
+Examples include, but are not limited to:
+
+- GitHub Copilot
+- Cursor
+- ChatGPT
+- Google Gemini
+- Claude
+- Other AI coding assistants
+
+If you use AI during development:
+
+- Clearly disclose the AI tools used in your project's **README**.
+- Be prepared to explain and justify **every part of your code** during the judging session.
+- Ensure that all submitted work reflects your team's understanding and implementation.
+
+AI should be used as a **development assistant**, not as a replacement for your own problem-solving and learning.
+
+Projects that rely heavily on AI-generated code **without sufficient understanding or proper disclosure** may receive lower technical evaluation scores or be subject to further review by the judges.
 
 # AI Usage
 
