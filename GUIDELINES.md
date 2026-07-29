@@ -136,6 +136,8 @@ Examples include, but are not limited to:
 - ChatGPT
 - Google Gemini
 - Claude
+- Opencode
+- kiro
 - Other AI coding assistants
 
 If you use AI during development:
@@ -148,13 +150,6 @@ AI should be used as a **development assistant**, not as a replacement for your 
 
 Projects that rely heavily on AI-generated code **without sufficient understanding or proper disclosure** may receive lower technical evaluation scores or be subject to further review by the judges.
 
-# AI Usage
-
-Using AI tools like ChatGPT, Gemini, Claude, GitHub Copilot, Cursor, etc. is allowed.
-
-Participants should understand the code they submit.
-
-Judges may ask implementation questions.
 
 ---
 
