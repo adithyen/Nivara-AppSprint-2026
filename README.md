@@ -42,13 +42,13 @@
 
 ## 📅 Timeline
 
-| Date | Milestone |
-|---|---|
-
-| July 29 – Aug 2 | 🔨 Week 1: Core feature sprint |
-| Aug 4 – Aug 10 | ✨ Week 2: Polish, test, record demo |
-| August 11 | 📦 Try to finish it by this day to avoid last minute rush |
-| August 12 | 🏆 final day |
+| Phase | Duration | Goal |
+|-------|----------|------|
+| 🚀 Kickoff | **July 29** | Challenge begins |
+| 🔨 Week 1 | **July 29 – Aug 2** | Build core features |
+| ✨ Week 2 | **Aug 4 – Aug 10** | Polish, test, and record your demo |
+| 📦 Wrap Up | **Aug 11** | Finalize and submit early to avoid last-minute issues |
+| 🏆 Submission | **Aug 12** | Final deadline & project showcase |
 
 
 ---
