@@ -2,7 +2,7 @@
 
 <p align="center">
 
-![Built for AppSprint 2025](https://img.shields.io/badge/Built%20for-AppSprint%202025-7C3AED?style=for-the-badge)
+![Built for AppSprint 2026](https://img.shields.io/badge/Built%20for-AppSprint%202025-7C3AED?style=for-the-badge)
 
 ![Hackathon](https://img.shields.io/badge/Hackathon-AppSprint%202025-blueviolet?style=for-the-badge)
 
@@ -290,9 +290,9 @@ This project is licensed under the MIT License.
 
 ---
 
-# 🏆 AppSprint Solution Challenge 2025
+# 🏆 AppSprint Solution Challenge 2026
 
-Built with ❤️ during **AppSprint Solution Challenge 2025**
+Built with ❤️ during **AppSprint Solution Challenge 2026**
 
 Organized by:
 
