@@ -1,8 +1,8 @@
-# 📋 AppSprint Solution Challenge 2025 Guidelines
+# 📋 AppSprint Solution Challenge 2026 Guidelines
 
 ## Overview
 
-Welcome to AppSprint Solution Challenge 2025!
+Welcome to AppSprint Solution Challenge 2026!
 
 This is a 15-day virtual mobile application development hackathon organized by the App Development IG, muLearn LBSITW.
 
