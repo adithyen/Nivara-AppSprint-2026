@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  A mobile application built during <b>AppSprint Solution Challenge 2025</b>
+  A mobile application built during <b>AppSprint Solution Challenge 2026</b>
 </p>
 
 ---
