@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="assets/banner.jpeg" alt="AppSprint 2025 Banner" width="100%"/>
+  <img src="assets/banner.jpeg" alt="AppSprint 2026 Banner" width="100%"/>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Hackathon-AppSprint%202025-7C3AED?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Hackathon-AppSprint%202026-7C3AED?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Duration-15%20Days-0D9488?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Mode-Virtual-2563EB?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Status-Open-16A34A?style=for-the-badge"/>
@@ -30,8 +30,8 @@
 
 | | |
 |---|---|
-| 📅 Start Date | July 2, 2025 |
-| 🏁 Submission Deadline | August 16, 2025 at 11:59 PM |
+| 📅 Start Date | August 2, 2026 |
+| 🏁 Submission Deadline | August 16, 2026 at 11:59 PM |
 | 🎤 Project Expo | offline |
 | 👥 Team Size | 2–4 members (solo allowed) |
 | 🛠️ Recommended Framework | Flutter (Any mobile framework allowed) |
@@ -44,8 +44,8 @@
 
 | Phase | Duration | Goal |
 |-------|----------|------|
-| 🚀 Kickoff | **July 2** | Challenge begins |
-| 🔨 Week 1 | **July 2 – Aug 2** | Build core features |
+| 🚀 Kickoff | **Augt 2** | Challenge begins |
+| 🔨 Week 1 | **Aug 2 – Aug 2** | Build core features |
 | ✨ Week 2 | **Aug 4 – Aug 14** | Polish, test, and record your demo |
 | 📦 Wrap Up | **Aug 15** | Finalize and submit early to avoid last-minute issues |
 | 🏆 Submission | **Aug 16** | Final deadline & project showcase |
@@ -75,7 +75,7 @@ Before submitting, make sure you have all of these:
 - [ ] ✅ Public GitHub repository forked from this repo
 - [ ] ✅ README with problem statement, Solution, features, screenshots, TechStack, Installation, Team members 
 - [ ] ✅ Demo video ( less than 2 minutes, uploaded to YouTube/Drive)
-- [ ] ✅ Repository topic `appsprint-2025` added (GitHub → About → Topics → add AppSprint 2026)
+- [ ] ✅ Repository topic `appsprint-2026` added (GitHub → About → Topics → add AppSprint 2026)
 - [ ] ✅ AppSprint badge in your README (copy from below)
 - [ ] ✅ Presentation (5–8 slides) uploaded to repo
 - [ ] ✅ README updated using README_TEMPLATE.md
