@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/any%20-06B6D4?style=for-the-badge&logo=flutter"/>
 </p>
 
-<h1 align="center">🏆 AppSprint Solution Challenge 2025</h1>
+<h1 align="center">🏆 AppSprint Solution Challenge 2026</h1>
 <p align="center">
   A 15-day virtual app development hackathon where you build a mobile application,<br/>
   solve a real problem, and ship a working APK.
@@ -30,8 +30,8 @@
 
 | | |
 |---|---|
-| 📅 Start Date | July 29, 2025 |
-| 🏁 Submission Deadline | August 12, 2025 at 11:59 PM |
+| 📅 Start Date | July 2, 2025 |
+| 🏁 Submission Deadline | August 16, 2025 at 11:59 PM |
 | 🎤 Project Expo | offline |
 | 👥 Team Size | 2–4 members (solo allowed) |
 | 🛠️ Recommended Framework | Flutter (Any mobile framework allowed) |
@@ -44,11 +44,11 @@
 
 | Phase | Duration | Goal |
 |-------|----------|------|
-| 🚀 Kickoff | **July 29** | Challenge begins |
-| 🔨 Week 1 | **July 29 – Aug 2** | Build core features |
-| ✨ Week 2 | **Aug 4 – Aug 10** | Polish, test, and record your demo |
-| 📦 Wrap Up | **Aug 11** | Finalize and submit early to avoid last-minute issues |
-| 🏆 Submission | **Aug 12** | Final deadline & project showcase |
+| 🚀 Kickoff | **July 2** | Challenge begins |
+| 🔨 Week 1 | **July 2 – Aug 2** | Build core features |
+| ✨ Week 2 | **Aug 4 – Aug 14** | Polish, test, and record your demo |
+| 📦 Wrap Up | **Aug 15** | Finalize and submit early to avoid last-minute issues |
+| 🏆 Submission | **Aug 16** | Final deadline & project showcase |
 
 
 ---
