@@ -11,8 +11,16 @@ pubspec.lock
 # If you don't generate documentation locally you can remove this line.
 doc/api/
 
-# dotenv environment variables file
-.env*
+# dotenv environment variables file — ignore real secrets, keep the template
+.env
+.env.*
+!.env.example
+
+# Android signing — never commit keystores or key credentials
+*.jks
+*.keystore
+key.properties
+android/app/upload-keystore.jks
 
 # Avoid committing generated Javascript files:
 *.dart.js
@@ -27,3 +35,11 @@ doc/api/
 
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# IDEs (IntelliJ / Android Studio / VS Code) — machine-local project files
+.idea/
+*.iml
+.vscode/
+
+# Stray local scratch files
+.write_test
