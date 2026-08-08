@@ -8,6 +8,7 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/signup_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/map/civic_map.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
 
@@ -20,6 +21,7 @@ abstract final class Routes {
   static const home = '/home';
   static const sensorWatch = '/sensorwatch';
   static const report = '/report';
+  static const map = '/map';
   static const admin = '/admin';
 }
 
@@ -83,6 +85,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.report,
         builder: (context, state) => const ReportFormScreen(),
+      ),
+      GoRoute(
+        path: Routes.map,
+        builder: (context, state) => const CivicMapScreen(),
       ),
       GoRoute(
         path: Routes.admin,

@@ -54,6 +54,9 @@ const double kDefaultZoom = 12;
 const String kOlaVectorStyleUrl =
     'https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json';
 
+/// Ola Maps API key (read from .env at runtime via dotenv).
+const String kOlaMapsApiKey = String.fromEnvironment('OLA_MAPS_API_KEY');
+
 /// OpenStreetMap raster fallback tile template.
 const String kOsmRasterTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 

@@ -60,12 +60,12 @@ class HomeScreen extends ConsumerWidget {
             onTap: () => context.push(Routes.report),
           ),
           const SizedBox(height: 12),
-          const _ModuleCard(
+          _ModuleCard(
             icon: Icons.map,
             color: NivaraColors.success,
             title: 'CivicMap',
             subtitle: 'Live map of reports and Lost & Found pins',
-            enabled: false,
+            onTap: () => context.push(Routes.map),
           ),
           const SizedBox(height: 12),
           const _ModuleCard(
