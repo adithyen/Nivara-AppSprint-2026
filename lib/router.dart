@@ -8,6 +8,7 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/signup_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
 
 /// App routes. Kept as plain string constants so redirects and navigation
@@ -18,6 +19,7 @@ abstract final class Routes {
   static const signup = '/signup';
   static const home = '/home';
   static const sensorWatch = '/sensorwatch';
+  static const report = '/report';
   static const admin = '/admin';
 }
 
@@ -77,6 +79,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.sensorWatch,
         builder: (context, state) => const SensorWatchScreen(),
+      ),
+      GoRoute(
+        path: Routes.report,
+        builder: (context, state) => const ReportFormScreen(),
       ),
       GoRoute(
         path: Routes.admin,

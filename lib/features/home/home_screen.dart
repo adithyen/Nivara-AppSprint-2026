@@ -52,12 +52,12 @@ class HomeScreen extends ConsumerWidget {
             onTap: () => context.push(Routes.sensorWatch),
           ),
           const SizedBox(height: 12),
-          const _ModuleCard(
+          _ModuleCard(
             icon: Icons.report,
             color: NivaraColors.accent,
             title: 'CivicReport',
             subtitle: 'File a complaint across 19 civic categories',
-            enabled: false,
+            onTap: () => context.push(Routes.report),
           ),
           const SizedBox(height: 12),
           const _ModuleCard(
