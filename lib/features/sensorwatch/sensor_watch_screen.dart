@@ -156,7 +156,7 @@ class _StatusPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 snap.monitoring
-                    ? (snap.warmingUp ? 'Calibrating baseline…' : 'Monitoring')
+                    ? (snap.warmingUp ? 'Warming up sensor…' : 'Monitoring — live')
                     : 'Idle',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
@@ -179,7 +179,7 @@ class _StatusPanel extends StatelessWidget {
               const SizedBox(width: 6),
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text('g above baseline',
+                child: Text('g impact force (live)',
                     style: Theme.of(context).textTheme.bodySmall),
               ),
             ],
@@ -197,7 +197,7 @@ class _StatusPanel extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _Stat(label: 'Baseline', value: '${snap.baselineG.toStringAsFixed(2)} g'),
+              _Stat(label: 'Peak', value: '${snap.peakG.toStringAsFixed(2)} g'),
               _Stat(label: 'Speed', value: '${snap.speedKmph.toStringAsFixed(0)} km/h'),
               _Stat(
                 label: 'GPS',
@@ -233,6 +233,26 @@ class _StatusPanel extends StatelessWidget {
                     minimumSize: const Size.fromHeight(52),
                   ),
                   label: const Text('Simulate impact'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline,
+                  size: 16, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Tip: shake the phone hard to test — any impact above '
+                  '${kDetectionThresholdG.toStringAsFixed(1)} g is captured '
+                  'automatically. In a vehicle it triggers on potholes and '
+                  'speed breakers on its own.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
                 ),
               ),
             ],
@@ -284,8 +304,9 @@ class _EmptyState extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              'Start monitoring and drive over rough road, or tap '
-              '"Simulate impact" to generate a tamper-proof evidence package.',
+              'Start monitoring, then shake the phone hard (or drive over '
+              'rough road) — or tap "Simulate impact" to generate a '
+              'tamper-proof evidence package.',
               textAlign: TextAlign.center,
               style: Theme.of(context)
                   .textTheme
@@ -481,9 +502,8 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
               const SizedBox(height: 16),
               _HashRow(hash: hash),
               const SizedBox(height: 8),
-              _kv('Impact', '${(_pkg.accelZPeak - _pkg.accelZBaseline).toStringAsFixed(2)} g above baseline'),
-              _kv('Peak / baseline',
-                  '${_pkg.accelZPeak.toStringAsFixed(2)} / ${_pkg.accelZBaseline.toStringAsFixed(2)} g'),
+              _kv('Impact', '${_pkg.accelZPeak.toStringAsFixed(2)} g'),
+              _kv('Noise floor', '${_pkg.accelZBaseline.toStringAsFixed(2)} g'),
               _kv('Location', '${_pkg.lat.toStringAsFixed(5)}, ${_pkg.lng.toStringAsFixed(5)}'),
               _kv('GPS accuracy', '±${_pkg.gpsAccuracy.toStringAsFixed(0)} m'),
               _kv('Speed', '${_pkg.speedKmph.toStringAsFixed(0)} km/h'),

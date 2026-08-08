@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -10,12 +9,11 @@ import 'package:sensors_plus/sensors_plus.dart';
 import '../../models/enums.dart';
 import '../../models/evidence_package.dart';
 import '../constants.dart';
-import '../utils.dart';
 import 'device_identity.dart';
 import 'evidence_engine.dart';
 import 'location_service.dart';
 
-/// m/s² — converts an acceleration magnitude to g (≈1.0 at rest).
+/// m/s² per g — converts a linear-acceleration magnitude to g.
 const double _gravity = 9.80665;
 
 /// One passive detection: a jolt past the threshold, already sealed into a
@@ -29,6 +27,8 @@ class SensorDetection {
   });
 
   final DetectionType type;
+
+  /// Jolt magnitude in g (linear acceleration; gravity already removed).
   final double gAboveBaseline;
   final EvidencePackage evidence;
   final DateTime at;
@@ -39,7 +39,7 @@ class SensorSnapshot {
   const SensorSnapshot({
     required this.monitoring,
     required this.currentG,
-    required this.baselineG,
+    required this.peakG,
     required this.speedKmph,
     required this.detectionCount,
     required this.hasFix,
@@ -47,22 +47,24 @@ class SensorSnapshot {
   });
 
   final bool monitoring;
+
+  /// Live jolt magnitude in g (≈0 at rest, spikes on impact).
   final double currentG;
-  final double baselineG;
+
+  /// Largest jolt seen since monitoring started, in g.
+  final double peakG;
   final double speedKmph;
   final int detectionCount;
   final bool hasFix;
   final bool warmingUp;
 
-  double get impactG {
-    final d = currentG - baselineG;
-    return d < 0 ? 0 : d;
-  }
+  /// The value the impact meter renders — the live jolt (never negative).
+  double get impactG => currentG < 0 ? 0 : currentG;
 
   factory SensorSnapshot.idle() => const SensorSnapshot(
         monitoring: false,
-        currentG: 1,
-        baselineG: 1,
+        currentG: 0,
+        peakG: 0,
         speedKmph: 0,
         detectionCount: 0,
         hasFix: false,
@@ -72,18 +74,20 @@ class SensorSnapshot {
 
 enum StartResult { started, startedWithoutLocation, alreadyRunning }
 
-/// Classifies a jolt (g above baseline) into a civic detection type. Pure, so
+/// Classifies a jolt (linear-accel g) into a civic detection type. Pure, so
 /// it's unit-testable without sensors.
-DetectionType classifyImpact(double gAboveBaseline) {
-  if (gAboveBaseline >= 4.5) return DetectionType.pothole;
-  if (gAboveBaseline >= 3.0) return DetectionType.speedBreaker;
-  return DetectionType.badRoad;
+DetectionType classifyImpact(double joltG) {
+  if (joltG >= 4.5) return DetectionType.pothole;
+  if (joltG >= 3.0) return DetectionType.speedBreaker;
+  return DetectionType.badRoad; // uneven / rough surface
 }
 
-/// Passive accelerometer engine. Holds a rolling g-force baseline and emits a
-/// sealed [SensorDetection] when a jolt clears [kDetectionThresholdG] above it
-/// — gated by [kMinSpeedKmh] and [kDebounceMeters] so phone handling and
-/// repeated samples over one pothole don't spam reports.
+/// Passive detection engine. Reads **linear acceleration** (gravity removed by
+/// the OS via [userAccelerometerEventStream]) so the phone reads ~0 g at rest
+/// and a jolt shows its true magnitude. A detection fires the instant a jolt
+/// clears [kDetectionThresholdG]; a [kDetectionCooldownMs] debounce stops one
+/// impact from producing a burst. Works stationary (desk shake) and while
+/// driving — there is no speed gate.
 class SensorWatchService {
   SensorWatchService({LocationService location = const LocationService()})
       // ignore: prefer_initializing_formals — public param name intentional for DI
@@ -97,25 +101,41 @@ class SensorWatchService {
   final _detections = StreamController<SensorDetection>.broadcast();
   Stream<SensorDetection> get detections => _detections.stream;
 
-  StreamSubscription<AccelerometerEvent>? _accelSub;
+  StreamSubscription<UserAccelerometerEvent>? _accelSub;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
   StreamSubscription<Position>? _posSub;
 
-  final Queue<double> _window = Queue<double>();
-  double _sum = 0;
-  double _baselineG = 1;
-  double _currentG = 1;
+  double _currentG = 0;
+  double _peakG = 0;
+  double _noiseFloorG = 0; // light EMA of the jolt magnitude (~0 at rest)
   double _gyroX = 0, _gyroY = 0, _gyroZ = 0;
   Position? _pos;
-  double? _lastLat, _lastLng;
   int _count = 0;
   bool _sealing = false;
   int _lastEmitMs = 0;
+  int _lastFireMs = 0;
+  int _startMs = 0;
 
   bool get isMonitoring => _accelSub != null;
 
+  /// Live GPS speed in km/h, deadbanded — sub-[kSpeedDeadbandKmh] jitter while
+  /// at rest reads as 0. (True inertial speed needs GPS; the accelerometer only
+  /// gives acceleration, and integrating it drifts badly, so we clean GPS here.)
+  double get _speedKmh {
+    if (_pos == null) return 0;
+    final s = LocationService.msToKmh(_pos!.speed);
+    return s < kSpeedDeadbandKmh ? 0 : s;
+  }
+
+  bool get _warmingUp =>
+      isMonitoring && DateTime.now().millisecondsSinceEpoch - _startMs < kSettleMs;
+
   Future<StartResult> start() async {
     if (isMonitoring) return StartResult.alreadyRunning;
+
+    _peakG = 0;
+    _noiseFloorG = 0;
+    _startMs = DateTime.now().millisecondsSinceEpoch;
 
     final perm = await _location.ensurePermission();
     final hasLocation = _location.isGranted(perm);
@@ -132,7 +152,8 @@ class SensorWatchService {
       _gyroY = e.y;
       _gyroZ = e.z;
     }, onError: (_) {});
-    _accelSub = accelerometerEventStream(samplingPeriod: period)
+    // Linear acceleration — gravity already removed, so rest ≈ 0 g.
+    _accelSub = userAccelerometerEventStream(samplingPeriod: period)
         .listen(_onAccel, onError: (_) {});
 
     _emit(force: true);
@@ -146,50 +167,40 @@ class SensorWatchService {
     _accelSub = null;
     _gyroSub = null;
     _posSub = null;
-    _window.clear();
-    _sum = 0;
+    _currentG = 0;
     _emit(force: true);
   }
 
-  void _onAccel(AccelerometerEvent e) {
+  void _onAccel(UserAccelerometerEvent e) {
+    // Magnitude of linear acceleration in g. At rest this is ~0.02 g (noise);
+    // a pothole or a hard shake spikes well past kDetectionThresholdG.
     final g = math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z) / _gravity;
     _currentG = g;
-
-    _window.addLast(g);
-    _sum += g;
-    if (_window.length > kBaselineSamples) _sum -= _window.removeFirst();
-    _baselineG = _sum / _window.length;
+    if (g > _peakG) _peakG = g;
+    // Slow EMA → a stable noise-floor estimate for the evidence package.
+    _noiseFloorG = _noiseFloorG == 0 ? g : _noiseFloorG * 0.98 + g * 0.02;
 
     _emit();
 
-    // Only trust a spike once the baseline window is full.
-    if (_window.length >= kBaselineSamples &&
-        g - _baselineG >= kDetectionThresholdG) {
-      _fire(g - _baselineG, synthetic: false);
-    }
+    if (_warmingUp) return; // skip the sensor spin-up transient
+    if (g < kDetectionThresholdG) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastFireMs < kDetectionCooldownMs) return; // debounce a burst
+    _fire(g, synthetic: false);
   }
 
-  /// Demo helper: fire a detection on demand, bypassing the speed/debounce
-  /// gates, so the evidence flow can be shown at a desk without driving.
-  Future<void> simulateImpact({double gAboveBaseline = 3.8}) =>
-      _fire(gAboveBaseline, synthetic: true);
+  /// Demo helper: fire a detection on demand (bypasses the settle + cooldown
+  /// gates) so the evidence flow can be shown at a desk without driving.
+  Future<void> simulateImpact({double joltG = 3.8}) =>
+      _fire(joltG, synthetic: true);
 
-  Future<void> _fire(double impact, {required bool synthetic}) async {
+  Future<void> _fire(double joltG, {required bool synthetic}) async {
     if (_sealing) return;
-    final speed = _pos != null ? LocationService.msToKmh(_pos!.speed) : 0.0;
-
-    if (!synthetic) {
-      if (speed < kMinSpeedKmh) return; // filter phone handling at rest
-      if (_lastLat != null && _pos != null) {
-        final moved = haversineMeters(
-            _lastLat!, _lastLng!, _pos!.latitude, _pos!.longitude);
-        if (moved < kDebounceMeters) return; // same pothole, already logged
-      }
-    }
-
     _sealing = true;
+    _lastFireMs = DateTime.now().millisecondsSinceEpoch;
     try {
-      final type = classifyImpact(impact);
+      final type = classifyImpact(joltG);
       final lat = _pos?.latitude ?? kDefaultLat;
       final lng = _pos?.longitude ?? kDefaultLng;
 
@@ -199,11 +210,11 @@ class SensorWatchService {
         lat: lat,
         lng: lng,
         gpsAccuracy: _pos?.accuracy ?? 0,
-        speedKmph: speed,
+        speedKmph: _speedKmh,
         heading: _pos?.heading ?? 0,
         altitude: _pos?.altitude ?? 0,
-        accelZPeak: _baselineG + impact,
-        accelZBaseline: _baselineG,
+        accelZPeak: joltG,
+        accelZBaseline: synthetic ? 0 : _noiseFloorG,
         gyroX: _gyroX,
         gyroY: _gyroY,
         gyroZ: _gyroZ,
@@ -212,11 +223,9 @@ class SensorWatchService {
       ));
 
       _count++;
-      _lastLat = lat;
-      _lastLng = lng;
       _detections.add(SensorDetection(
         type: type,
-        gAboveBaseline: impact,
+        gAboveBaseline: joltG,
         evidence: pkg,
         at: DateTime.now(),
       ));
@@ -232,15 +241,14 @@ class SensorWatchService {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (!force && now - _lastEmitMs < 90) return;
     _lastEmitMs = now;
-    final speed = _pos != null ? LocationService.msToKmh(_pos!.speed) : 0.0;
     snapshot.value = SensorSnapshot(
       monitoring: isMonitoring,
       currentG: _currentG,
-      baselineG: _baselineG,
-      speedKmph: speed,
+      peakG: _peakG,
+      speedKmph: _speedKmh,
       detectionCount: _count,
       hasFix: _pos != null,
-      warmingUp: isMonitoring && _window.length < kBaselineSamples,
+      warmingUp: _warmingUp,
     );
   }
 
