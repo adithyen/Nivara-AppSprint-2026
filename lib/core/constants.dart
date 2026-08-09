@@ -50,14 +50,23 @@ const double kDefaultLat = 8.5241;
 const double kDefaultLng = 76.9366;
 const double kDefaultZoom = 12;
 
-/// Ola Maps vector style. `?api_key=` is appended at runtime by the maps layer.
+/// Ola Maps vector style (custom "Style1-Dark" created in the Ola style
+/// editor). `?api_key=` is appended at runtime from `.env`.
+///
+/// NOTE: maplibre_gl 0.26.2 has no `transformRequest`, so the sprite/glyph/tile
+/// URLs *inside* Ola's returned style.json cannot be authenticated → the map
+/// renders black even when this top-level URL returns 200. We therefore render
+/// a self-contained dark raster base (below) and HTTP-probe this URL only to
+/// log Ola reachability. See lib/features/map/civic_map.dart.
 const String kOlaVectorStyleUrl =
-    'https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json';
+    'https://api.olamaps.io/tiles/vector/v1/styles/Style1-Dark/style.json';
 
-/// Ola Maps API key (read from .env at runtime via dotenv).
-const String kOlaMapsApiKey = String.fromEnvironment('OLA_MAPS_API_KEY');
+/// Dark raster base-map tiles (CARTO dark_all) — no API key, renders reliably.
+/// Matches the intended dark aesthetic of the Ola "Style1-Dark" style.
+const String kDarkRasterTileUrl =
+    'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
 
-/// OpenStreetMap raster fallback tile template.
+/// OpenStreetMap raster fallback tile template (light).
 const String kOsmRasterTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // ── Lost & Found matching ───────────────────────────────────────────────────
