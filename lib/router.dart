@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/admin/admin_dashboard.dart';
+import 'features/admin/admin_report_detail.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/signup_screen.dart';
@@ -16,6 +17,7 @@ import 'features/map/civic_map.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
 import 'models/lf_item.dart';
+import 'models/report.dart';
 
 /// App routes. Kept as plain string constants so redirects and navigation
 /// don't drift apart.
@@ -32,6 +34,7 @@ abstract final class Routes {
   static const reportFound = '/lostfound/found';
   static const lostFoundMatch = '/lostfound/match';
   static const admin = '/admin';
+  static const adminReportDetail = '/admin/report';
 }
 
 /// The single [GoRouter] instance, built with an auth/role redirect guard.
@@ -118,6 +121,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.admin,
         builder: (context, state) => const AdminDashboard(),
+      ),
+      GoRoute(
+        path: Routes.adminReportDetail,
+        builder: (context, state) =>
+            AdminReportDetailScreen(report: state.extra as Report),
       ),
     ],
   );

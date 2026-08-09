@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
+import 'admin_queue.dart';
 
-/// Municipal (admin) landing screen (stub). The real report queue —
-/// Acknowledged → In Progress → Resolved, gated by department — lands here next.
+/// Municipal (admin) home. Hosts the live report queue and carries the signed-in
+/// officer's identity + department in the bar. Role access is enforced by the
+/// router guard (citizens can't reach `/admin`) and, authoritatively, by RLS +
+/// the `admin_set_report_status` RPC on the server.
 class AdminDashboard extends ConsumerWidget {
   const AdminDashboard({super.key});
 
@@ -15,7 +18,24 @@ class AdminDashboard extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nivara Admin'),
+        titleSpacing: 16,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Nivara Admin'),
+            Text(
+              dept == null
+                  ? 'Municipal authority'
+                  : '$dept · ${profile?.displayName ?? 'Officer'}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Sign out',
@@ -25,35 +45,7 @@ class AdminDashboard extends ConsumerWidget {
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.shield_outlined, size: 48),
-              const SizedBox(height: 12),
-              Text(
-                profile?.displayName ?? 'Administrator',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                dept == null ? 'Municipal authority' : '$dept department',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: Theme.of(context).colorScheme.outline),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'The report queue and resolution tools are coming next.',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
+      body: const SafeArea(child: AdminQueue()),
     );
   }
 }
