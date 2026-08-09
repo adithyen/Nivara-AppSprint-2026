@@ -11,6 +11,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../core/constants.dart';
 import '../../core/services/debug_logger.dart';
+import '../../core/services/location_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../models/enums.dart';
@@ -51,6 +52,8 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   bool _mapReady = false;
   bool _imagesReady = false;
   bool _showLog = false;
+  bool _locating = false;
+  final _loc = const LocationService();
 
   // Pin image name → fill colour. Registered once after the style loads.
   static const _grey = Color(0xFF95A5A6);
@@ -207,6 +210,8 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     await _registerPinImages(c);
     _mapReady = true;
     await _rebuildSymbols();
+    // Prompt for location on open and snap to the user if they allow it.
+    unawaited(_goToMyLocation(initial: true));
     // Fire-and-forget: probe Ola so the log records what it actually returns.
     unawaited(_probeOla());
   }
@@ -252,15 +257,50 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     }
   }
 
-  void _moveToDefault() {
-    _controller?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: LatLng(kDefaultLat, kDefaultLng),
-          zoom: kDefaultZoom,
+  /// Center the camera on the user's real GPS position at street zoom.
+  ///
+  /// [initial] runs it silently on first style load: it prompts for permission
+  /// (so the dialog appears when the map opens) and, if granted, snaps to the
+  /// user — but stays quiet on failure so the district default remains visible.
+  /// Tapping the recenter FAB calls it with [initial] false, surfacing a
+  /// snackbar when there's no permission / no fix.
+  Future<void> _goToMyLocation({bool initial = false}) async {
+    if (_locating) return;
+    if (mounted) setState(() => _locating = true);
+    try {
+      final perm = await _loc.ensurePermission();
+      if (!_loc.isGranted(perm)) {
+        _log.log('MAP', 'my-location: permission not granted ($perm)');
+        if (!initial) _snack('Location permission needed to center on you');
+        return;
+      }
+      final pos = await _loc.current();
+      if (pos == null) {
+        _log.log('MAP', 'my-location: no GPS fix');
+        if (!initial) _snack('Could not get your location — is GPS on?');
+        return;
+      }
+      _log.log(
+          'MAP',
+          'my-location → ${pos.latitude.toStringAsFixed(5)}, '
+              '${pos.longitude.toStringAsFixed(5)} @ zoom 16.5');
+      await _controller?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(pos.latitude, pos.longitude),
+            zoom: 16.5,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _showReportSheet(Report r) => showModalBottomSheet(
@@ -325,9 +365,16 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
             right: 16,
             child: FloatingActionButton.small(
               heroTag: 'recenter',
-              onPressed: _moveToDefault,
+              onPressed: _locating ? null : () => _goToMyLocation(),
               backgroundColor: NivaraColors.primary,
-              child: const Icon(Icons.my_location, color: Colors.white),
+              child: _locating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.my_location, color: Colors.white),
             ),
           ),
 
