@@ -8,9 +8,14 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/signup_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/lostfound/lostfound_hub.dart';
+import 'features/lostfound/match_screen.dart';
+import 'features/lostfound/report_found_screen.dart';
+import 'features/lostfound/report_lost_screen.dart';
 import 'features/map/civic_map.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
+import 'models/lf_item.dart';
 
 /// App routes. Kept as plain string constants so redirects and navigation
 /// don't drift apart.
@@ -22,6 +27,10 @@ abstract final class Routes {
   static const sensorWatch = '/sensorwatch';
   static const report = '/report';
   static const map = '/map';
+  static const lostFound = '/lostfound';
+  static const reportLost = '/lostfound/lost';
+  static const reportFound = '/lostfound/found';
+  static const lostFoundMatch = '/lostfound/match';
   static const admin = '/admin';
 }
 
@@ -89,6 +98,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.map,
         builder: (context, state) => const CivicMapScreen(),
+      ),
+      GoRoute(
+        path: Routes.lostFound,
+        builder: (context, state) => const LostFoundHub(),
+      ),
+      GoRoute(
+        path: Routes.reportLost,
+        builder: (context, state) => const ReportLostScreen(),
+      ),
+      GoRoute(
+        path: Routes.reportFound,
+        builder: (context, state) => const ReportFoundScreen(),
+      ),
+      GoRoute(
+        path: Routes.lostFoundMatch,
+        builder: (context, state) => MatchScreen(item: state.extra as LFItem),
       ),
       GoRoute(
         path: Routes.admin,

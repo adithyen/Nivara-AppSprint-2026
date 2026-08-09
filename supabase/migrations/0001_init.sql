@@ -530,6 +530,9 @@ DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE confirmations;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE lf_items;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE lf_matches;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 

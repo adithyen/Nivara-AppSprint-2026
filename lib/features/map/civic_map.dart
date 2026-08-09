@@ -58,18 +58,19 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   // Pin image name → fill colour. Registered once after the style loads.
   static const _grey = Color(0xFF95A5A6);
   Map<String, Color> get _pinPalette => {
-        'pin-submitted': NivaraColors.accent,
-        'pin-inprogress': NivaraColors.primary,
-        'pin-resolved': NivaraColors.success,
-        'pin-default': _grey,
-        'pin-lost': NivaraColors.danger,
-        'pin-found': NivaraColors.success,
-      };
+    'pin-submitted': NivaraColors.accent,
+    'pin-inprogress': NivaraColors.primary,
+    'pin-resolved': NivaraColors.success,
+    'pin-default': _grey,
+    'pin-lost': NivaraColors.danger,
+    'pin-found': NivaraColors.success,
+  };
 
   @override
   void initState() {
     super.initState();
     _log.log('MAP', 'CivicMapScreen initState');
+    _seedFromRest();
     _subscribeRealtime();
   }
 
@@ -81,25 +82,70 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     super.dispose();
   }
 
+  // ── One-time REST seed ────────────────────────────────────────────────────
+  /// Fetch current reports + lf_items once via REST so pins paint even when
+  /// Realtime is disabled for a table (the logger showed lf_items Realtime was
+  /// off). The streams below then keep things live if/when they connect.
+  Future<void> _seedFromRest() async {
+    try {
+      final rows = await supabase.from(kTableReports).select();
+      for (final r in rows) {
+        try {
+          _reports[r['id'] as String] = Report.fromMap(r);
+        } catch (_) {
+          /* skip */
+        }
+      }
+    } catch (e) {
+      _log.error('MAP', 'reports seed failed: $e');
+    }
+    try {
+      final rows = await supabase
+          .from(kTableLfItems)
+          .select()
+          .eq('status', 'ACTIVE');
+      for (final r in rows) {
+        try {
+          _lfItems[r['id'] as String] = LFItem.fromMap(r);
+        } catch (_) {
+          /* skip */
+        }
+      }
+    } catch (e) {
+      _log.error('MAP', 'lf_items seed failed: $e');
+    }
+    _log.log(
+      'MAP',
+      'REST seed: ${_reports.length} reports, '
+          '${_lfItems.length} lf items',
+    );
+    if (_mapReady && _imagesReady) _rebuildSymbols();
+  }
+
   // ── Realtime data ───────────────────────────────────────────────────────
   void _subscribeRealtime() {
     _reportsSub = supabase
         .from(kTableReports)
-        .stream(primaryKey: ['id']).listen((rows) {
-      for (final r in rows) {
-        try {
-          _reports[r['id'] as String] = Report.fromMap(r);
-        } catch (e) {
-          _log.error('MAP', 'Report.fromMap failed: $e');
-        }
-      }
-      _log.log('MAP', 'reports stream: ${rows.length} row(s), '
-          '${_reports.length} total');
-      if (_mapReady && _imagesReady) _rebuildSymbols();
-    }, onError: (e) => _log.error('MAP', 'reports stream error: $e'));
+        .stream(primaryKey: ['id'])
+        .listen((rows) {
+          for (final r in rows) {
+            try {
+              _reports[r['id'] as String] = Report.fromMap(r);
+            } catch (e) {
+              _log.error('MAP', 'Report.fromMap failed: $e');
+            }
+          }
+          _log.log(
+            'MAP',
+            'reports stream: ${rows.length} row(s), '
+                '${_reports.length} total',
+          );
+          if (_mapReady && _imagesReady) _rebuildSymbols();
+        }, onError: (e) => _log.error('MAP', 'reports stream error: $e'));
 
-    _lfSub =
-        supabase.from(kTableLfItems).stream(primaryKey: ['id']).listen((rows) {
+    _lfSub = supabase.from(kTableLfItems).stream(primaryKey: ['id']).listen((
+      rows,
+    ) {
       for (final r in rows) {
         try {
           _lfItems[r['id'] as String] = LFItem.fromMap(r);
@@ -107,8 +153,11 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
           _log.error('MAP', 'LFItem.fromMap failed: $e');
         }
       }
-      _log.log('MAP', 'lf_items stream: ${rows.length} row(s), '
-          '${_lfItems.length} total');
+      _log.log(
+        'MAP',
+        'lf_items stream: ${rows.length} row(s), '
+            '${_lfItems.length} total',
+      );
       if (_mapReady && _imagesReady) _rebuildSymbols();
     }, onError: (e) => _log.error('MAP', 'lf_items stream error: $e'));
   }
@@ -129,27 +178,30 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
       final sym = await c.addSymbol(_lfSymbolOptions(l));
       _symbolIds['lf_${l.id}'] = sym.id;
     }
-    _log.log('MAP', 'symbols rebuilt: ${_reports.length} reports + '
-        '${_lfItems.length} lf = ${_symbolIds.length} pins');
+    _log.log(
+      'MAP',
+      'symbols rebuilt: ${_reports.length} reports + '
+          '${_lfItems.length} lf = ${_symbolIds.length} pins',
+    );
   }
 
   SymbolOptions _reportSymbolOptions(Report r) => SymbolOptions(
-        geometry: LatLng(r.lat, r.lng),
-        iconImage: _reportPinName(r),
-        iconSize: 0.7,
-        iconAnchor: 'center',
-        draggable: false,
-        zIndex: 10,
-      );
+    geometry: LatLng(r.lat, r.lng),
+    iconImage: _reportPinName(r),
+    iconSize: 0.7,
+    iconAnchor: 'center',
+    draggable: false,
+    zIndex: 10,
+  );
 
   SymbolOptions _lfSymbolOptions(LFItem l) => SymbolOptions(
-        geometry: LatLng(l.lat, l.lng),
-        iconImage: l.itemType == LFItemType.lost ? 'pin-lost' : 'pin-found',
-        iconSize: 0.7,
-        iconAnchor: 'center',
-        draggable: false,
-        zIndex: 10,
-      );
+    geometry: LatLng(l.lat, l.lng),
+    iconImage: l.itemType == LFItemType.lost ? 'pin-lost' : 'pin-found',
+    iconSize: 0.7,
+    iconAnchor: 'center',
+    draggable: false,
+    zIndex: 10,
+  );
 
   String _reportPinName(Report r) {
     switch (r.status) {
@@ -185,12 +237,26 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     final canvas = Canvas(recorder);
     const center = Offset(s / 2, s / 2);
     canvas.drawCircle(
-        center, 30, Paint()..color = Colors.white.withValues(alpha: 0.95)
-          ..isAntiAlias = true);
+      center,
+      30,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.95)
+        ..isAntiAlias = true,
+    );
     canvas.drawCircle(
-        center, 26, Paint()..color = color..isAntiAlias = true);
+      center,
+      26,
+      Paint()
+        ..color = color
+        ..isAntiAlias = true,
+    );
     canvas.drawCircle(
-        center, 8.5, Paint()..color = Colors.white..isAntiAlias = true);
+      center,
+      8.5,
+      Paint()
+        ..color = Colors.white
+        ..isAntiAlias = true,
+    );
     final img = await recorder.endRecording().toImage(s.toInt(), s.toInt());
     final data = await img.toByteData(format: ui.ImageByteFormat.png);
     return data!.buffer.asUint8List();
@@ -224,13 +290,17 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
       final resp = await http
           .get(Uri.parse(url))
           .timeout(const Duration(seconds: 10));
-      _log.log('OLA',
-          'style.json → HTTP ${resp.statusCode} (${resp.bodyBytes.length} B)');
+      _log.log(
+        'OLA',
+        'style.json → HTTP ${resp.statusCode} (${resp.bodyBytes.length} B)',
+      );
       if (resp.statusCode == 200) {
-        _log.log('OLA',
-            'Ola reachable, but maplibre_gl 0.26.2 has no transformRequest → '
-            'its sprite/glyph/tile sub-requests cannot be keyed. Using dark '
-            'raster base instead (this is why Ola vector rendered black).');
+        _log.log(
+          'OLA',
+          'Ola reachable, but maplibre_gl 0.26.2 has no transformRequest → '
+              'its sprite/glyph/tile sub-requests cannot be keyed. Using dark '
+              'raster base instead (this is why Ola vector rendered black).',
+        );
       } else {
         final head = resp.body.length > 180
             ? resp.body.substring(0, 180)
@@ -244,8 +314,10 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
 
   void _onSymbolTapped(Symbol symbol) {
     final itemId = _symbolIds.entries
-        .firstWhere((e) => e.value == symbol.id,
-            orElse: () => const MapEntry('', ''))
+        .firstWhere(
+          (e) => e.value == symbol.id,
+          orElse: () => const MapEntry('', ''),
+        )
         .key;
     if (itemId.isEmpty) return;
     if (itemId.startsWith('lf_')) {
@@ -281,9 +353,10 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
         return;
       }
       _log.log(
-          'MAP',
-          'my-location → ${pos.latitude.toStringAsFixed(5)}, '
-              '${pos.longitude.toStringAsFixed(5)} @ zoom 16.5');
+        'MAP',
+        'my-location → ${pos.latitude.toStringAsFixed(5)}, '
+            '${pos.longitude.toStringAsFixed(5)} @ zoom 16.5',
+      );
       await _controller?.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
@@ -299,44 +372,43 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _showReportSheet(Report r) => showModalBottomSheet(
-        context: context,
-        showDragHandle: true,
-        isScrollControlled: true,
-        builder: (_) => _ReportBottomSheet(report: r),
-      );
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (_) => _ReportBottomSheet(report: r),
+  );
 
   void _showLfSheet(LFItem l) => showModalBottomSheet(
-        context: context,
-        showDragHandle: true,
-        builder: (_) => _LfBottomSheet(item: l),
-      );
+    context: context,
+    showDragHandle: true,
+    builder: (_) => _LfBottomSheet(item: l),
+  );
 
   /// Self-contained dark raster style — no API key, renders reliably.
   String _darkStyleJson() => jsonEncode({
-        'version': 8,
-        'name': 'nivara-dark',
-        'sources': {
-          'dark': {
-            'type': 'raster',
-            'tiles': [kDarkRasterTileUrl],
-            'tileSize': 256,
-            'attribution': '© OpenStreetMap © CARTO',
-          },
-        },
-        'layers': [
-          {
-            'id': 'bg',
-            'type': 'background',
-            'paint': {'background-color': '#0b0f14'},
-          },
-          {'id': 'dark', 'type': 'raster', 'source': 'dark'},
-        ],
-      });
+    'version': 8,
+    'name': 'nivara-dark',
+    'sources': {
+      'dark': {
+        'type': 'raster',
+        'tiles': [kDarkRasterTileUrl],
+        'tileSize': 256,
+        'attribution': '© OpenStreetMap © CARTO',
+      },
+    },
+    'layers': [
+      {
+        'id': 'bg',
+        'type': 'background',
+        'paint': {'background-color': '#0b0f14'},
+      },
+      {'id': 'dark', 'type': 'raster', 'source': 'dark'},
+    ],
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -372,7 +444,9 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.my_location, color: Colors.white),
             ),
@@ -386,8 +460,10 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
               heroTag: 'debuglog',
               backgroundColor: Colors.black87,
               onPressed: () => setState(() => _showLog = !_showLog),
-              child: Icon(_showLog ? Icons.close : Icons.bug_report,
-                  color: Colors.white),
+              child: Icon(
+                _showLog ? Icons.close : Icons.bug_report,
+                color: Colors.white,
+              ),
             ),
           ),
 
@@ -418,17 +494,23 @@ class _LogOverlay extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Debug log',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13)),
+              const Text(
+                'Debug log',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text('file: ${DebugLogger.instance.resolvedPath}',
-                  style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 10,
-                      fontFamily: 'monospace')),
+              Text(
+                'file: ${DebugLogger.instance.resolvedPath}',
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                ),
+              ),
               const Divider(color: Colors.white24, height: 12),
               Expanded(
                 child: ValueListenableBuilder<int>(
@@ -443,13 +525,16 @@ class _LogOverlay extends StatelessWidget {
                         final isErr = line.contains('ERROR');
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 1),
-                          child: Text(line,
-                              style: TextStyle(
-                                  color: isErr
-                                      ? const Color(0xFFFF8A80)
-                                      : Colors.white70,
-                                  fontSize: 10.5,
-                                  fontFamily: 'monospace')),
+                          child: Text(
+                            line,
+                            style: TextStyle(
+                              color: isErr
+                                  ? const Color(0xFFFF8A80)
+                                  : Colors.white70,
+                              fontSize: 10.5,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
                         );
                       },
                     );
@@ -489,8 +574,8 @@ class _ReportBottomSheet extends StatelessWidget {
                 child: Text(
                   report.category.label,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               _StatusChip(status: report.status),
@@ -498,35 +583,51 @@ class _ReportBottomSheet extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (report.title != null) ...[
-            Text(report.title!,
-                style: Theme.of(context).textTheme.bodyLarge
-                    ?.copyWith(fontWeight: FontWeight.w600)),
+            Text(
+              report.title!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 4),
           ],
-          Text(report.description ?? '',
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant)),
+          Text(
+            report.description ?? '',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.location_on_outlined,
-                  size: 16, color: scheme.onSurfaceVariant),
+              Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
               Text(
                 '${report.lat.toStringAsFixed(4)}, ${report.lng.toStringAsFixed(4)}',
-                style: Theme.of(context).textTheme.bodySmall),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ),
           if (report.address != null) ...[
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.place_outlined,
-                    size: 16, color: scheme.onSurfaceVariant),
+                Icon(
+                  Icons.place_outlined,
+                  size: 16,
+                  color: scheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(report.address!,
-                      style: Theme.of(context).textTheme.bodySmall)),
+                  child: Text(
+                    report.address!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               ],
             ),
           ],
@@ -536,14 +637,14 @@ class _ReportBottomSheet extends StatelessWidget {
               _InfoPill(icon: Icons.flag_outlined, text: report.severity.label),
               const SizedBox(width: 8),
               _InfoPill(
-                  icon: report.source == 'SENSORWATCH'
-                      ? Icons.radar
-                      : Icons.edit,
-                  text: report.source),
+                icon: report.source == 'SENSORWATCH' ? Icons.radar : Icons.edit,
+                text: report.source,
+              ),
               const SizedBox(width: 8),
               _InfoPill(
-                  icon: Icons.verified_user_outlined,
-                  text: report.isCommunityVerified ? 'Verified' : 'Unverified'),
+                icon: Icons.verified_user_outlined,
+                text: report.isCommunityVerified ? 'Verified' : 'Unverified',
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -590,8 +691,8 @@ class _LfBottomSheet extends StatelessWidget {
                 child: Text(
                   item.title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               Chip(
@@ -600,44 +701,59 @@ class _LfBottomSheet extends StatelessWidget {
                     (isLost ? NivaraColors.danger : NivaraColors.success)
                         .withValues(alpha: 0.15),
                 labelStyle: TextStyle(
-                    color: isLost ? NivaraColors.danger : NivaraColors.success,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11),
+                  color: isLost ? NivaraColors.danger : NivaraColors.success,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(item.description,
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant)),
+          Text(
+            item.description,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.category_outlined,
-                  size: 16, color: scheme.onSurfaceVariant),
+              Icon(
+                Icons.category_outlined,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
-              Text(item.category.label,
-                  style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                item.category.label,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(width: 16),
-              Icon(Icons.contact_phone_outlined,
-                  size: 16, color: scheme.onSurfaceVariant),
+              Icon(
+                Icons.contact_phone_outlined,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
-              Text(item.contactMethod,
-                  style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                item.contactMethod,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ),
           if (item.rewardAmount != null && item.rewardAmount! > 0) ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.card_giftcard,
-                    size: 16, color: NivaraColors.accent),
+                Icon(Icons.card_giftcard, size: 16, color: NivaraColors.accent),
                 const SizedBox(width: 4),
-                Text('Reward: ₹${item.rewardAmount}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: NivaraColors.accent,
-                          fontWeight: FontWeight.w600,
-                        )),
+                Text(
+                  'Reward: ₹${item.rewardAmount}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: NivaraColors.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ],
@@ -673,9 +789,14 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _colors[status] ?? NivaraColors.primary;
     return Chip(
-      label: Text(status.label,
-          style: TextStyle(
-              color: color, fontWeight: FontWeight.w600, fontSize: 11)),
+      label: Text(
+        status.label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
       backgroundColor: color.withValues(alpha: 0.15),
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
@@ -702,10 +823,12 @@ class _InfoPill extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: scheme.onSurfaceVariant),
           const SizedBox(width: 4),
-          Text(text,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  )),
+          Text(
+            text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
         ],
       ),
     );

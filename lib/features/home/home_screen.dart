@@ -38,10 +38,9 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             kAppTagline,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Theme.of(context).colorScheme.outline),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
           const SizedBox(height: 20),
           _ModuleCard(
@@ -68,12 +67,12 @@ class HomeScreen extends ConsumerWidget {
             onTap: () => context.push(Routes.map),
           ),
           const SizedBox(height: 12),
-          const _ModuleCard(
+          _ModuleCard(
             icon: Icons.travel_explore,
             color: NivaraColors.danger,
             title: 'Lost & Found',
             subtitle: 'Report lost or found items, auto-matched nearby',
-            enabled: false,
+            onTap: () => context.push(Routes.lostFound),
           ),
         ],
       ),
@@ -81,8 +80,7 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// A tappable module entry on the citizen home. `enabled: false` renders a
-/// dimmed "coming soon" card for modules not built yet.
+/// A tappable module entry on the citizen home.
 class _ModuleCard extends StatelessWidget {
   const _ModuleCard({
     required this.icon,
@@ -90,7 +88,6 @@ class _ModuleCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.onTap,
-    this.enabled = true,
   });
 
   final IconData icon;
@@ -98,32 +95,21 @@ class _ModuleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: CircleAvatar(
-            backgroundColor: color.withValues(alpha: 0.15),
-            child: Icon(icon, color: color),
-          ),
-          title: Text(title,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: Text(subtitle),
-          trailing: enabled
-              ? const Icon(Icons.chevron_right)
-              : const Chip(
-                  label: Text('Soon'),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                ),
-          onTap: enabled ? onTap : null,
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.15),
+          child: Icon(icon, color: color),
         ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
       ),
     );
   }
