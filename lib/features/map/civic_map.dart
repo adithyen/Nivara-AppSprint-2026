@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -17,6 +18,7 @@ import '../../core/theme.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../../models/report.dart';
+import '../../router.dart';
 import '../../features/report/category_grid.dart';
 
 /// Live civic map.
@@ -650,10 +652,13 @@ class _ReportBottomSheet extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.directions),
-              label: const Text('Navigate'),
-              onPressed: () => Navigator.pop(context),
+            child: FilledButton.icon(
+              icon: const Icon(Icons.open_in_full),
+              label: const Text('View full report'),
+              onPressed: () {
+                Navigator.pop(context);
+                context.push(Routes.reportDetail, extra: report);
+              },
             ),
           ),
         ],

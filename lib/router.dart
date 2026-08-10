@@ -15,6 +15,7 @@ import 'features/lostfound/match_screen.dart';
 import 'features/lostfound/report_found_screen.dart';
 import 'features/lostfound/report_lost_screen.dart';
 import 'features/map/civic_map.dart';
+import 'features/report/report_detail_screen.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
 import 'models/lf_item.dart';
@@ -29,6 +30,7 @@ abstract final class Routes {
   static const home = '/home';
   static const sensorWatch = '/sensorwatch';
   static const report = '/report';
+  static const reportDetail = '/report/detail';
   static const map = '/map';
   static const lostFound = '/lostfound';
   static const reportLost = '/lostfound/lost';
@@ -99,6 +101,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.report,
         builder: (context, state) => const ReportFormScreen(),
+      ),
+      GoRoute(
+        path: Routes.reportDetail,
+        builder: (context, state) =>
+            ReportDetailScreen(report: state.extra as Report),
       ),
       GoRoute(
         path: Routes.map,
