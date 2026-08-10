@@ -14,8 +14,9 @@ import '../report/category_grid.dart';
 import 'status_style.dart';
 
 /// The municipal report queue. Fetches `reports` once (so it populates even if
-/// Realtime is off), then subscribes for live updates. Filter by status;
-/// tapping a report opens the detail screen where staff advance its status.
+/// Realtime is off), then subscribes for live updates. A single row of metric
+/// pills doubles as the live counts *and* the filter — tapping one narrows the
+/// list. Tapping a report opens the detail screen where staff advance status.
 class AdminQueue extends StatefulWidget {
   const AdminQueue({super.key});
 
@@ -23,14 +24,12 @@ class AdminQueue extends StatefulWidget {
   State<AdminQueue> createState() => _AdminQueueState();
 }
 
-/// null = "Open" (everything still needing attention); otherwise an exact status.
 class _AdminQueueState extends State<AdminQueue> {
   final _reports = <String, Report>{};
   StreamSubscription? _sub;
   bool _loaded = false;
   String? _error;
-  ReportStatus? _statusFilter; // null → open bucket
-  bool _allStatuses = false; // "All" chip overrides the open bucket
+  String _filterKey = 'open'; // key into _kQueueFilters; 'open' is the default
 
   @override
   void initState() {
@@ -103,14 +102,13 @@ class _AdminQueueState extends State<AdminQueue> {
         );
   }
 
-  List<Report> get _visible {
-    bool match(Report r) {
-      if (_allStatuses) return true;
-      if (_statusFilter != null) return r.status == _statusFilter;
-      return r.isOpen; // default "Open" bucket
-    }
+  _QueueFilter get _selectedFilter => _kQueueFilters.firstWhere(
+    (f) => f.key == _filterKey,
+    orElse: () => _kQueueFilters.first,
+  );
 
-    final list = _reports.values.where(match).toList()
+  List<Report> get _visible {
+    final list = _reports.values.where(_selectedFilter.test).toList()
       ..sort((a, b) {
         // Emergencies bubble up, then most recent first.
         final byEmergency = _emergencyRank(b).compareTo(_emergencyRank(a));
@@ -138,14 +136,10 @@ class _AdminQueueState extends State<AdminQueue> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _StatsStrip(reports: _reports.values),
-        _FilterBar(
-          allStatuses: _allStatuses,
-          statusFilter: _statusFilter,
-          onSelect: (all, status) => setState(() {
-            _allStatuses = all;
-            _statusFilter = status;
-          }),
+        _MetricFilterBar(
+          reports: _reports.values,
+          selectedKey: _filterKey,
+          onSelect: (k) => setState(() => _filterKey = k),
         ),
         const SizedBox(height: 4),
         Expanded(child: _buildList()),
@@ -166,14 +160,13 @@ class _AdminQueueState extends State<AdminQueue> {
     }
     final items = _visible;
     if (items.isEmpty) {
+      final isOpenDefault = _filterKey == 'open';
       return _Empty(
         icon: Icons.inbox,
-        title: _allStatuses || _statusFilter != null
-            ? 'Nothing in this view'
-            : 'Queue is clear',
-        subtitle: _allStatuses || _statusFilter != null
-            ? 'No reports match this filter yet.'
-            : 'No open reports right now. New citizen reports appear here live.',
+        title: isOpenDefault ? 'Queue is clear' : 'Nothing in this view',
+        subtitle: isOpenDefault
+            ? 'No open reports right now. New citizen reports appear here live.'
+            : 'No reports match this filter yet.',
       );
     }
     return RefreshIndicator(
@@ -189,124 +182,142 @@ class _AdminQueueState extends State<AdminQueue> {
   }
 }
 
-class _StatsStrip extends StatelessWidget {
-  const _StatsStrip({required this.reports});
+/// One filter option: a label, an accent colour, and the predicate that both
+/// counts matching reports (the pill's number) and narrows the list when
+/// selected. Order defines the pill row, left to right.
+class _QueueFilter {
+  const _QueueFilter(this.key, this.label, this.color, this.test);
+  final String key;
+  final String label;
+  final Color color;
+  final bool Function(Report) test;
+}
+
+final List<_QueueFilter> _kQueueFilters = [
+  _QueueFilter('open', 'Open', NivaraColors.accent, (r) => r.isOpen),
+  _QueueFilter(
+    'new',
+    'New',
+    NivaraColors.accent,
+    (r) => r.status == ReportStatus.submitted,
+  ),
+  _QueueFilter(
+    'ack',
+    'Acknowledged',
+    NivaraColors.primary,
+    (r) => r.status == ReportStatus.acknowledged,
+  ),
+  _QueueFilter(
+    'progress',
+    'In progress',
+    NivaraColors.primary,
+    (r) => r.status == ReportStatus.inProgress,
+  ),
+  _QueueFilter(
+    'resolved',
+    'Resolved',
+    NivaraColors.success,
+    (r) => r.status == ReportStatus.resolved,
+  ),
+  _QueueFilter(
+    'emergency',
+    'Emergency',
+    NivaraColors.danger,
+    (r) => r.severity == Severity.emergency && r.isOpen,
+  ),
+  _QueueFilter('all', 'All', Colors.blueGrey, (_) => true),
+];
+
+/// The one control at the top of the queue: live counts that are *also* the
+/// filter. Each pill shows how many reports match and, when tapped, filters the
+/// list to them. This replaces the old split of a (non-interactive) stats strip
+/// above a separate chip row with the same labels.
+class _MetricFilterBar extends StatelessWidget {
+  const _MetricFilterBar({
+    required this.reports,
+    required this.selectedKey,
+    required this.onSelect,
+  });
+
   final Iterable<Report> reports;
+  final String selectedKey;
+  final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
-    var open = 0, progress = 0, resolved = 0, emergency = 0;
-    for (final r in reports) {
-      if (r.isOpen) open++;
-      if (r.status == ReportStatus.inProgress) progress++;
-      if (r.status == ReportStatus.resolved) resolved++;
-      if (r.severity == Severity.emergency && r.isOpen) emergency++;
-    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          _Stat(label: 'Open', value: open, color: NivaraColors.accent),
-          _Stat(
-            label: 'In progress',
-            value: progress,
-            color: NivaraColors.primary,
-          ),
-          _Stat(
-            label: 'Resolved',
-            value: resolved,
-            color: NivaraColors.success,
-          ),
-          _Stat(
-            label: 'Emergency',
-            value: emergency,
-            color: NivaraColors.danger,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value, required this.color});
-  final String label;
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$value',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
+          for (final f in _kQueueFilters)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: _MetricPill(
+                label: f.label,
+                count: reports.where(f.test).length,
+                color: f.color,
+                selected: f.key == selectedKey,
+                onTap: () => onSelect(f.key),
+              ),
             ),
-          ),
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-          ),
         ],
       ),
     );
   }
 }
 
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
-    required this.allStatuses,
-    required this.statusFilter,
-    required this.onSelect,
+class _MetricPill extends StatelessWidget {
+  const _MetricPill({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.selected,
+    required this.onTap,
   });
 
-  final bool allStatuses;
-  final ReportStatus? statusFilter;
-  final void Function(bool allStatuses, ReportStatus? status) onSelect;
+  final String label;
+  final int count;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    Widget chip(String label, {bool all = false, ReportStatus? status}) {
-      final selected = all
-          ? allStatuses
-          : (!allStatuses && statusFilter == status);
-      return Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: ChoiceChip(
-          label: Text(label),
-          selected: selected,
-          visualDensity: VisualDensity.compact,
-          onSelected: (_) => onSelect(all, status),
+    final bg = selected ? color : color.withValues(alpha: 0.12);
+    final fg = selected ? Colors.white : color;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 76),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          chip('Open'), // all=false, status=null
-          chip('Submitted', status: ReportStatus.submitted),
-          chip('Acknowledged', status: ReportStatus.acknowledged),
-          chip('In Progress', status: ReportStatus.inProgress),
-          chip('Resolved', status: ReportStatus.resolved),
-          chip('All', all: true),
-        ],
       ),
     );
   }

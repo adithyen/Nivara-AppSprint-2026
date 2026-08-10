@@ -115,10 +115,15 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     for (var i = 0; i < _photos.length; i++) {
       final bytes = await _photos[i].readAsBytes();
       final path = '$uid/${stamp}_$i.jpg';
-      await supabase.storage.from(kBucketPhotos).uploadBinary(
+      await supabase.storage
+          .from(kBucketPhotos)
+          .uploadBinary(
             path,
             bytes,
-            fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
           );
       urls.add(supabase.storage.from(kBucketPhotos).getPublicUrl(path));
     }
@@ -160,7 +165,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       description: _descCtrl.text.trim(),
       lat: _pos?.latitude ?? kDefaultLat,
       lng: _pos?.longitude ?? kDefaultLng,
-      address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+      address: _addressCtrl.text.trim().isEmpty
+          ? null
+          : _addressCtrl.text.trim(),
       source: 'MANUAL',
       photoUrls: photoUrls,
       createdAt: DateTime.now(),
@@ -170,7 +177,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       await supabase.from(kTableReports).insert(report.toInsertMap());
       if (!mounted) return;
       Navigator.pop(context, true);
-      _snack('Report submitted${photoNote ?? ''} — routed to the municipal queue.');
+      _snack(
+        'Report submitted${photoNote ?? ''} — routed to the municipal queue.',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -261,7 +270,10 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.5, color: Colors.white))
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.send),
               label: Text(_submitting ? 'Submitting…' : 'Submit report'),
             ),
@@ -279,12 +291,11 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text,
-        style: Theme.of(context)
-            .textTheme
-            .titleMedium
-            ?.copyWith(fontWeight: FontWeight.w700),
-      );
+    text,
+    style: Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+  );
 }
 
 class _SeveritySelector extends StatelessWidget {
@@ -309,8 +320,9 @@ class _SeveritySelector extends StatelessWidget {
           ChoiceChip(
             label: Text(s.label),
             selected: s == value,
-            selectedColor: (_colors[s] ?? NivaraColors.primary)
-                .withValues(alpha: 0.18),
+            selectedColor: (_colors[s] ?? NivaraColors.primary).withValues(
+              alpha: 0.18,
+            ),
             onSelected: (_) => onChanged(s),
           ),
       ],
@@ -349,19 +361,21 @@ class _LocationCard extends StatelessWidget {
             child: locating
                 ? const Text('Getting your location…')
                 : pos != null
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${pos!.latitude.toStringAsFixed(5)}, '
-                            '${pos!.longitude.toStringAsFixed(5)}',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          Text('Accuracy ±${pos!.accuracy.toStringAsFixed(0)} m',
-                              style: Theme.of(context).textTheme.bodySmall),
-                        ],
-                      )
-                    : const Text('Location unavailable — using city default.'),
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${pos!.latitude.toStringAsFixed(5)}, '
+                        '${pos!.longitude.toStringAsFixed(5)}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        'Accuracy ±${pos!.accuracy.toStringAsFixed(0)} m',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  )
+                : const Text('Location unavailable — using city default.'),
           ),
           IconButton(
             tooltip: 'Refresh location',

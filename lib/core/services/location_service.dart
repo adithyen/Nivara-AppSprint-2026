@@ -26,7 +26,9 @@ class LocationService {
   Future<Position?> current() async {
     try {
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
     } catch (_) {
       return null;
@@ -35,11 +37,11 @@ class LocationService {
 
   /// Continuous position updates (lat/lng/speed/heading) for live monitoring.
   Stream<Position> stream() => Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 0,
-        ),
-      );
+    locationSettings: const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 0,
+    ),
+  );
 
   /// m/s → km/h. geolocator reports a negative speed when it's unknown.
   static double msToKmh(double ms) => ms <= 0 ? 0 : ms * 3.6;

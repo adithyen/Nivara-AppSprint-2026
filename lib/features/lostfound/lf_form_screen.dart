@@ -14,6 +14,7 @@ import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../../router.dart';
 import 'item_card.dart';
+import 'lf_contact.dart';
 
 /// Shared form for reporting a lost OR found item — [itemType] selects which.
 /// Mirrors CivicReport's [ReportFormScreen]: category → details → date →
@@ -36,12 +37,12 @@ class _LFFormScreenState extends State<LFFormScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _labelCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
+  final _contactCtrl = TextEditingController();
   final _rewardCtrl = TextEditingController();
 
   LFCategory? _category;
   DateTime _eventDate = DateTime.now();
-  String _contactMethod = 'INAPP';
+  LFContactMethod _contactMethod = LFContactMethod.phone;
   Position? _pos;
   bool _locating = false;
   final List<XFile> _photos = [];
@@ -60,7 +61,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _labelCtrl.dispose();
-    _phoneCtrl.dispose();
+    _contactCtrl.dispose();
     _rewardCtrl.dispose();
     super.dispose();
   }
@@ -163,8 +164,9 @@ class _LFFormScreenState extends State<LFFormScreen> {
       _snack('Please describe the item.');
       return;
     }
-    if (_contactMethod == 'PHONE' && _phoneCtrl.text.trim().isEmpty) {
-      _snack('Please enter a phone number, or switch to in-app contact.');
+    final contactError = lfContactValidate(_contactMethod, _contactCtrl.text);
+    if (contactError != null) {
+      _snack(contactError);
       return;
     }
     if (uid == null) {
@@ -198,11 +200,8 @@ class _LFFormScreenState extends State<LFFormScreen> {
           ? null
           : _labelCtrl.text.trim(),
       eventDate: _eventDate,
-      contactMethod: _contactMethod,
-      contactPhone:
-          _contactMethod == 'PHONE' && _phoneCtrl.text.trim().isNotEmpty
-          ? _phoneCtrl.text.trim()
-          : null,
+      contactMethod: _contactMethod.wire,
+      contactValue: _contactCtrl.text.trim(),
       rewardAmount: _isLost && reward != null && reward > 0 ? reward : null,
     );
 
@@ -305,20 +304,10 @@ class _LFFormScreenState extends State<LFFormScreen> {
             const _SectionLabel('5. How should people reach you?'),
             const SizedBox(height: 8),
             _ContactSelector(
-              value: _contactMethod,
-              onChanged: (m) => setState(() => _contactMethod = m),
+              method: _contactMethod,
+              controller: _contactCtrl,
+              onMethodChanged: (m) => setState(() => _contactMethod = m),
             ),
-            if (_contactMethod == 'PHONE') ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Phone number',
-                  prefixIcon: Icon(Icons.phone_outlined),
-                ),
-              ),
-            ],
             if (_isLost) ...[
               const SizedBox(height: 20),
               const _SectionLabel('6. Reward (optional)'),
@@ -555,29 +544,85 @@ class _DateCard extends StatelessWidget {
   }
 }
 
+/// Contact picker for the report form: a dropdown of [LFContactMethod] plus a
+/// value field whose label/hint/keyboard adapt to the chosen method. The value
+/// becomes a one-tap deep link on the viewer's side (see [lf_contact.dart]).
 class _ContactSelector extends StatelessWidget {
-  const _ContactSelector({required this.value, required this.onChanged});
-  final String value;
-  final ValueChanged<String> onChanged;
+  const _ContactSelector({
+    required this.method,
+    required this.controller,
+    required this.onMethodChanged,
+  });
+
+  final LFContactMethod method;
+  final TextEditingController controller;
+  final ValueChanged<LFContactMethod> onMethodChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
+    return Column(
       children: [
-        ChoiceChip(
-          avatar: const Icon(Icons.chat_bubble_outline, size: 18),
-          label: const Text('In-app'),
-          selected: value == 'INAPP',
-          selectedColor: NivaraColors.primary.withValues(alpha: 0.18),
-          onSelected: (_) => onChanged('INAPP'),
+        InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Contact via',
+            prefixIcon: Icon(Icons.contact_page_outlined),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<LFContactMethod>(
+              value: method,
+              isExpanded: true,
+              isDense: true,
+              onChanged: (m) {
+                if (m != null) onMethodChanged(m);
+              },
+              items: [
+                for (final m in LFContactMethod.values)
+                  DropdownMenuItem(
+                    value: m,
+                    child: Row(
+                      children: [
+                        Icon(
+                          lfContactIcon(m),
+                          size: 18,
+                          color: lfContactColor(m),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(m.label),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
-        ChoiceChip(
-          avatar: const Icon(Icons.phone_outlined, size: 18),
-          label: const Text('Phone'),
-          selected: value == 'PHONE',
-          selectedColor: NivaraColors.primary.withValues(alpha: 0.18),
-          onSelected: (_) => onChanged('PHONE'),
+        const SizedBox(height: 12),
+        TextField(
+          controller: controller,
+          keyboardType: lfContactKeyboard(method),
+          decoration: InputDecoration(
+            labelText: lfContactFieldLabel(method),
+            hintText: lfContactHint(method),
+            prefixIcon: Icon(lfContactIcon(method)),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 14,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Only shown to someone who matches with your item.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

@@ -10,6 +10,7 @@ import 'features/auth/signup_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/lostfound/lostfound_hub.dart';
+import 'features/lostfound/lf_item_detail.dart';
 import 'features/lostfound/match_screen.dart';
 import 'features/lostfound/report_found_screen.dart';
 import 'features/lostfound/report_lost_screen.dart';
@@ -33,6 +34,7 @@ abstract final class Routes {
   static const reportLost = '/lostfound/lost';
   static const reportFound = '/lostfound/found';
   static const lostFoundMatch = '/lostfound/match';
+  static const lostFoundDetail = '/lostfound/detail';
   static const admin = '/admin';
   static const adminReportDetail = '/admin/report';
 }
@@ -117,6 +119,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.lostFoundMatch,
         builder: (context, state) => MatchScreen(item: state.extra as LFItem),
+      ),
+      GoRoute(
+        path: Routes.lostFoundDetail,
+        builder: (context, state) {
+          // extra is a record: (item, distanceMeters, isMatch). Hub taps pass a
+          // bare LFItem; normalise both.
+          final extra = state.extra;
+          if (extra is LFItem) {
+            return LFItemDetailScreen(item: extra);
+          }
+          final args = extra as ({LFItem item, double? distance, bool isMatch});
+          return LFItemDetailScreen(
+            item: args.item,
+            distanceMeters: args.distance,
+            isMatch: args.isMatch,
+          );
+        },
       ),
       GoRoute(
         path: Routes.admin,

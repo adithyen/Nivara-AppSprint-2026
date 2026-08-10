@@ -104,8 +104,9 @@ class Report {
       confirmationCount: toInt(map['confirmation_count']),
       resolvedCount: toInt(map['resolved_count']),
       isCommunityVerified: (map['is_community_verified'] as bool?) ?? false,
-      assignedDepartment:
-          AdminDepartment.fromWire(map['assigned_department'] as String?),
+      assignedDepartment: AdminDepartment.fromWire(
+        map['assigned_department'] as String?,
+      ),
       assignedTo: map['assigned_to'] as String?,
       acknowledgedAt: toDateTimeOrNull(map['acknowledged_at']),
       resolvedAt: toDateTimeOrNull(map['resolved_at']),
@@ -119,21 +120,20 @@ class Report {
   /// Columns the app writes on insert. Server-managed fields (location,
   /// assigned_department, status, counts, timestamps) are intentionally omitted.
   Map<String, dynamic> toInsertMap() => {
-        'user_id': userId,
-        'category': category.wire,
-        'severity': severity.wire,
-        if (title != null) 'title': title,
-        if (description != null) 'description': description,
-        'lat': lat,
-        'lng': lng,
-        if (address != null) 'address': address,
-        if (city != null) 'city': city,
-        if (ward != null) 'ward': ward,
-        'source': source,
-        if (detectionType != null) 'detection_type': detectionType!.wire,
-        if (evidencePackage != null)
-          'evidence_package': evidencePackage!.toMap(),
-        if (evidenceHash != null) 'evidence_hash': evidenceHash,
-        if (photoUrls != null) 'photo_urls': photoUrls,
-      };
+    'user_id': userId,
+    'category': category.wire,
+    'severity': severity.wire,
+    if (title != null) 'title': title,
+    if (description != null) 'description': description,
+    'lat': lat,
+    'lng': lng,
+    if (address != null) 'address': address,
+    if (city != null) 'city': city,
+    if (ward != null) 'ward': ward,
+    'source': source,
+    if (detectionType != null) 'detection_type': detectionType!.wire,
+    if (evidencePackage != null) 'evidence_package': evidencePackage!.toMap(),
+    if (evidenceHash != null) 'evidence_hash': evidenceHash,
+    if (photoUrls != null) 'photo_urls': photoUrls,
+  };
 }

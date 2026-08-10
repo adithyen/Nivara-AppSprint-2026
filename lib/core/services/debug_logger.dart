@@ -80,13 +80,18 @@ class DebugLogger {
           mode: FileMode.append,
           flush: true,
         );
-      } catch (_) {/* ignore */}
+      } catch (_) {
+        /* ignore */
+      }
       _pending.clear();
     }
 
-    log('LOG', _ready
-        ? 'Logger ready → $_resolvedPath'
-        : 'Logger could NOT open any file; console-only.');
+    log(
+      'LOG',
+      _ready
+          ? 'Logger ready → $_resolvedPath'
+          : 'Logger could NOT open any file; console-only.',
+    );
   }
 
   /// Append a timestamped `[tag] message` line. Flushes to disk immediately.
@@ -101,7 +106,9 @@ class DebugLogger {
     if (_ready && _file != null) {
       try {
         _file!.writeAsStringSync(line, mode: FileMode.append, flush: true);
-      } catch (_) {/* never let logging crash the app */}
+      } catch (_) {
+        /* never let logging crash the app */
+      }
     } else {
       _pending.add(line);
     }
@@ -131,13 +138,17 @@ class DebugLogger {
     try {
       final ext = await getExternalStorageDirectory();
       if (ext != null) out.add('${ext.path}/nivara/logs');
-    } catch (_) {/* not Android / unavailable */}
+    } catch (_) {
+      /* not Android / unavailable */
+    }
 
     // 3) App documents dir — last resort, always exists.
     try {
       final docs = await getApplicationDocumentsDirectory();
       out.add('${docs.path}/nivara/logs');
-    } catch (_) {/* ignore */}
+    } catch (_) {
+      /* ignore */
+    }
 
     return out;
   }

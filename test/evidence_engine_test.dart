@@ -18,24 +18,23 @@ EvidencePackage _sample({
   double lat = 8.5241,
   double lng = 76.9366,
   double peak = 4.6,
-}) =>
-    EvidencePackage(
-      eventType: type,
-      timestampDevice: ts,
-      lat: lat,
-      lng: lng,
-      gpsAccuracy: 5,
-      speedKmph: 32,
-      heading: 180,
-      altitude: 12,
-      accelZPeak: peak,
-      accelZBaseline: 1.02,
-      gyroX: 0.1,
-      gyroY: 0.2,
-      gyroZ: 0.3,
-      deviceFingerprint: 'a' * 64,
-      appVersion: '1.0.0+1',
-    );
+}) => EvidencePackage(
+  eventType: type,
+  timestampDevice: ts,
+  lat: lat,
+  lng: lng,
+  gpsAccuracy: 5,
+  speedKmph: 32,
+  heading: 180,
+  altitude: 12,
+  accelZPeak: peak,
+  accelZBaseline: 1.02,
+  gyroX: 0.1,
+  gyroY: 0.2,
+  gyroZ: 0.3,
+  deviceFingerprint: 'a' * 64,
+  appVersion: '1.0.0+1',
+);
 
 void main() {
   group('EvidenceEngine.computeHash', () {
@@ -63,7 +62,10 @@ void main() {
       final base = EvidenceEngine.computeHash(_sample());
       expect(EvidenceEngine.computeHash(_sample(lat: 8.5242)), isNot(base));
       expect(EvidenceEngine.computeHash(_sample(peak: 4.7)), isNot(base));
-      expect(EvidenceEngine.computeHash(_sample(ts: 1723101000001)), isNot(base));
+      expect(
+        EvidenceEngine.computeHash(_sample(ts: 1723101000001)),
+        isNot(base),
+      );
       expect(
         EvidenceEngine.computeHash(_sample(type: DetectionType.speedBreaker)),
         isNot(base),

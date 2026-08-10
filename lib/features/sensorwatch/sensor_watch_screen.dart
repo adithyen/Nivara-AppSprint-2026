@@ -156,13 +156,17 @@ class _StatusPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 snap.monitoring
-                    ? (snap.warmingUp ? 'Warming up sensor…' : 'Monitoring — live')
+                    ? (snap.warmingUp
+                          ? 'Warming up sensor…'
+                          : 'Monitoring — live')
                     : 'Idle',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const Spacer(),
-              Text('${snap.detectionCount} detected',
-                  style: Theme.of(context).textTheme.labelLarge),
+              Text(
+                '${snap.detectionCount} detected',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -172,15 +176,17 @@ class _StatusPanel extends StatelessWidget {
               Text(
                 snap.impactG.toStringAsFixed(2),
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: meterColor,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: meterColor,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(width: 6),
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text('g impact force (live)',
-                    style: Theme.of(context).textTheme.bodySmall),
+                child: Text(
+                  'g impact force (live)',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
             ],
           ),
@@ -198,7 +204,10 @@ class _StatusPanel extends StatelessWidget {
           Row(
             children: [
               _Stat(label: 'Peak', value: '${snap.peakG.toStringAsFixed(2)} g'),
-              _Stat(label: 'Speed', value: '${snap.speedKmph.toStringAsFixed(0)} km/h'),
+              _Stat(
+                label: 'Speed',
+                value: '${snap.speedKmph.toStringAsFixed(0)} km/h',
+              ),
               _Stat(
                 label: 'GPS',
                 value: snap.hasFix ? 'Fix' : '—',
@@ -219,7 +228,8 @@ class _StatusPanel extends StatelessWidget {
                   icon: Icon(snap.monitoring ? Icons.stop : Icons.play_arrow),
                   style: snap.monitoring
                       ? FilledButton.styleFrom(
-                          backgroundColor: NivaraColors.danger)
+                          backgroundColor: NivaraColors.danger,
+                        )
                       : null,
                   label: Text(snap.monitoring ? 'Stop' : 'Start monitoring'),
                 ),
@@ -241,8 +251,11 @@ class _StatusPanel extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline,
-                  size: 16, color: Theme.of(context).colorScheme.outline),
+              Icon(
+                Icons.info_outline,
+                size: 16,
+                color: Theme.of(context).colorScheme.outline,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -251,8 +264,8 @@ class _StatusPanel extends StatelessWidget {
                   'automatically. In a vehicle it triggers on potholes and '
                   'speed breakers on its own.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
                 ),
               ),
             ],
@@ -275,11 +288,13 @@ class _Stat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: valueColor, fontWeight: FontWeight.w600)),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: valueColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
@@ -298,20 +313,25 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.radar, size: 56, color: Colors.grey.withValues(alpha: 0.5)),
+            Icon(
+              Icons.radar,
+              size: 56,
+              color: Colors.grey.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 12),
-            Text('No detections yet',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'No detections yet',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 6),
             Text(
               'Start monitoring, then shake the phone hard (or drive over '
               'rough road) — or tap "Simulate impact" to generate a '
               'tamper-proof evidence package.',
               textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
             ),
           ],
         ),
@@ -321,18 +341,18 @@ class _EmptyState extends StatelessWidget {
 }
 
 Color detectionColor(DetectionType t) => switch (t) {
-      DetectionType.pothole => NivaraColors.danger,
-      DetectionType.speedBreaker => NivaraColors.accent,
-      DetectionType.badRoad => NivaraColors.primary,
-      DetectionType.manual => Colors.grey,
-    };
+  DetectionType.pothole => NivaraColors.danger,
+  DetectionType.speedBreaker => NivaraColors.accent,
+  DetectionType.badRoad => NivaraColors.primary,
+  DetectionType.manual => Colors.grey,
+};
 
 IconData detectionIcon(DetectionType t) => switch (t) {
-      DetectionType.pothole => Icons.dangerous,
-      DetectionType.speedBreaker => Icons.speed,
-      DetectionType.badRoad => Icons.warning_amber,
-      DetectionType.manual => Icons.edit_location_alt,
-    };
+  DetectionType.pothole => Icons.dangerous,
+  DetectionType.speedBreaker => Icons.speed,
+  DetectionType.badRoad => Icons.warning_amber,
+  DetectionType.manual => Icons.edit_location_alt,
+};
 
 class _DetectionTile extends StatelessWidget {
   const _DetectionTile({required this.detection, required this.onTap});
@@ -458,10 +478,14 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_pkg.eventType.label,
-                            style: Theme.of(context).textTheme.titleLarge),
-                        Text('Evidence package',
-                            style: Theme.of(context).textTheme.bodySmall),
+                        Text(
+                          _pkg.eventType.label,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        Text(
+                          'Evidence package',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ],
                     ),
                   ),
@@ -478,10 +502,12 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
                 ),
                 child: Row(
                   children: [
-                    Icon(verified ? Icons.verified : Icons.gpp_bad,
-                        color: verified
-                            ? NivaraColors.success
-                            : NivaraColors.danger),
+                    Icon(
+                      verified ? Icons.verified : Icons.gpp_bad,
+                      color: verified
+                          ? NivaraColors.success
+                          : NivaraColors.danger,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -504,25 +530,42 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
               const SizedBox(height: 8),
               _kv('Impact', '${_pkg.accelZPeak.toStringAsFixed(2)} g'),
               _kv('Noise floor', '${_pkg.accelZBaseline.toStringAsFixed(2)} g'),
-              _kv('Location', '${_pkg.lat.toStringAsFixed(5)}, ${_pkg.lng.toStringAsFixed(5)}'),
+              _kv(
+                'Location',
+                '${_pkg.lat.toStringAsFixed(5)}, ${_pkg.lng.toStringAsFixed(5)}',
+              ),
               _kv('GPS accuracy', '±${_pkg.gpsAccuracy.toStringAsFixed(0)} m'),
               _kv('Speed', '${_pkg.speedKmph.toStringAsFixed(0)} km/h'),
-              _kv('Gyro (x,y,z)',
-                  '${_pkg.gyroX.toStringAsFixed(2)}, ${_pkg.gyroY.toStringAsFixed(2)}, ${_pkg.gyroZ.toStringAsFixed(2)}'),
-              _kv('Device', '${_pkg.deviceFingerprint.substring(0, _pkg.deviceFingerprint.length.clamp(0, 16))}…'),
+              _kv(
+                'Gyro (x,y,z)',
+                '${_pkg.gyroX.toStringAsFixed(2)}, ${_pkg.gyroY.toStringAsFixed(2)}, ${_pkg.gyroZ.toStringAsFixed(2)}',
+              ),
+              _kv(
+                'Device',
+                '${_pkg.deviceFingerprint.substring(0, _pkg.deviceFingerprint.length.clamp(0, 16))}…',
+              ),
               _kv('App version', _pkg.appVersion),
-              _kv('Captured', formatDateTime(
-                  DateTime.fromMillisecondsSinceEpoch(_pkg.timestampDevice))),
+              _kv(
+                'Captured',
+                formatDateTime(
+                  DateTime.fromMillisecondsSinceEpoch(_pkg.timestampDevice),
+                ),
+              ),
               const SizedBox(height: 16),
               if (_submittedId != null)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle,
-                        color: NivaraColors.success, size: 20),
+                    const Icon(
+                      Icons.check_circle,
+                      color: NivaraColors.success,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
-                    Text('Filed as report',
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      'Filed as report',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ],
                 )
               else
@@ -533,7 +576,10 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2.5, color: Colors.white))
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.send),
                   label: const Text('File as civic report'),
                 ),
@@ -545,25 +591,25 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
   }
 
   Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 130,
-              child: Text(k,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Theme.of(context).colorScheme.outline)),
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 130,
+          child: Text(
+            k,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
             ),
-            Expanded(
-              child: Text(v,
-                  style: const TextStyle(fontWeight: FontWeight.w500)),
-            ),
-          ],
+          ),
         ),
-      );
+        Expanded(
+          child: Text(v, style: const TextStyle(fontWeight: FontWeight.w500)),
+        ),
+      ],
+    ),
+  );
 }
 
 class _HashRow extends StatelessWidget {
@@ -596,13 +642,18 @@ class _HashRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('SHA-256',
-                      style: Theme.of(context).textTheme.labelMedium),
+                  Text(
+                    'SHA-256',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     hash,
                     style: const TextStyle(
-                        fontFamily: 'monospace', fontSize: 12, height: 1.3),
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
                   ),
                 ],
               ),

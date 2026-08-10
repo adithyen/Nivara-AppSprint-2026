@@ -51,7 +51,8 @@ void main() {
       expect(item.eventDate.month, 8);
       expect(item.eventDate.day, 5);
       expect(item.rewardAmount, 200);
-      expect(item.contactPhone, '99999');
+      // Legacy contact_phone rows still parse into contactValue.
+      expect(item.contactValue, '99999');
     });
   });
 
@@ -74,15 +75,15 @@ void main() {
       expect(m['category'], 'KEYS');
       expect(m['title'], 'House keys');
       expect(m['event_date'], '2026-08-07'); // DATE column, no time part
-      expect(m['contact_method'], 'INAPP');
+      expect(m['contact_method'], 'PHONE'); // default method
       // Null optionals are left out entirely.
       expect(m.containsKey('photo_urls'), isFalse);
       expect(m.containsKey('location_label'), isFalse);
-      expect(m.containsKey('contact_phone'), isFalse);
+      expect(m.containsKey('contact_value'), isFalse);
       expect(m.containsKey('reward_amount'), isFalse);
     });
 
-    test('includes reward, phone, label and photos when present', () {
+    test('includes reward, contact, label and photos when present', () {
       final item = LFItem(
         id: '',
         userId: 'u1',
@@ -95,14 +96,14 @@ void main() {
         locationLabel: 'MG Road',
         eventDate: DateTime(2026, 8, 7),
         contactMethod: 'PHONE',
-        contactPhone: '12345',
+        contactValue: '12345',
         rewardAmount: 500,
         photoUrls: const ['https://x/y.jpg'],
       );
       final m = item.toInsertMap();
       expect(m['location_label'], 'MG Road');
       expect(m['contact_method'], 'PHONE');
-      expect(m['contact_phone'], '12345');
+      expect(m['contact_value'], '12345');
       expect(m['reward_amount'], 500);
       expect(m['photo_urls'], const ['https://x/y.jpg']);
     });

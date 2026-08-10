@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
@@ -6,6 +7,7 @@ import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
+import '../../router.dart';
 import 'item_card.dart';
 
 /// Shows candidate matches for a given [item]: items of the *opposite* type
@@ -52,17 +54,26 @@ class _MatchScreenState extends State<MatchScreen> {
 
     final list = (rows as List).map((r) {
       final m = r as Map<String, dynamic>;
-      final item = LFItem(
-        id: m['id'] as String,
-        userId: '',
-        itemType: _lookingFor,
-        category: LFCategory.fromWire(m['category'] as String?),
-        title: (m['title'] as String?) ?? '',
-        description: (m['description'] as String?) ?? '',
-        lat: toDouble(m['lat']),
-        lng: toDouble(m['lng']),
-        eventDate: toDateTimeOrNull(m['event_date']) ?? DateTime.now(),
-      );
+      // The migrated find_nearby_items returns the full row (photos, owner,
+      // contact) so we can parse it straight into a complete LFItem. An older
+      // deployment returns only bare columns (no user_id) — fall back to a
+      // minimal item; the detail screen then re-fetches the full row by id.
+      final LFItem item;
+      if (m['user_id'] != null) {
+        item = LFItem.fromMap(m);
+      } else {
+        item = LFItem(
+          id: m['id'] as String,
+          userId: '',
+          itemType: _lookingFor,
+          category: LFCategory.fromWire(m['category'] as String?),
+          title: (m['title'] as String?) ?? '',
+          description: (m['description'] as String?) ?? '',
+          lat: toDouble(m['lat']),
+          lng: toDouble(m['lng']),
+          eventDate: toDateTimeOrNull(m['event_date']) ?? DateTime.now(),
+        );
+      }
       return _Match(
         item: item,
         distanceMeters: toDouble(m['distance_km']) * 1000,
@@ -123,6 +134,14 @@ class _MatchScreenState extends State<MatchScreen> {
                       child: LFItemCard(
                         item: m.item,
                         distanceMeters: m.distanceMeters,
+                        onTap: () => context.push(
+                          Routes.lostFoundDetail,
+                          extra: (
+                            item: m.item,
+                            distance: m.distanceMeters,
+                            isMatch: true,
+                          ),
+                        ),
                       ),
                     ),
                   ),

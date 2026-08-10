@@ -67,7 +67,8 @@ const String kDarkRasterTileUrl =
     'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
 
 /// OpenStreetMap raster fallback tile template (light).
-const String kOsmRasterTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const String kOsmRasterTileUrl =
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // ── Lost & Found matching ───────────────────────────────────────────────────
 /// Radius (metres) within which a lost and a found item may match.

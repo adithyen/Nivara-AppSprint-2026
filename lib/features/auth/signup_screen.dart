@@ -41,12 +41,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _error = null;
     });
     try {
-      final hasSession =
-          await ref.read(authControllerProvider.notifier).signUp(
-                email: _email.text.trim(),
-                password: _password.text,
-                displayName: _name.text.trim(),
-              );
+      final hasSession = await ref
+          .read(authControllerProvider.notifier)
+          .signUp(
+            email: _email.text.trim(),
+            password: _password.text,
+            displayName: _name.text.trim(),
+          );
       if (!mounted) return;
       if (hasSession) {
         // Redirect guard takes over.
@@ -85,10 +86,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   Text(
                     'Join $kAppName',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   TextFormField(
@@ -133,11 +133,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined),
-                        onPressed: () =>
-                            setState(() => _obscure = !_obscure),
+                        icon: Icon(
+                          _obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
                     validator: (v) {
@@ -153,7 +154,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     Text(
                       _error!,
                       style: TextStyle(
-                          color: Theme.of(context).colorScheme.error),
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -164,14 +166,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2.5, color: Colors.white),
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Create account'),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
-                    onPressed:
-                        _loading ? null : () => context.go(Routes.login),
+                    onPressed: _loading ? null : () => context.go(Routes.login),
                     child: const Text('Already have an account? Sign in'),
                   ),
                 ],

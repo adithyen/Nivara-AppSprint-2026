@@ -6,26 +6,26 @@ import '../../models/enums.dart';
 /// Material icon for each civic category. Kept in one place so the grid, report
 /// tiles, and map pins can all share a consistent visual language.
 IconData categoryIcon(ReportCategory c) => switch (c) {
-      ReportCategory.pothole => Icons.dangerous,
-      ReportCategory.brokenFootpath => Icons.directions_walk,
-      ReportCategory.openManhole => Icons.circle_outlined,
-      ReportCategory.fallenTree => Icons.park,
-      ReportCategory.waterlogging => Icons.water,
-      ReportCategory.roadSign => Icons.signpost,
-      ReportCategory.garbage => Icons.delete,
-      ReportCategory.blockedDrain => Icons.water_damage,
-      ReportCategory.sewage => Icons.plumbing,
-      ReportCategory.streetLight => Icons.lightbulb,
-      ReportCategory.damagedPole => Icons.electrical_services,
-      ReportCategory.powerIssue => Icons.power,
-      ReportCategory.waterSupply => Icons.water_drop,
-      ReportCategory.pipeLeak => Icons.plumbing,
-      ReportCategory.encroachment => Icons.fence,
-      ReportCategory.brokenProperty => Icons.broken_image,
-      ReportCategory.strayAnimals => Icons.pets,
-      ReportCategory.noise => Icons.volume_up,
-      ReportCategory.other => Icons.more_horiz,
-    };
+  ReportCategory.pothole => Icons.dangerous,
+  ReportCategory.brokenFootpath => Icons.directions_walk,
+  ReportCategory.openManhole => Icons.circle_outlined,
+  ReportCategory.fallenTree => Icons.park,
+  ReportCategory.waterlogging => Icons.water,
+  ReportCategory.roadSign => Icons.signpost,
+  ReportCategory.garbage => Icons.delete,
+  ReportCategory.blockedDrain => Icons.water_damage,
+  ReportCategory.sewage => Icons.plumbing,
+  ReportCategory.streetLight => Icons.lightbulb,
+  ReportCategory.damagedPole => Icons.electrical_services,
+  ReportCategory.powerIssue => Icons.power,
+  ReportCategory.waterSupply => Icons.water_drop,
+  ReportCategory.pipeLeak => Icons.plumbing,
+  ReportCategory.encroachment => Icons.fence,
+  ReportCategory.brokenProperty => Icons.broken_image,
+  ReportCategory.strayAnimals => Icons.pets,
+  ReportCategory.noise => Icons.volume_up,
+  ReportCategory.other => Icons.more_horiz,
+};
 
 /// A tappable 3-column grid of all 19 civic categories. [selected] is
 /// highlighted; tapping one calls [onSelect].
@@ -96,7 +96,9 @@ class _CategoryTile extends StatelessWidget {
             children: [
               Icon(
                 categoryIcon(category),
-                color: selected ? NivaraColors.primary : scheme.onSurfaceVariant,
+                color: selected
+                    ? NivaraColors.primary
+                    : scheme.onSurfaceVariant,
                 size: 26,
               ),
               const SizedBox(height: 6),
@@ -106,10 +108,10 @@ class _CategoryTile extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: selected ? NivaraColors.primary : null,
-                      fontWeight: selected ? FontWeight.w600 : null,
-                      height: 1.1,
-                    ),
+                  color: selected ? NivaraColors.primary : null,
+                  fontWeight: selected ? FontWeight.w600 : null,
+                  height: 1.1,
+                ),
               ),
             ],
           ),

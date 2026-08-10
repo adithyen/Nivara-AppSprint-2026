@@ -52,47 +52,47 @@ class EvidencePackage {
   /// The canonical payload that gets hashed. Excludes [evidenceHash] itself.
   /// Key order here is irrelevant — the engine sorts keys before hashing.
   Map<String, dynamic> toHashableMap() => {
-        'event_type': eventType.wire,
-        'timestamp_device': timestampDevice,
-        'lat': lat,
-        'lng': lng,
-        'gps_accuracy': gpsAccuracy,
-        'speed_kmph': speedKmph,
-        'heading': heading,
-        'altitude': altitude,
-        'accel_z_peak': accelZPeak,
-        'accel_z_baseline': accelZBaseline,
-        'gyro_x': gyroX,
-        'gyro_y': gyroY,
-        'gyro_z': gyroZ,
-        'device_fingerprint': deviceFingerprint,
-        'app_version': appVersion,
-      };
+    'event_type': eventType.wire,
+    'timestamp_device': timestampDevice,
+    'lat': lat,
+    'lng': lng,
+    'gps_accuracy': gpsAccuracy,
+    'speed_kmph': speedKmph,
+    'heading': heading,
+    'altitude': altitude,
+    'accel_z_peak': accelZPeak,
+    'accel_z_baseline': accelZBaseline,
+    'gyro_x': gyroX,
+    'gyro_y': gyroY,
+    'gyro_z': gyroZ,
+    'device_fingerprint': deviceFingerprint,
+    'app_version': appVersion,
+  };
 
   /// Full map for storage — includes the hash once sealed.
   Map<String, dynamic> toMap() => {
-        ...toHashableMap(),
-        if (evidenceHash != null) 'evidence_hash': evidenceHash,
-      };
+    ...toHashableMap(),
+    if (evidenceHash != null) 'evidence_hash': evidenceHash,
+  };
 
   factory EvidencePackage.fromMap(Map<String, dynamic> map) => EvidencePackage(
-        eventType:
-            DetectionType.fromWire(map['event_type'] as String?) ??
-                DetectionType.manual,
-        timestampDevice: toInt(map['timestamp_device']),
-        lat: toDouble(map['lat']),
-        lng: toDouble(map['lng']),
-        gpsAccuracy: toDouble(map['gps_accuracy']),
-        speedKmph: toDouble(map['speed_kmph']),
-        heading: toDouble(map['heading']),
-        altitude: toDouble(map['altitude']),
-        accelZPeak: toDouble(map['accel_z_peak']),
-        accelZBaseline: toDouble(map['accel_z_baseline']),
-        gyroX: toDouble(map['gyro_x']),
-        gyroY: toDouble(map['gyro_y']),
-        gyroZ: toDouble(map['gyro_z']),
-        deviceFingerprint: (map['device_fingerprint'] as String?) ?? '',
-        appVersion: (map['app_version'] as String?) ?? '',
-        evidenceHash: map['evidence_hash'] as String?,
-      );
+    eventType:
+        DetectionType.fromWire(map['event_type'] as String?) ??
+        DetectionType.manual,
+    timestampDevice: toInt(map['timestamp_device']),
+    lat: toDouble(map['lat']),
+    lng: toDouble(map['lng']),
+    gpsAccuracy: toDouble(map['gps_accuracy']),
+    speedKmph: toDouble(map['speed_kmph']),
+    heading: toDouble(map['heading']),
+    altitude: toDouble(map['altitude']),
+    accelZPeak: toDouble(map['accel_z_peak']),
+    accelZBaseline: toDouble(map['accel_z_baseline']),
+    gyroX: toDouble(map['gyro_x']),
+    gyroY: toDouble(map['gyro_y']),
+    gyroZ: toDouble(map['gyro_z']),
+    deviceFingerprint: (map['device_fingerprint'] as String?) ?? '',
+    appVersion: (map['app_version'] as String?) ?? '',
+    evidenceHash: map['evidence_hash'] as String?,
+  );
 }

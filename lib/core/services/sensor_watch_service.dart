@@ -62,14 +62,14 @@ class SensorSnapshot {
   double get impactG => currentG < 0 ? 0 : currentG;
 
   factory SensorSnapshot.idle() => const SensorSnapshot(
-        monitoring: false,
-        currentG: 0,
-        peakG: 0,
-        speedKmph: 0,
-        detectionCount: 0,
-        hasFix: false,
-        warmingUp: true,
-      );
+    monitoring: false,
+    currentG: 0,
+    peakG: 0,
+    speedKmph: 0,
+    detectionCount: 0,
+    hasFix: false,
+    warmingUp: true,
+  );
 }
 
 enum StartResult { started, startedWithoutLocation, alreadyRunning }
@@ -90,13 +90,14 @@ DetectionType classifyImpact(double joltG) {
 /// driving — there is no speed gate.
 class SensorWatchService {
   SensorWatchService({LocationService location = const LocationService()})
-      // ignore: prefer_initializing_formals — public param name intentional for DI
-      : _location = location;
+    // ignore: prefer_initializing_formals — public param name intentional for DI
+    : _location = location;
 
   final LocationService _location;
 
-  final ValueNotifier<SensorSnapshot> snapshot =
-      ValueNotifier(SensorSnapshot.idle());
+  final ValueNotifier<SensorSnapshot> snapshot = ValueNotifier(
+    SensorSnapshot.idle(),
+  );
 
   final _detections = StreamController<SensorDetection>.broadcast();
   Stream<SensorDetection> get detections => _detections.stream;
@@ -128,7 +129,8 @@ class SensorWatchService {
   }
 
   bool get _warmingUp =>
-      isMonitoring && DateTime.now().millisecondsSinceEpoch - _startMs < kSettleMs;
+      isMonitoring &&
+      DateTime.now().millisecondsSinceEpoch - _startMs < kSettleMs;
 
   Future<StartResult> start() async {
     if (isMonitoring) return StartResult.alreadyRunning;
@@ -153,11 +155,14 @@ class SensorWatchService {
       _gyroZ = e.z;
     }, onError: (_) {});
     // Linear acceleration — gravity already removed, so rest ≈ 0 g.
-    _accelSub = userAccelerometerEventStream(samplingPeriod: period)
-        .listen(_onAccel, onError: (_) {});
+    _accelSub = userAccelerometerEventStream(
+      samplingPeriod: period,
+    ).listen(_onAccel, onError: (_) {});
 
     _emit(force: true);
-    return hasLocation ? StartResult.started : StartResult.startedWithoutLocation;
+    return hasLocation
+        ? StartResult.started
+        : StartResult.startedWithoutLocation;
   }
 
   Future<void> stop() async {
@@ -204,31 +209,35 @@ class SensorWatchService {
       final lat = _pos?.latitude ?? kDefaultLat;
       final lng = _pos?.longitude ?? kDefaultLng;
 
-      final pkg = EvidenceEngine.seal(EvidencePackage(
-        eventType: type,
-        timestampDevice: DateTime.now().millisecondsSinceEpoch,
-        lat: lat,
-        lng: lng,
-        gpsAccuracy: _pos?.accuracy ?? 0,
-        speedKmph: _speedKmh,
-        heading: _pos?.heading ?? 0,
-        altitude: _pos?.altitude ?? 0,
-        accelZPeak: joltG,
-        accelZBaseline: synthetic ? 0 : _noiseFloorG,
-        gyroX: _gyroX,
-        gyroY: _gyroY,
-        gyroZ: _gyroZ,
-        deviceFingerprint: await DeviceIdentity.fingerprint(),
-        appVersion: await DeviceIdentity.appVersion(),
-      ));
+      final pkg = EvidenceEngine.seal(
+        EvidencePackage(
+          eventType: type,
+          timestampDevice: DateTime.now().millisecondsSinceEpoch,
+          lat: lat,
+          lng: lng,
+          gpsAccuracy: _pos?.accuracy ?? 0,
+          speedKmph: _speedKmh,
+          heading: _pos?.heading ?? 0,
+          altitude: _pos?.altitude ?? 0,
+          accelZPeak: joltG,
+          accelZBaseline: synthetic ? 0 : _noiseFloorG,
+          gyroX: _gyroX,
+          gyroY: _gyroY,
+          gyroZ: _gyroZ,
+          deviceFingerprint: await DeviceIdentity.fingerprint(),
+          appVersion: await DeviceIdentity.appVersion(),
+        ),
+      );
 
       _count++;
-      _detections.add(SensorDetection(
-        type: type,
-        gAboveBaseline: joltG,
-        evidence: pkg,
-        at: DateTime.now(),
-      ));
+      _detections.add(
+        SensorDetection(
+          type: type,
+          gAboveBaseline: joltG,
+          evidence: pkg,
+          at: DateTime.now(),
+        ),
+      );
       _emit(force: true);
     } finally {
       _sealing = false;

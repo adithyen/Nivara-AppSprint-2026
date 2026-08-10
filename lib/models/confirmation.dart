@@ -24,18 +24,18 @@ class Confirmation {
   static const String typeResolved = 'RESOLVED';
 
   factory Confirmation.fromMap(Map<String, dynamic> map) => Confirmation(
-        id: map['id'] as String,
-        reportId: map['report_id'] as String,
-        userId: map['user_id'] as String,
-        type: (map['type'] as String?) ?? typeConfirm,
-        createdAt: toDateTimeOrNull(map['created_at']),
-      );
+    id: map['id'] as String,
+    reportId: map['report_id'] as String,
+    userId: map['user_id'] as String,
+    type: (map['type'] as String?) ?? typeConfirm,
+    createdAt: toDateTimeOrNull(map['created_at']),
+  );
 
   /// Columns the app writes on insert. `location` is optional and set by
   /// callers that have a GPS fix at vote time.
   Map<String, dynamic> toInsertMap() => {
-        'report_id': reportId,
-        'user_id': userId,
-        'type': type,
-      };
+    'report_id': reportId,
+    'user_id': userId,
+    'type': type,
+  };
 }

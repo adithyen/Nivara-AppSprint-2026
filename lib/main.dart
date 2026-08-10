@@ -15,8 +15,10 @@ Future<void> main() async {
   DebugLogger.instance.log('BOOT', 'main() start');
 
   await dotenv.load(fileName: '.env');
-  DebugLogger.instance.log('BOOT',
-      '.env loaded (OLA key present: ${(dotenv.env['OLA_MAPS_API_KEY'] ?? '').isNotEmpty})');
+  DebugLogger.instance.log(
+    'BOOT',
+    '.env loaded (OLA key present: ${(dotenv.env['OLA_MAPS_API_KEY'] ?? '').isNotEmpty})',
+  );
 
   final supabaseUrl = dotenv.env['SUPABASE_URL'];
   final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];

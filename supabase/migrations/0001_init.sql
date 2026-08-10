@@ -306,8 +306,9 @@ CREATE TABLE IF NOT EXISTS lf_items (
   location         GEOGRAPHY(POINT, 4326) NOT NULL,
   location_label   TEXT,
   event_date       DATE NOT NULL,
-  contact_method   TEXT DEFAULT 'INAPP',
+  contact_method   TEXT DEFAULT 'PHONE',
   contact_phone    TEXT,
+  contact_value    TEXT,
   reward_amount    INTEGER,
   status           TEXT DEFAULT 'ACTIVE',
   expires_at       TIMESTAMPTZ DEFAULT NOW() + INTERVAL '30 days',
@@ -354,19 +355,27 @@ CREATE TABLE IF NOT EXISTS score_events (
 );
 
 -- ─────────────────── RPC: nearby LF items ─────────────────────────
+-- Returns the full counterpart payload (photos, owner, contact) so the match
+-- list can show images to verify ownership and offer one-tap contact.
 CREATE OR REPLACE FUNCTION find_nearby_items(
   p_lat DOUBLE PRECISION, p_lng DOUBLE PRECISION,
   p_radius_km DOUBLE PRECISION, p_category lf_category,
   p_item_type lf_item_type, p_within_days INTEGER
 ) RETURNS TABLE (
-  id UUID, category lf_category, title TEXT, description TEXT,
-  lat DOUBLE PRECISION, lng DOUBLE PRECISION,
-  event_date DATE, created_at TIMESTAMPTZ, distance_km DOUBLE PRECISION
+  id UUID, user_id UUID, item_type lf_item_type, category lf_category,
+  title TEXT, description TEXT, photo_urls TEXT[],
+  lat DOUBLE PRECISION, lng DOUBLE PRECISION, location_label TEXT,
+  event_date DATE, contact_method TEXT, contact_value TEXT,
+  contact_phone TEXT, reward_amount INTEGER,
+  created_at TIMESTAMPTZ, distance_km DOUBLE PRECISION
 ) LANGUAGE plpgsql STABLE AS $$
 BEGIN
   RETURN QUERY
-  SELECT i.id, i.category, i.title, i.description, i.lat, i.lng,
-         i.event_date, i.created_at,
+  SELECT i.id, i.user_id, i.item_type, i.category,
+         i.title, i.description, i.photo_urls,
+         i.lat, i.lng, i.location_label,
+         i.event_date, i.contact_method, i.contact_value,
+         i.contact_phone, i.reward_amount, i.created_at,
          ST_Distance(i.location, ST_MakePoint(p_lng, p_lat)::geography) / 1000.0 AS distance_km
   FROM lf_items i
   WHERE i.item_type = p_item_type

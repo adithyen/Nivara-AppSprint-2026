@@ -70,8 +70,8 @@ enum ReportCategory {
   final String label;
   const ReportCategory(this.wire, this.label);
 
-  static ReportCategory fromWire(String? w) => values
-      .firstWhere((e) => e.wire == w, orElse: () => ReportCategory.other);
+  static ReportCategory fromWire(String? w) =>
+      values.firstWhere((e) => e.wire == w, orElse: () => ReportCategory.other);
 }
 
 enum ReportStatus {
@@ -86,8 +86,10 @@ enum ReportStatus {
   final String label;
   const ReportStatus(this.wire, this.label);
 
-  static ReportStatus fromWire(String? w) => values
-      .firstWhere((e) => e.wire == w, orElse: () => ReportStatus.submitted);
+  static ReportStatus fromWire(String? w) => values.firstWhere(
+    (e) => e.wire == w,
+    orElse: () => ReportStatus.submitted,
+  );
 }
 
 enum Severity {
@@ -157,6 +159,28 @@ enum LFItemType {
 
   static LFItemType fromWire(String? w) =>
       values.firstWhere((e) => e.wire == w, orElse: () => LFItemType.lost);
+}
+
+/// How a Lost & Found poster wants to be reached. Each maps to a one-tap deep
+/// link on the viewer's side (see `features/lostfound/lf_contact.dart`):
+/// phone → `tel:`, whatsapp → `wa.me/…`, email → `mailto:`,
+/// telegram → `t.me/…`, instagram → `instagram.com/…`.
+enum LFContactMethod {
+  phone('PHONE', 'Phone'),
+  whatsapp('WHATSAPP', 'WhatsApp'),
+  email('EMAIL', 'Email'),
+  telegram('TELEGRAM', 'Telegram'),
+  instagram('INSTAGRAM', 'Instagram');
+
+  final String wire;
+  final String label;
+  const LFContactMethod(this.wire, this.label);
+
+  /// Legacy rows may carry 'INAPP'; fall back to phone so the UI stays sane.
+  static LFContactMethod fromWire(String? w) => values.firstWhere(
+    (e) => e.wire == w,
+    orElse: () => LFContactMethod.phone,
+  );
 }
 
 enum MatchStatus {

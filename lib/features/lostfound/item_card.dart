@@ -121,8 +121,44 @@ class LFItemCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (item.photoUrls != null && item.photoUrls!.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                _Thumb(url: item.photoUrls!.first),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Thumb extends StatelessWidget {
+  const _Thumb({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Image.network(
+        url,
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        loadingBuilder: (c, child, progress) => progress == null
+            ? child
+            : Container(
+                width: 56,
+                height: 56,
+                color: scheme.surfaceContainerHighest,
+              ),
+        errorBuilder: (c, _, _) => Container(
+          width: 56,
+          height: 56,
+          color: scheme.surfaceContainerHighest,
+          child: Icon(Icons.image_outlined, size: 20, color: scheme.outline),
         ),
       ),
     );

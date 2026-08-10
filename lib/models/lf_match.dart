@@ -24,13 +24,13 @@ class LFMatch {
   });
 
   factory LFMatch.fromMap(Map<String, dynamic> map) => LFMatch(
-        id: map['id'] as String,
-        lostItemId: map['lost_item_id'] as String,
-        foundItemId: map['found_item_id'] as String,
-        matchScore: toInt(map['match_score']),
-        status: MatchStatus.fromWire(map['status'] as String?),
-        confirmedAt: toDateTimeOrNull(map['confirmed_at']),
-        resolvedAt: toDateTimeOrNull(map['resolved_at']),
-        createdAt: toDateTimeOrNull(map['created_at']),
-      );
+    id: map['id'] as String,
+    lostItemId: map['lost_item_id'] as String,
+    foundItemId: map['found_item_id'] as String,
+    matchScore: toInt(map['match_score']),
+    status: MatchStatus.fromWire(map['status'] as String?),
+    confirmedAt: toDateTimeOrNull(map['confirmed_at']),
+    resolvedAt: toDateTimeOrNull(map['resolved_at']),
+    createdAt: toDateTimeOrNull(map['created_at']),
+  );
 }
