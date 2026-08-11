@@ -8,7 +8,8 @@ import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/signup_screen.dart';
 import 'features/auth/splash_screen.dart';
-import 'features/home/home_screen.dart';
+import 'features/community/community_compose_screen.dart';
+import 'features/home/home_shell.dart';
 import 'features/lostfound/lostfound_hub.dart';
 import 'features/lostfound/lf_item_detail.dart';
 import 'features/lostfound/match_screen.dart';
@@ -18,6 +19,8 @@ import 'features/map/civic_map.dart';
 import 'features/report/report_detail_screen.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
+import 'models/community_post.dart';
+import 'models/enums.dart';
 import 'models/lf_item.dart';
 import 'models/report.dart';
 
@@ -37,6 +40,7 @@ abstract final class Routes {
   static const reportFound = '/lostfound/found';
   static const lostFoundMatch = '/lostfound/match';
   static const lostFoundDetail = '/lostfound/detail';
+  static const communityCompose = '/community/compose';
   static const admin = '/admin';
   static const adminReportDetail = '/admin/report';
 }
@@ -92,7 +96,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.home,
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) => const HomeShell(),
       ),
       GoRoute(
         path: Routes.sensorWatch,
@@ -141,6 +145,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             item: args.item,
             distanceMeters: args.distance,
             isMatch: args.isMatch,
+          );
+        },
+      ),
+      GoRoute(
+        path: Routes.communityCompose,
+        builder: (context, state) {
+          final args =
+              state.extra as ({CommunityPostType type, CommunityPost? existing});
+          return CommunityComposeScreen(
+            type: args.type,
+            existing: args.existing,
           );
         },
       ),

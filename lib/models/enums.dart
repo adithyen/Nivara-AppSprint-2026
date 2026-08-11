@@ -197,3 +197,38 @@ enum MatchStatus {
   static MatchStatus fromWire(String? w) =>
       values.firstWhere((e) => e.wire == w, orElse: () => MatchStatus.pending);
 }
+
+// ── Community board ─────────────────────────────────────────────────────────
+/// The four post templates on the neighbourhood Community board. Mirrors the
+/// `community_post_type` Postgres enum in `0002_community.sql`.
+enum CommunityPostType {
+  general('GENERAL', 'Post'),
+  poll('POLL', 'Poll'),
+  job('JOB', 'Job / Service'),
+  announcement('ANNOUNCEMENT', 'Announcement');
+
+  final String wire;
+  final String label;
+  const CommunityPostType(this.wire, this.label);
+
+  static CommunityPostType fromWire(String? w) => values.firstWhere(
+    (e) => e.wire == w,
+    orElse: () => CommunityPostType.general,
+  );
+}
+
+/// A community post is OPEN (active) or CLOSED (the author ended it — a filled
+/// job, a finished poll). Mirrors `community_post_status`.
+enum CommunityPostStatus {
+  open('OPEN', 'Open'),
+  closed('CLOSED', 'Closed');
+
+  final String wire;
+  final String label;
+  const CommunityPostStatus(this.wire, this.label);
+
+  static CommunityPostStatus fromWire(String? w) => values.firstWhere(
+    (e) => e.wire == w,
+    orElse: () => CommunityPostStatus.open,
+  );
+}

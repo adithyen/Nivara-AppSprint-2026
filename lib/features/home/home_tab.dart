@@ -13,21 +13,22 @@ import '../admin/status_style.dart';
 import '../auth/auth_controller.dart';
 import '../report/category_grid.dart';
 
-/// Citizen landing screen — the build-order #7 dashboard.
+/// The **Home** tab of the citizen shell — the landing dashboard.
 ///
-/// Stats are computed **live** from the database, not read from the profile
-/// counters (those have no maintaining triggers, so they'd always show 0). We
-/// count the signed-in user's reports, confirmations and finds, derive a civic
-/// impact score client-side, and show a "community pulse" + recent-report feed
-/// built from the 50 latest reports. Pull-to-refresh re-runs everything.
-class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+/// Body only: the surrounding [Scaffold]/[AppBar]/bottom-nav belong to
+/// [HomeShell]. Stats are computed **live** from the database (the profile
+/// counters have no maintaining triggers, so they'd read 0). We count the
+/// signed-in user's reports, confirmations and finds, derive a civic-impact
+/// score client-side, and show a community-pulse strip + a recent-report feed
+/// over the 50 latest reports. Pull-to-refresh re-runs everything.
+class HomeTab extends ConsumerStatefulWidget {
+  const HomeTab({super.key});
 
   @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeTabState extends ConsumerState<HomeTab> {
   bool _loading = true;
   int _myReports = 0;
   int _myConfirms = 0;
@@ -139,118 +140,105 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final profile = ref.watch(authControllerProvider).asData?.value;
     final recentFeed = _recent.take(6).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(kAppName),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).signOut(),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        children: [
+          Text(
+            'Welcome, ${profile?.displayName ?? 'Citizen'}',
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-          children: [
-            Text(
-              'Welcome, ${profile?.displayName ?? 'Citizen'}',
-              style: Theme.of(context).textTheme.headlineSmall,
+          const SizedBox(height: 4),
+          Text(
+            kAppTagline,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
             ),
-            const SizedBox(height: 4),
-            Text(
-              kAppTagline,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
-            ),
-            const SizedBox(height: 20),
-            _ImpactCard(
-              loading: _loading,
-              score: _civicScore,
-              reports: _myReports,
-              confirms: _myConfirms,
-              finds: _myFinds,
-            ),
-            const SizedBox(height: 20),
-            _SectionHeader('Community pulse'),
-            const SizedBox(height: 10),
-            _PulseCard(
-              loading: _loading,
-              open: _openCount,
-              inProgress: _inProgressCount,
-              resolved: _resolvedCount,
-              sample: _recent.length,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(child: _SectionHeader('Recent in your area')),
-                if (recentFeed.isNotEmpty)
-                  TextButton(
-                    onPressed: () => context.push(Routes.map),
-                    child: const Text('View map'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (recentFeed.isEmpty)
-              const _EmptyRecent()
-            else
-              ...recentFeed.map(
-                (r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _RecentReportTile(
-                    report: r,
-                    onTap: () => context.push(Routes.reportDetail, extra: r),
-                  ),
+          ),
+          const SizedBox(height: 20),
+          _ImpactCard(
+            loading: _loading,
+            score: _civicScore,
+            reports: _myReports,
+            confirms: _myConfirms,
+            finds: _myFinds,
+          ),
+          const SizedBox(height: 20),
+          _SectionHeader('Community pulse'),
+          const SizedBox(height: 10),
+          _PulseCard(
+            loading: _loading,
+            open: _openCount,
+            inProgress: _inProgressCount,
+            resolved: _resolvedCount,
+            sample: _recent.length,
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(child: _SectionHeader('Recent reports')),
+              if (recentFeed.isNotEmpty)
+                TextButton(
+                  onPressed: () => context.push(Routes.map),
+                  child: const Text('View map'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (recentFeed.isEmpty)
+            const _EmptyRecent()
+          else
+            ...recentFeed.map(
+              (r) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _RecentReportTile(
+                  report: r,
+                  onTap: () => context.push(Routes.reportDetail, extra: r),
                 ),
               ),
-            const SizedBox(height: 12),
-            _SectionHeader('Modules'),
-            const SizedBox(height: 10),
-            _ModuleCard(
-              icon: Icons.radar,
-              color: NivaraColors.primary,
-              title: 'SensorWatch',
-              subtitle: 'Passive pothole detection with tamper-proof evidence',
-              onTap: () => context.push(Routes.sensorWatch),
             ),
-            const SizedBox(height: 12),
-            _ModuleCard(
-              icon: Icons.report,
-              color: NivaraColors.accent,
-              title: 'CivicReport',
-              subtitle: 'File a complaint across 19 civic categories',
-              onTap: () => context.push(Routes.report),
-            ),
-            const SizedBox(height: 12),
-            _ModuleCard(
-              icon: Icons.map,
-              color: NivaraColors.success,
-              title: 'CivicMap',
-              subtitle: 'Live map of reports and Lost & Found pins',
-              onTap: () => context.push(Routes.map),
-            ),
-            const SizedBox(height: 12),
-            _ModuleCard(
-              icon: Icons.travel_explore,
-              color: NivaraColors.danger,
-              title: 'Lost & Found',
-              subtitle: 'Report lost or found items, auto-matched nearby',
-              onTap: () => context.push(Routes.lostFound),
-            ),
-          ],
-        ),
+          const SizedBox(height: 12),
+          _SectionHeader('Modules'),
+          const SizedBox(height: 10),
+          _ModuleCard(
+            icon: Icons.radar,
+            color: NivaraColors.primary,
+            title: 'SensorWatch',
+            subtitle: 'Passive pothole detection with tamper-proof evidence',
+            onTap: () => context.push(Routes.sensorWatch),
+          ),
+          const SizedBox(height: 12),
+          _ModuleCard(
+            icon: Icons.report,
+            color: NivaraColors.accent,
+            title: 'CivicReport',
+            subtitle: 'File a complaint across 19 civic categories',
+            onTap: () => context.push(Routes.report),
+          ),
+          const SizedBox(height: 12),
+          _ModuleCard(
+            icon: Icons.map,
+            color: NivaraColors.success,
+            title: 'CivicMap',
+            subtitle: 'Live map of reports and Lost & Found pins',
+            onTap: () => context.push(Routes.map),
+          ),
+          const SizedBox(height: 12),
+          _ModuleCard(
+            icon: Icons.travel_explore,
+            color: NivaraColors.danger,
+            title: 'Lost & Found',
+            subtitle: 'Report lost or found items, auto-matched nearby',
+            onTap: () => context.push(Routes.lostFound),
+          ),
+        ],
       ),
     );
   }

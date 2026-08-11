@@ -84,6 +84,9 @@ const String kTableLfItems = 'lf_items';
 const String kTableLfMatches = 'lf_matches';
 const String kTableConfirmations = 'confirmations';
 const String kTableStatusHistory = 'report_status_history';
+const String kTableCommunityPosts = 'community_posts';
+const String kTableCommunityPollOptions = 'community_poll_options';
+const String kTableCommunityPollVotes = 'community_poll_votes';
 const String kBucketPhotos = 'complaint-photos';
 
 // ── Demo admin (hackathon) ──────────────────────────────────────────────────
