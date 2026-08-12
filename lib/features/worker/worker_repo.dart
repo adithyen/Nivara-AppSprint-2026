@@ -25,6 +25,41 @@ class WorkerRepo {
     return rows.map<UserProfile>((r) => UserProfile.fromMap(r)).toList();
   }
 
+  /// Every user profile, newest first. Superadmins use this in Manage Staff to
+  /// promote citizens or reassign roles. RLS lets admins read every profile.
+  static Future<List<UserProfile>> listAllProfiles() async {
+    final rows = await supabase
+        .from(kTableProfiles)
+        .select()
+        .order('created_at', ascending: false);
+    return rows.map<UserProfile>((r) => UserProfile.fromMap(r)).toList();
+  }
+
+  /// Superadmin-only role change. Wraps the `set_user_role` SECURITY DEFINER
+  /// RPC — the server re-checks `is_superadmin(auth.uid())` and raises if not.
+  /// [department]/[city]/[ward] are cleared when null (e.g. demoting to citizen).
+  /// Returns the updated profile.
+  static Future<UserProfile> setUserRole({
+    required String userId,
+    required UserRole role,
+    AdminDepartment? department,
+    String? city,
+    String? ward,
+  }) async {
+    final res = await supabase.rpc(
+      'set_user_role',
+      params: {
+        'p_user_id': userId,
+        'p_role': role.wire,
+        'p_department': ?department?.wire,
+        'p_city': ?city,
+        'p_ward': ?ward,
+      },
+    );
+    final row = res is List ? res.first : res;
+    return UserProfile.fromMap(row as Map<String, dynamic>);
+  }
+
   /// Display names for a set of user ids (e.g. to label an assignee).
   static Future<Map<String, String>> displayNamesByIds(
     Iterable<String> ids,
