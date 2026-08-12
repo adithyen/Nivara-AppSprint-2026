@@ -99,3 +99,13 @@ const String kBucketPhotos = 'complaint-photos';
 const String kDemoAdminUsername = 'admin';
 const String kDemoAdminEmail = 'admin@nivara.app';
 const String kDemoAdminPassword = 'admin123';
+
+// ── Demo field worker (hackathon) ───────────────────────────────────────────
+/// A convenience login for the worker side of the round-trip demo. The login
+/// screen's "Worker" toggle reveals + prefills these, and sign-in maps the
+/// [kDemoWorkerUsername] alias onto [kDemoWorkerEmail].
+///
+/// Seed the account once with `supabase/seed_demo_staff.sql`.
+const String kDemoWorkerUsername = 'worker';
+const String kDemoWorkerEmail = 'worker@nivara.app';
+const String kDemoWorkerPassword = 'worker123';

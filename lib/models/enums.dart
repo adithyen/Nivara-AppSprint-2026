@@ -10,6 +10,7 @@ library;
 // ── Roles & departments ─────────────────────────────────────────────────────
 enum UserRole {
   citizen('CITIZEN', 'Citizen'),
+  worker('WORKER', 'Field Worker'),
   admin('ADMIN', 'Administrator'),
   superadmin('SUPERADMIN', 'Super Admin');
 

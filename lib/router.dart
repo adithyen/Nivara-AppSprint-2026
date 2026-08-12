@@ -21,6 +21,8 @@ import 'features/report/report_detail_screen.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/worker/worker_dashboard.dart';
+import 'features/worker/worker_task_detail.dart';
 import 'models/community_post.dart';
 import 'models/enums.dart';
 import 'models/lf_item.dart';
@@ -45,6 +47,8 @@ abstract final class Routes {
   static const myListings = '/lostfound/mine';
   static const communityCompose = '/community/compose';
   static const settings = '/settings';
+  static const worker = '/worker';
+  static const workerTask = '/worker/task';
   static const admin = '/admin';
   static const adminReportDetail = '/admin/report';
 }
@@ -77,11 +81,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!loggedIn) return atAuth ? null : Routes.login;
 
       // Logged in: send splash/auth traffic to the role's landing screen.
-      final landing = profile.isAdmin ? Routes.admin : Routes.home;
+      final landing = profile.isAdmin
+          ? Routes.admin
+          : profile.isWorker
+          ? Routes.worker
+          : Routes.home;
       if (atAuth || atSplash) return landing;
 
-      // Citizens can't reach the municipal side.
-      if (loc.startsWith(Routes.admin) && !profile.isAdmin) return Routes.home;
+      // Keep each side to its own role. Citizens can't reach the municipal
+      // pages; officials and workers each stay on their own dashboard.
+      if (loc.startsWith(Routes.admin) && !profile.isAdmin) return landing;
+      if (loc.startsWith(Routes.worker) && !profile.isWorker) return landing;
 
       return null;
     },
@@ -171,6 +181,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.worker,
+        builder: (context, state) => const WorkerDashboard(),
+      ),
+      GoRoute(
+        path: Routes.workerTask,
+        builder: (context, state) =>
+            WorkerTaskDetailScreen(report: state.extra as Report),
       ),
       GoRoute(
         path: Routes.admin,

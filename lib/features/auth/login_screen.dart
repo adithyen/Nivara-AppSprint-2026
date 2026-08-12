@@ -11,8 +11,11 @@ import 'auth_controller.dart';
 /// Email + password sign-in. Navigation on success is handled by the router's
 /// redirect guard — this screen only drives the form + error display.
 ///
-/// The "Admin" toggle reveals + prefills the demo administrator credentials so
-/// testers can reach the municipal side without a separate account setup.
+/// The role toggle (Citizen / Official / Worker) reveals + prefills the demo
+/// credentials for each side so testers can walk the full round-trip without
+/// setting up separate accounts.
+enum _LoginMode { citizen, official, worker }
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,7 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _password = TextEditingController();
   bool _loading = false;
   bool _obscure = true;
-  bool _adminMode = false;
+  _LoginMode _mode = _LoginMode.citizen;
   String? _error;
 
   @override
@@ -36,16 +39,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _setMode(bool admin) {
+  void _setMode(_LoginMode mode) {
     setState(() {
-      _adminMode = admin;
+      _mode = mode;
       _error = null;
-      if (admin) {
-        _email.text = kDemoAdminUsername;
-        _password.text = kDemoAdminPassword;
-      } else {
-        if (_email.text == kDemoAdminUsername) _email.clear();
-        if (_password.text == kDemoAdminPassword) _password.clear();
+      // Clear any previously prefilled demo value before applying the new one.
+      const demoUsers = [kDemoAdminUsername, kDemoWorkerUsername];
+      const demoPasswords = [kDemoAdminPassword, kDemoWorkerPassword];
+      if (demoUsers.contains(_email.text)) _email.clear();
+      if (demoPasswords.contains(_password.text)) _password.clear();
+      switch (mode) {
+        case _LoginMode.citizen:
+          break;
+        case _LoginMode.official:
+          _email.text = kDemoAdminUsername;
+          _password.text = kDemoAdminPassword;
+        case _LoginMode.worker:
+          _email.text = kDemoWorkerUsername;
+          _password.text = kDemoWorkerPassword;
       }
     });
   }
@@ -59,9 +70,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       final raw = _email.text.trim();
-      // The demo admin signs in with the username "admin"; map it to the email.
-      final email = raw.toLowerCase() == kDemoAdminUsername
+      // Demo staff sign in with a username alias; map it to the real email.
+      final lower = raw.toLowerCase();
+      final email = lower == kDemoAdminUsername
           ? kDemoAdminEmail
+          : lower == kDemoWorkerUsername
+          ? kDemoWorkerEmail
           : raw;
       await ref
           .read(authControllerProvider.notifier)
@@ -78,6 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isStaff = _mode != _LoginMode.citizen;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -111,50 +126,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  SegmentedButton<bool>(
+                  SegmentedButton<_LoginMode>(
+                    showSelectedIcon: false,
                     segments: const [
                       ButtonSegment(
-                        value: false,
+                        value: _LoginMode.citizen,
                         label: Text('Citizen'),
                         icon: Icon(Icons.person_outline),
                       ),
                       ButtonSegment(
-                        value: true,
-                        label: Text('Admin'),
+                        value: _LoginMode.official,
+                        label: Text('Official'),
                         icon: Icon(Icons.shield_outlined),
                       ),
+                      ButtonSegment(
+                        value: _LoginMode.worker,
+                        label: Text('Worker'),
+                        icon: Icon(Icons.engineering),
+                      ),
                     ],
-                    selected: {_adminMode},
+                    selected: {_mode},
                     onSelectionChanged: _loading
                         ? null
                         : (s) => _setMode(s.first),
                   ),
-                  if (_adminMode) ...[
+                  if (isStaff) ...[
                     const SizedBox(height: 16),
-                    _DemoAdminCard(),
+                    _DemoStaffCard(mode: _mode),
                   ],
                   const SizedBox(height: 20),
                   TextFormField(
                     controller: _email,
-                    keyboardType: _adminMode
+                    keyboardType: isStaff
                         ? TextInputType.text
                         : TextInputType.emailAddress,
-                    autofillHints: _adminMode
-                        ? null
-                        : const [AutofillHints.email],
+                    autofillHints: isStaff ? null : const [AutofillHints.email],
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: _adminMode ? 'Username' : 'Email',
+                      labelText: isStaff ? 'Username' : 'Email',
                       prefixIcon: Icon(
-                        _adminMode
-                            ? Icons.badge_outlined
-                            : Icons.email_outlined,
+                        isStaff ? Icons.badge_outlined : Icons.email_outlined,
                       ),
                     ),
                     validator: (v) {
                       final t = v?.trim() ?? '';
                       if (t.isEmpty) return 'Enter your email';
-                      if (t.toLowerCase() == kDemoAdminUsername) return null;
+                      final lower = t.toLowerCase();
+                      if (lower == kDemoAdminUsername ||
+                          lower == kDemoWorkerUsername) {
+                        return null;
+                      }
                       if (!t.contains('@') || !t.contains('.')) {
                         return 'Enter a valid email';
                       }
@@ -165,7 +186,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   TextFormField(
                     controller: _password,
                     obscureText: _obscure,
-                    autofillHints: _adminMode
+                    autofillHints: isStaff
                         ? null
                         : const [AutofillHints.password],
                     textInputAction: TextInputAction.done,
@@ -206,10 +227,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : Text(_adminMode ? 'Sign in as admin' : 'Sign in'),
+                        : Text(switch (_mode) {
+                            _LoginMode.citizen => 'Sign in',
+                            _LoginMode.official => 'Sign in as official',
+                            _LoginMode.worker => 'Sign in as worker',
+                          }),
                   ),
                   const SizedBox(height: 8),
-                  if (!_adminMode)
+                  if (!isStaff)
                     TextButton(
                       onPressed: _loading
                           ? null
@@ -226,11 +251,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-/// Shows the prefilled demo administrator credentials.
-class _DemoAdminCard extends StatelessWidget {
+/// Shows the prefilled demo credentials for the selected staff role.
+class _DemoStaffCard extends StatelessWidget {
+  const _DemoStaffCard({required this.mode});
+  final _LoginMode mode;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isWorker = mode == _LoginMode.worker;
+    final title = isWorker
+        ? 'Demo field worker (prefilled)'
+        : 'Demo official (prefilled)';
+    final username = isWorker ? kDemoWorkerUsername : kDemoAdminUsername;
+    final password = isWorker ? kDemoWorkerPassword : kDemoAdminPassword;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -251,7 +285,7 @@ class _DemoAdminCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Demo administrator (prefilled)',
+                  title,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: scheme.onSecondaryContainer,
                     fontWeight: FontWeight.bold,
@@ -259,7 +293,7 @@ class _DemoAdminCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Username: $kDemoAdminUsername\nPassword: $kDemoAdminPassword',
+                  'Username: $username\nPassword: $password',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: scheme.onSecondaryContainer,
                   ),

@@ -6,7 +6,9 @@ import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
+import '../../models/user_profile.dart';
 import '../report/category_grid.dart';
+import '../worker/worker_repo.dart';
 import 'status_style.dart';
 
 /// Municipal detail view for a single report. Staff read the full context —
@@ -27,6 +29,58 @@ class AdminReportDetailScreen extends StatefulWidget {
 class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
   late Report _report = widget.report;
   bool _working = false;
+
+  /// Display name of the currently assigned worker, resolved lazily from the
+  /// `assigned_to` id so the Assignment card reads "Assigned to Ravi Kumar".
+  String? _assigneeName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssignee();
+  }
+
+  Future<void> _loadAssignee() async {
+    final id = _report.assignedTo;
+    if (id == null) return;
+    try {
+      final names = await WorkerRepo.displayNamesByIds([id]);
+      if (mounted) setState(() => _assigneeName = names[id]);
+    } catch (_) {
+      /* name is a nicety; the id-only fallback still renders */
+    }
+  }
+
+  Future<void> _openAssignSheet() async {
+    final worker = await showModalBottomSheet<UserProfile>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _AssignSheet(),
+    );
+    if (worker != null) await _assignTo(worker);
+  }
+
+  Future<void> _assignTo(UserProfile worker) async {
+    setState(() => _working = true);
+    try {
+      final updated = await WorkerRepo.assignReport(
+        reportId: _report.id,
+        workerId: worker.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _report = updated;
+        _assigneeName = worker.displayName;
+        _working = false;
+      });
+      _snack('Assigned to ${worker.displayName}.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _working = false);
+      _snack('Could not assign: $e');
+    }
+  }
 
   /// The status transitions offered from the current status.
   List<_Action> get _actions {
@@ -214,6 +268,16 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
                     if (r.isCommunityVerified)
                       _MetaRow('Community', 'Verified by nearby citizens'),
                   ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              _Section(
+                title: 'Assignment',
+                child: _AssignmentBody(
+                  assigneeName: _assigneeName,
+                  assigneeId: r.assignedTo,
+                  working: _working,
+                  onAssign: _openAssignSheet,
                 ),
               ),
               const SizedBox(height: 8),
@@ -511,6 +575,169 @@ class _MetaRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Current assignee (if any) plus the Assign / Reassign button. Handing a
+/// report to a worker also bumps SUBMITTED → ACKNOWLEDGED server-side.
+class _AssignmentBody extends StatelessWidget {
+  const _AssignmentBody({
+    required this.assigneeName,
+    required this.assigneeId,
+    required this.working,
+    required this.onAssign,
+  });
+
+  final String? assigneeName;
+  final String? assigneeId;
+  final bool working;
+  final VoidCallback onAssign;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final assigned = assigneeId != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              assigned ? Icons.assignment_ind : Icons.person_off_outlined,
+              color: assigned ? NivaraColors.primary : scheme.outline,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                assigned
+                    ? 'Assigned to ${assigneeName ?? 'a field worker'}'
+                    : 'Not yet assigned to a field worker',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: working ? null : onAssign,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
+          icon: Icon(
+            assigned ? Icons.published_with_changes : Icons.person_add_alt,
+          ),
+          label: Text(
+            assigned ? 'Reassign to another worker' : 'Assign to worker',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bottom sheet listing every field worker for the official to pick from.
+/// Pops the chosen [UserProfile].
+class _AssignSheet extends StatefulWidget {
+  const _AssignSheet();
+
+  @override
+  State<_AssignSheet> createState() => _AssignSheetState();
+}
+
+class _AssignSheetState extends State<_AssignSheet> {
+  List<UserProfile>? _workers;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await WorkerRepo.listWorkers();
+      if (mounted) setState(() => _workers = list);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final workers = _workers;
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: Text(
+                'Assign to worker',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Text('Could not load workers: $_error'),
+              )
+            else if (workers == null)
+              const Padding(
+                padding: EdgeInsets.all(28),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (workers.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Text(
+                  'No field workers found. Seed them with '
+                  'supabase/seed_demo_staff.sql.',
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  itemCount: workers.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final w = workers[i];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: NivaraColors.primary.withValues(
+                          alpha: 0.15,
+                        ),
+                        child: const Icon(
+                          Icons.engineering,
+                          color: NivaraColors.primary,
+                        ),
+                      ),
+                      title: Text(w.displayName),
+                      subtitle: Text(
+                        w.department?.label ?? 'General',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.pop(context, w),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -43,6 +43,12 @@ class UserProfile {
   bool get isAdmin => role == UserRole.admin || role == UserRole.superadmin;
   bool get isSuperadmin => role == UserRole.superadmin;
 
+  /// A municipal field worker: sees only the tasks assigned to them.
+  bool get isWorker => role == UserRole.worker;
+
+  /// Any municipal account (official or field worker) — i.e. not a citizen.
+  bool get isStaff => isAdmin || isWorker;
+
   factory UserProfile.fromMap(Map<String, dynamic> map) => UserProfile(
     id: map['id'] as String,
     displayName: (map['display_name'] as String?) ?? 'Citizen',
