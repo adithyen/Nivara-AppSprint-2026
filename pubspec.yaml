@@ -38,7 +38,7 @@ dependencies:
   device_info_plus: ^13.2.0
   package_info_plus: ^10.2.1
   path_provider: ^2.1.4
-  font_awesome_flutter: ^10.10.0
+  simple_icons: ^16.23.0
 
 dev_dependencies:
   flutter_test:

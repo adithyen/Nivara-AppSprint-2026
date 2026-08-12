@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:simple_icons/simple_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
@@ -13,15 +13,16 @@ import '../../models/enums.dart';
 /// Deep links: phone → `tel:`, whatsapp → `wa.me/<digits>`, email → `mailto:`,
 /// telegram → `t.me/<handle>`, instagram → `instagram.com/<handle>`.
 
-/// Each method shows with its *official* brand glyph (Font Awesome brands),
-/// not a generic look-alike — so WhatsApp is the WhatsApp mark, Instagram the
-/// Instagram mark, and so on.
+/// Each method shows with its *official* brand glyph where one exists — WhatsApp
+/// is the WhatsApp mark, Telegram the Telegram mark, Instagram the Instagram
+/// mark (via Simple Icons). Phone and email are generic channels, so they keep
+/// clean Material glyphs rather than a look-alike brand mark.
 IconData lfContactIcon(LFContactMethod m) => switch (m) {
-  LFContactMethod.phone => FontAwesomeIcons.phone,
-  LFContactMethod.whatsapp => FontAwesomeIcons.whatsapp,
-  LFContactMethod.email => FontAwesomeIcons.envelope,
-  LFContactMethod.telegram => FontAwesomeIcons.telegram,
-  LFContactMethod.instagram => FontAwesomeIcons.instagram,
+  LFContactMethod.phone => Icons.phone,
+  LFContactMethod.whatsapp => SimpleIcons.whatsapp,
+  LFContactMethod.email => Icons.mail_outline,
+  LFContactMethod.telegram => SimpleIcons.telegram,
+  LFContactMethod.instagram => SimpleIcons.instagram,
 };
 
 Color lfContactColor(LFContactMethod m) => switch (m) {
