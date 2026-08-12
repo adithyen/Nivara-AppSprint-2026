@@ -14,17 +14,21 @@ abstract final class NivaraColors {
   static const Color surfaceDark = Color(0xFF121517);
 }
 
-/// Central theme factory. `NivaraTheme.light` / `.dark` feed [MaterialApp].
+/// Central theme factory. `NivaraTheme.light(seed)` / `.dark(seed)` feed
+/// [MaterialApp]. [seed] is the user's chosen accent colour (defaults to the
+/// brand blue) and drives the whole [ColorScheme] plus the app bar.
 abstract final class NivaraTheme {
-  static ThemeData get light => _build(Brightness.light);
-  static ThemeData get dark => _build(Brightness.dark);
+  static ThemeData light([Color seed = NivaraColors.primary]) =>
+      _build(Brightness.light, seed);
+  static ThemeData dark([Color seed = NivaraColors.primary]) =>
+      _build(Brightness.dark, seed);
 
-  static ThemeData _build(Brightness brightness) {
+  static ThemeData _build(Brightness brightness, Color seed) {
     final isDark = brightness == Brightness.dark;
     final scheme = ColorScheme.fromSeed(
-      seedColor: NivaraColors.primary,
+      seedColor: seed,
       brightness: brightness,
-      primary: NivaraColors.primary,
+      primary: seed,
       secondary: NivaraColors.accent,
       error: NivaraColors.danger,
       surface: isDark ? NivaraColors.surfaceDark : NivaraColors.surface,
@@ -35,7 +39,7 @@ abstract final class NivaraTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       appBarTheme: AppBarTheme(
-        backgroundColor: NivaraColors.primary,
+        backgroundColor: seed,
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,

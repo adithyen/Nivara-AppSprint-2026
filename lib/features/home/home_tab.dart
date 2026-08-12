@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/civic_level.dart';
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
-import '../../core/utils.dart';
+import '../../core/widgets/civic_level_view.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../router.dart';
-import '../admin/status_style.dart';
 import '../auth/auth_controller.dart';
-import '../report/category_grid.dart';
 
 /// The **Home** tab of the citizen shell — the landing dashboard.
 ///
@@ -19,8 +18,9 @@ import '../report/category_grid.dart';
 /// [HomeShell]. Stats are computed **live** from the database (the profile
 /// counters have no maintaining triggers, so they'd read 0). We count the
 /// signed-in user's reports, confirmations and finds, derive a civic-impact
-/// score client-side, and show a community-pulse strip + a recent-report feed
-/// over the 50 latest reports. Pull-to-refresh re-runs everything.
+/// score client-side, and show a community-pulse strip over the 50 latest
+/// reports. The full recent-report feed lives on the Pulse tab (kept out of
+/// Home to avoid duplication). Pull-to-refresh re-runs everything.
 class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({super.key});
 
@@ -138,7 +138,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(authControllerProvider).asData?.value;
-    final recentFeed = _recent.take(6).toList();
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -176,35 +175,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             sample: _recent.length,
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(child: _SectionHeader('Recent reports')),
-              if (recentFeed.isNotEmpty)
-                TextButton(
-                  onPressed: () => context.push(Routes.map),
-                  child: const Text('View map'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (recentFeed.isEmpty)
-            const _EmptyRecent()
-          else
-            ...recentFeed.map(
-              (r) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _RecentReportTile(
-                  report: r,
-                  onTap: () => context.push(Routes.reportDetail, extra: r),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
           _SectionHeader('Modules'),
           const SizedBox(height: 10),
           _ModuleCard(
@@ -332,13 +302,7 @@ class _ImpactCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 2),
-          Text(
-            'Estimated from your activity below',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 12,
-            ),
-          ),
+          CivicLevelBar(standing: civicStandingFor(score), onDark: true),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -509,125 +473,6 @@ class _PulseStat extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A compact recent-report row that taps through to the full report detail.
-class _RecentReportTile extends StatelessWidget {
-  const _RecentReportTile({required this.report, required this.onTap});
-
-  final Report report;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final sev = severityColor(report.severity);
-    final title = report.title?.trim().isNotEmpty == true
-        ? report.title!.trim()
-        : report.category.label;
-    final status = statusColor(report.status);
-
-    return Material(
-      color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: sev.withValues(alpha: 0.15),
-                child: Icon(
-                  categoryIcon(report.category),
-                  color: sev,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${report.category.label} · ${timeAgo(report.createdAt)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: status.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  report.status.label,
-                  style: TextStyle(
-                    color: status,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyRecent extends StatelessWidget {
-  const _EmptyRecent();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.inbox_outlined, size: 36, color: scheme.outline),
-          const SizedBox(height: 8),
-          Text(
-            'No reports yet',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Be the first — file a report or run SensorWatch.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
           ),
         ],
       ),

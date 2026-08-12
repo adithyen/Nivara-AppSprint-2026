@@ -117,7 +117,16 @@ class _LostFoundHubState extends State<LostFoundHub> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Lost & Found')),
+      appBar: AppBar(
+        title: const Text('Lost & Found'),
+        actions: [
+          IconButton(
+            tooltip: 'My listings',
+            icon: const Icon(Icons.inbox_outlined),
+            onPressed: () => context.push(Routes.myListings),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(

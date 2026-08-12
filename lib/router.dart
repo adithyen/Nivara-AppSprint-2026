@@ -12,6 +12,7 @@ import 'features/community/community_compose_screen.dart';
 import 'features/home/home_shell.dart';
 import 'features/lostfound/lostfound_hub.dart';
 import 'features/lostfound/lf_item_detail.dart';
+import 'features/lostfound/my_listings_screen.dart';
 import 'features/lostfound/match_screen.dart';
 import 'features/lostfound/report_found_screen.dart';
 import 'features/lostfound/report_lost_screen.dart';
@@ -19,6 +20,7 @@ import 'features/map/civic_map.dart';
 import 'features/report/report_detail_screen.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
+import 'features/settings/settings_screen.dart';
 import 'models/community_post.dart';
 import 'models/enums.dart';
 import 'models/lf_item.dart';
@@ -40,7 +42,9 @@ abstract final class Routes {
   static const reportFound = '/lostfound/found';
   static const lostFoundMatch = '/lostfound/match';
   static const lostFoundDetail = '/lostfound/detail';
+  static const myListings = '/lostfound/mine';
   static const communityCompose = '/community/compose';
+  static const settings = '/settings';
   static const admin = '/admin';
   static const adminReportDetail = '/admin/report';
 }
@@ -120,6 +124,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LostFoundHub(),
       ),
       GoRoute(
+        path: Routes.myListings,
+        builder: (context, state) => const MyListingsScreen(),
+      ),
+      GoRoute(
         path: Routes.reportLost,
         builder: (context, state) => const ReportLostScreen(),
       ),
@@ -152,12 +160,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.communityCompose,
         builder: (context, state) {
           final args =
-              state.extra as ({CommunityPostType type, CommunityPost? existing});
+              state.extra
+                  as ({CommunityPostType type, CommunityPost? existing});
           return CommunityComposeScreen(
             type: args.type,
             existing: args.existing,
           );
         },
+      ),
+      GoRoute(
+        path: Routes.settings,
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: Routes.admin,

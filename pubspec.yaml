@@ -38,11 +38,22 @@ dependencies:
   device_info_plus: ^13.2.0
   package_info_plus: ^10.2.1
   path_provider: ^2.1.4
+  font_awesome_flutter: ^10.10.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# App launcher icon — regenerate with `dart run flutter_launcher_icons`.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/nivara_icon.png"
+  adaptive_icon_background: "#1B6CA8"
+  adaptive_icon_foreground: "assets/icon/nivara_icon_foreground.png"
+  min_sdk_android: 21
 
 # The following section is specific to Flutter packages.
 flutter:

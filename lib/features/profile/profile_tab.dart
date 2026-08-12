@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/civic_level.dart';
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/civic_level_view.dart';
 import '../../models/enums.dart';
 import '../../models/user_profile.dart';
+import '../../router.dart';
 import '../auth/auth_controller.dart';
 
 /// The **Profile** tab — account identity, a live civic-impact summary, the
@@ -40,7 +44,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   Future<void> _load() async {
     final uid = ref.read(authControllerProvider).asData?.value?.id;
     final reports = await _count(kTableReports, uid, {});
-    final confirms = await _count(kTableConfirmations, uid, {'type': 'CONFIRM'});
+    final confirms = await _count(kTableConfirmations, uid, {
+      'type': 'CONFIRM',
+    });
     final finds = await _count(kTableLfItems, uid, {'item_type': 'FOUND'});
     if (!mounted) return;
     setState(() {
@@ -146,8 +152,16 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.edit_outlined,
             color: NivaraColors.primary,
             title: 'Edit profile',
-            subtitle: 'Name, phone, and area',
+            subtitle: 'Name, contact, and area',
             onTap: profile == null ? null : () => _editProfile(profile),
+          ),
+          const SizedBox(height: 12),
+          _ActionTile(
+            icon: Icons.palette_outlined,
+            color: const Color(0xFF7B4BC4),
+            title: 'Appearance',
+            subtitle: 'Theme mode and accent colour',
+            onTap: () => context.push(Routes.settings),
           ),
           const SizedBox(height: 12),
           _ActionTile(
@@ -302,9 +316,9 @@ class _ImpactCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 'Civic impact',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               Text(
@@ -320,18 +334,32 @@ class _ImpactCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _Stat(icon: Icons.report_outlined, value: reports, label: 'Reports', loading: loading),
+              _Stat(
+                icon: Icons.report_outlined,
+                value: reports,
+                label: 'Reports',
+                loading: loading,
+              ),
               _Divider(),
-              _Stat(icon: Icons.thumb_up_alt_outlined, value: confirms, label: 'Confirms', loading: loading),
+              _Stat(
+                icon: Icons.thumb_up_alt_outlined,
+                value: confirms,
+                label: 'Confirms',
+                loading: loading,
+              ),
               _Divider(),
-              _Stat(icon: Icons.volunteer_activism_outlined, value: finds, label: 'Finds', loading: loading),
+              _Stat(
+                icon: Icons.volunteer_activism_outlined,
+                value: finds,
+                label: 'Finds',
+                loading: loading,
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Estimated from your activity',
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
-          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+          CivicLevelBar(standing: civicStandingFor(score)),
         ],
       ),
     );
@@ -428,8 +456,12 @@ class _EditProfileSheet extends ConsumerStatefulWidget {
 }
 
 class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
-  late final _nameCtrl = TextEditingController(text: widget.profile.displayName);
-  late final _phoneCtrl = TextEditingController(text: widget.profile.phone ?? '');
+  late final _nameCtrl = TextEditingController(
+    text: widget.profile.displayName,
+  );
+  late final _phoneCtrl = TextEditingController(
+    text: widget.profile.phone ?? '',
+  );
   late final _cityCtrl = TextEditingController(text: widget.profile.city ?? '');
   late final _wardCtrl = TextEditingController(text: widget.profile.ward ?? '');
   bool _saving = false;
@@ -445,9 +477,9 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
 
   Future<void> _save() async {
     if (_nameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name can\'t be empty.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Name can\'t be empty.')));
       return;
     }
     setState(() => _saving = true);
@@ -467,15 +499,16 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final email = supabase.auth.currentUser?.email ?? '';
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + bottom),
       child: Column(
@@ -489,6 +522,17 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
+          if (email.isNotEmpty) ...[
+            TextField(
+              enabled: false,
+              controller: TextEditingController(text: email),
+              decoration: const InputDecoration(
+                labelText: 'Email (account login)',
+                prefixIcon: Icon(Icons.mail_outline),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           TextField(
             controller: _nameCtrl,
             textCapitalization: TextCapitalization.words,
@@ -603,7 +647,11 @@ class _WorkWithNivaraSheet extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.schedule, color: NivaraColors.accent, size: 20),
+                const Icon(
+                  Icons.schedule,
+                  color: NivaraColors.accent,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -641,7 +689,11 @@ class _Bullet extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 2),
-            child: Icon(Icons.check_circle, size: 18, color: NivaraColors.success),
+            child: Icon(
+              Icons.check_circle,
+              size: 18,
+              color: NivaraColors.success,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(text)),

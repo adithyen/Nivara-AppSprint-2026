@@ -120,7 +120,10 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
     };
   }
 
-  Future<void> _compose(CommunityPostType type, {CommunityPost? existing}) async {
+  Future<void> _compose(
+    CommunityPostType type, {
+    CommunityPost? existing,
+  }) async {
     final created = await context.push<bool>(
       Routes.communityCompose,
       extra: (type: type, existing: existing),
@@ -169,9 +172,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: NivaraColors.danger,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: NivaraColors.danger),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -281,10 +282,7 @@ class _ComposerPrompt extends StatelessWidget {
             runSpacing: 10,
             children: [
               for (final t in CommunityPostType.values)
-                _TemplateButton(
-                  type: t,
-                  onTap: () => onSelect(t),
-                ),
+                _TemplateButton(type: t, onTap: () => onSelect(t)),
             ],
           ),
         ],
@@ -709,9 +707,9 @@ class _ContactButton extends StatelessWidget {
       onPressed: () async {
         final ok = await launchLFContact(m, post.contactValue!);
         if (!ok && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not open ${m.label}.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Could not open ${m.label}.')));
         }
       },
       style: OutlinedButton.styleFrom(

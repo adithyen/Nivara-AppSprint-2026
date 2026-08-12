@@ -198,6 +198,25 @@ enum MatchStatus {
       values.firstWhere((e) => e.wire == w, orElse: () => MatchStatus.pending);
 }
 
+/// Lifecycle of a Lost & Found claim (see `0005_lf_claims.sql`). A claimant
+/// sends a PENDING claim on someone else's listing; the owner COMPLETEs it
+/// (resolving both listings) or REJECTs it; the claimant may CANCEL their own.
+enum LFClaimStatus {
+  pending('PENDING', 'Pending'),
+  completed('COMPLETED', 'Completed'),
+  rejected('REJECTED', 'Rejected'),
+  cancelled('CANCELLED', 'Withdrawn');
+
+  final String wire;
+  final String label;
+  const LFClaimStatus(this.wire, this.label);
+
+  static LFClaimStatus fromWire(String? w) => values.firstWhere(
+    (e) => e.wire == w,
+    orElse: () => LFClaimStatus.pending,
+  );
+}
+
 // ── Community board ─────────────────────────────────────────────────────────
 /// The four post templates on the neighbourhood Community board. Mirrors the
 /// `community_post_type` Postgres enum in `0002_community.sql`.

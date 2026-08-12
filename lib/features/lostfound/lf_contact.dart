@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
@@ -12,12 +13,15 @@ import '../../models/enums.dart';
 /// Deep links: phone → `tel:`, whatsapp → `wa.me/<digits>`, email → `mailto:`,
 /// telegram → `t.me/<handle>`, instagram → `instagram.com/<handle>`.
 
+/// Each method shows with its *official* brand glyph (Font Awesome brands),
+/// not a generic look-alike — so WhatsApp is the WhatsApp mark, Instagram the
+/// Instagram mark, and so on.
 IconData lfContactIcon(LFContactMethod m) => switch (m) {
-  LFContactMethod.phone => Icons.call,
-  LFContactMethod.whatsapp => Icons.chat,
-  LFContactMethod.email => Icons.email_outlined,
-  LFContactMethod.telegram => Icons.send,
-  LFContactMethod.instagram => Icons.camera_alt_outlined,
+  LFContactMethod.phone => FontAwesomeIcons.phone,
+  LFContactMethod.whatsapp => FontAwesomeIcons.whatsapp,
+  LFContactMethod.email => FontAwesomeIcons.envelope,
+  LFContactMethod.telegram => FontAwesomeIcons.telegram,
+  LFContactMethod.instagram => FontAwesomeIcons.instagram,
 };
 
 Color lfContactColor(LFContactMethod m) => switch (m) {

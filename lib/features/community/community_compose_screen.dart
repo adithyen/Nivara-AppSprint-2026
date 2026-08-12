@@ -327,9 +327,7 @@ class _CommunityComposeScreenState
   Widget build(BuildContext context) {
     final color = communityTypeColor(_type);
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${_isEdit ? 'Edit' : 'New'} ${_type.label}'),
-      ),
+      appBar: AppBar(title: Text('${_isEdit ? 'Edit' : 'New'} ${_type.label}')),
       body: AbsorbPointer(
         absorbing: _submitting,
         child: ListView(
@@ -536,7 +534,11 @@ class _CommunityComposeScreenState
                     value: m,
                     child: Row(
                       children: [
-                        Icon(lfContactIcon(m), size: 18, color: lfContactColor(m)),
+                        Icon(
+                          lfContactIcon(m),
+                          size: 18,
+                          color: lfContactColor(m),
+                        ),
                         const SizedBox(width: 10),
                         Text(m.label),
                       ],

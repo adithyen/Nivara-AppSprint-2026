@@ -82,6 +82,7 @@ const String kTableReports = 'reports';
 const String kTableProfiles = 'user_profiles';
 const String kTableLfItems = 'lf_items';
 const String kTableLfMatches = 'lf_matches';
+const String kTableLfClaims = 'lf_claims';
 const String kTableConfirmations = 'confirmations';
 const String kTableStatusHistory = 'report_status_history';
 const String kTableCommunityPosts = 'community_posts';

@@ -157,14 +157,8 @@ class _PulseTabState extends ConsumerState<PulseTab> {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _AreaReportTile(
                       report: r,
-                      distanceMeters: haversineMeters(
-                        _lat,
-                        _lng,
-                        r.lat,
-                        r.lng,
-                      ),
-                      onTap: () =>
-                          context.push(Routes.reportDetail, extra: r),
+                      distanceMeters: haversineMeters(_lat, _lng, r.lat, r.lng),
+                      onTap: () => context.push(Routes.reportDetail, extra: r),
                     ),
                   ),
                 ),
@@ -394,7 +388,11 @@ class _AreaReportTile extends StatelessWidget {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: sev.withValues(alpha: 0.15),
-                child: Icon(categoryIcon(report.category), color: sev, size: 20),
+                child: Icon(
+                  categoryIcon(report.category),
+                  color: sev,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
