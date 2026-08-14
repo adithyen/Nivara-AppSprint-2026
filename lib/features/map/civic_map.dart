@@ -1,14 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
-import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../core/constants.dart';
 import '../../core/services/debug_logger.dart';
@@ -16,20 +11,21 @@ import '../../core/services/location_service.dart';
 import '../../core/services/ola_maps_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/ola_map_view.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../../models/report.dart';
 import '../../router.dart';
-import '../../features/report/category_grid.dart';
+import '../report/category_grid.dart';
 
-/// Live civic map powered by Ola Maps.
+/// 2026-Level Futuristic Civic Map powered by official Native Ola Maps SDK.
 ///
 /// Features:
-/// • Native vector rendering of Ola "Style1-Dark" with dynamically signed tiles/sprites/glyphs
-/// • Top floating Search Bar with Ola Places Autocomplete
-/// • Nearby Search POI chips for landmarks (hospitals, police, transit, civic offices)
-/// • Supabase Realtime synchronized civic complaint & Lost & Found markers
-/// • Long-press / Tap to inspect location address & file an issue directly
+/// • Full native Android Ola Map rendering with Ola vector tiles & data
+/// • Glassmorphic top floating Search Bar with Ola Places Autocomplete
+/// • Nearby POI Discovery Pills (Hospitals, Police, Transit, Civic Offices)
+/// • Supabase Realtime synchronization with live colored marker pins
+/// • Tap-to-inspect reports, Lost & Found items, and custom spot reporting
 class CivicMapScreen extends ConsumerStatefulWidget {
   const CivicMapScreen({super.key});
 
@@ -40,20 +36,17 @@ class CivicMapScreen extends ConsumerStatefulWidget {
 class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   static final _log = DebugLogger.instance;
   final _ola = OlaMapsService.instance;
+  final _loc = const LocationService();
 
-  MapLibreMapController? _controller;
+  OlaNativeMapController? _controller;
   final _reports = <String, Report>{};
   final _lfItems = <String, LFItem>{};
-  final _symbolIds = <String, String>{}; // itemId -> symbolId
   StreamSubscription? _reportsSub;
   StreamSubscription? _lfSub;
   bool _mapReady = false;
-  bool _imagesReady = false;
-  bool _showLog = false;
   bool _locating = false;
-  final _loc = const LocationService();
+  bool _showLog = false;
 
-  String? _styleString;
   double _currentCenterLat = kDefaultLat;
   double _currentCenterLng = kDefaultLng;
 
@@ -66,7 +59,7 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
 
   // Nearby discovery filters
   final List<({String label, String icon, String? type})> _nearbyFilters = [
-    (label: 'All Reports', icon: '📍', type: null),
+    (label: 'All Issues', icon: '📍', type: null),
     (label: 'Hospitals', icon: '🏥', type: 'hospital'),
     (label: 'Police', icon: '👮', type: 'police'),
     (label: 'Transit', icon: '🚌', type: 'transit_station'),
@@ -76,22 +69,13 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   List<OlaPlacePrediction> _nearbyPlaces = [];
   bool _loadingNearby = false;
 
-  // Pin image name → fill colour. Registered once after the style loads.
-  static const _grey = Color(0xFF95A5A6);
-  Map<String, Color> get _pinPalette => {
-    'pin-submitted': NivaraColors.accent,
-    'pin-inprogress': NivaraColors.primary,
-    'pin-resolved': NivaraColors.success,
-    'pin-default': _grey,
-    'pin-lost': NivaraColors.danger,
-    'pin-found': NivaraColors.success,
-  };
+  // Quick spot tap inspect
+  ({double lat, double lng, String address})? _selectedSpot;
 
   @override
   void initState() {
     super.initState();
-    _log.log('MAP', 'CivicMapScreen initState');
-    _loadStyle();
+    _log.log('MAP', 'CivicMapScreen initState (Native Ola Map)');
     _seedFromRest();
     _subscribeRealtime();
   }
@@ -100,20 +84,138 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   void dispose() {
     _debounceTimer?.cancel();
     _searchCtrl.dispose();
-    _controller?.onSymbolTapped.remove(_onSymbolTapped);
     _reportsSub?.cancel();
     _lfSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadStyle() async {
-    final style = await _ola.getAuthenticatedVectorStyleJson();
-    if (mounted) {
-      setState(() {
-        _styleString = style ?? _darkStyleJson();
-      });
+  // ── Realtime & REST Sync ──────────────────────────────────────────────────
+
+  Future<void> _seedFromRest() async {
+    try {
+      final rows = await supabase.from(kTableReports).select();
+      for (final r in rows) {
+        try {
+          _reports[r['id'] as String] = Report.fromMap(r);
+        } catch (_) {}
+      }
+    } catch (e) {
+      _log.error('MAP', 'reports seed failed: $e');
+    }
+
+    try {
+      final rows = await supabase
+          .from(kTableLfItems)
+          .select()
+          .eq('status', 'ACTIVE');
+      for (final r in rows) {
+        try {
+          _lfItems[r['id'] as String] = LFItem.fromMap(r);
+        } catch (_) {}
+      }
+    } catch (e) {
+      _log.error('MAP', 'lf_items seed failed: $e');
+    }
+
+    if (_mapReady) _syncMarkersToOlaMap();
+  }
+
+  void _subscribeRealtime() {
+    _reportsSub = supabase
+        .from(kTableReports)
+        .stream(primaryKey: ['id'])
+        .listen((rows) {
+          for (final r in rows) {
+            try {
+              _reports[r['id'] as String] = Report.fromMap(r);
+            } catch (_) {}
+          }
+          if (_mapReady) _syncMarkersToOlaMap();
+        });
+
+    _lfSub = supabase
+        .from(kTableLfItems)
+        .stream(primaryKey: ['id'])
+        .listen((rows) {
+          for (final r in rows) {
+            try {
+              _lfItems[r['id'] as String] = LFItem.fromMap(r);
+            } catch (_) {}
+          }
+          if (_mapReady) _syncMarkersToOlaMap();
+        });
+  }
+
+  Future<void> _syncMarkersToOlaMap() async {
+    final c = _controller;
+    if (c == null) return;
+
+    await c.clearMarkers();
+
+    // Add reports
+    for (final r in _reports.values) {
+      final color = switch (r.status) {
+        ReportStatus.submitted => const Color(0xFFFFB300),
+        ReportStatus.inProgress => const Color(0xFF29B6F6),
+        ReportStatus.resolved => const Color(0xFF00E676),
+        _ => const Color(0xFF90A4AE),
+      };
+      await c.addMarker(
+        id: 'report_${r.id}',
+        lat: r.lat,
+        lng: r.lng,
+        snippet: r.title ?? r.category.label,
+        color: color,
+      );
+    }
+
+    // Add L&F items
+    for (final l in _lfItems.values) {
+      final color = l.isLost ? const Color(0xFFFF5252) : const Color(0xFF00E676);
+      await c.addMarker(
+        id: 'lf_${l.id}',
+        lat: l.lat,
+        lng: l.lng,
+        snippet: '${l.isLost ? 'Lost' : 'Found'}: ${l.title}',
+        color: color,
+      );
     }
   }
+
+  // ── Native Map Callbacks ──────────────────────────────────────────────────
+
+  void _onMapReady(OlaNativeMapController controller) {
+    _controller = controller;
+    _mapReady = true;
+    _syncMarkersToOlaMap();
+    _goToMyLocation(initial: true);
+  }
+
+  void _onMarkerClicked(String markerId) {
+    if (markerId.startsWith('report_')) {
+      final id = markerId.substring('report_'.length);
+      final r = _reports[id];
+      if (r != null) _showReportSheet(r);
+    } else if (markerId.startsWith('lf_')) {
+      final id = markerId.substring('lf_'.length);
+      final l = _lfItems[id];
+      if (l != null) _showLfSheet(l);
+    }
+  }
+
+  Future<void> _onMapClicked(double lat, double lng) async {
+    final addr = await _ola.reverseGeocode(lat: lat, lng: lng);
+    if (!mounted) return;
+    setState(() {
+      _selectedSpot = (
+        lat: lat,
+        lng: lng,
+        address: addr ?? '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+      );
+    });
+  }
+
+  // ── Autocomplete Search ───────────────────────────────────────────────────
 
   void _onSearchChanged(String text) {
     _debounceTimer?.cancel();
@@ -127,7 +229,7 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     }
 
     setState(() => _searching = true);
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 280), () async {
       final results = await _ola.autocomplete(
         text,
         lat: _currentCenterLat,
@@ -163,11 +265,7 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     if (lat != null && lng != null) {
       _currentCenterLat = lat;
       _currentCenterLng = lng;
-      await _controller?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: LatLng(lat, lng), zoom: 16.5),
-        ),
-      );
+      await _controller?.animateCamera(lat: lat, lng: lng, zoom: 16.5);
     }
   }
 
@@ -197,501 +295,253 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     if (p.lat != null && p.lng != null) {
       _currentCenterLat = p.lat!;
       _currentCenterLng = p.lng!;
-      await _controller?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: LatLng(p.lat!, p.lng!), zoom: 16.5),
-        ),
-      );
+      await _controller?.animateCamera(lat: p.lat!, lng: p.lng!, zoom: 16.5);
     }
   }
 
-  // ── One-time REST seed ────────────────────────────────────────────────────
-  /// Fetch current reports + lf_items once via REST so pins paint even when
-  /// Realtime is disabled for a table (the logger showed lf_items Realtime was
-  /// off). The streams below then keep things live if/when they connect.
-  Future<void> _seedFromRest() async {
-    try {
-      final rows = await supabase.from(kTableReports).select();
-      for (final r in rows) {
-        try {
-          _reports[r['id'] as String] = Report.fromMap(r);
-        } catch (_) {
-          /* skip */
-        }
-      }
-    } catch (e) {
-      _log.error('MAP', 'reports seed failed: $e');
-    }
-    try {
-      final rows = await supabase
-          .from(kTableLfItems)
-          .select()
-          .eq('status', 'ACTIVE');
-      for (final r in rows) {
-        try {
-          _lfItems[r['id'] as String] = LFItem.fromMap(r);
-        } catch (_) {
-          /* skip */
-        }
-      }
-    } catch (e) {
-      _log.error('MAP', 'lf_items seed failed: $e');
-    }
-    _log.log(
-      'MAP',
-      'REST seed: ${_reports.length} reports, '
-          '${_lfItems.length} lf items',
-    );
-    if (_mapReady && _imagesReady) _rebuildSymbols();
-  }
-
-  // ── Realtime data ───────────────────────────────────────────────────────
-  void _subscribeRealtime() {
-    _reportsSub = supabase
-        .from(kTableReports)
-        .stream(primaryKey: ['id'])
-        .listen((rows) {
-          for (final r in rows) {
-            try {
-              _reports[r['id'] as String] = Report.fromMap(r);
-            } catch (e) {
-              _log.error('MAP', 'Report.fromMap failed: $e');
-            }
-          }
-          _log.log(
-            'MAP',
-            'reports stream: ${rows.length} row(s), '
-                '${_reports.length} total',
-          );
-          if (_mapReady && _imagesReady) _rebuildSymbols();
-        }, onError: (e) => _log.error('MAP', 'reports stream error: $e'));
-
-    _lfSub = supabase.from(kTableLfItems).stream(primaryKey: ['id']).listen((
-      rows,
-    ) {
-      for (final r in rows) {
-        try {
-          _lfItems[r['id'] as String] = LFItem.fromMap(r);
-        } catch (e) {
-          _log.error('MAP', 'LFItem.fromMap failed: $e');
-        }
-      }
-      _log.log(
-        'MAP',
-        'lf_items stream: ${rows.length} row(s), '
-            '${_lfItems.length} total',
-      );
-      if (_mapReady && _imagesReady) _rebuildSymbols();
-    }, onError: (e) => _log.error('MAP', 'lf_items stream error: $e'));
-  }
-
-  // ── Symbols ─────────────────────────────────────────────────────────────
-  Future<void> _rebuildSymbols() async {
-    final c = _controller;
-    if (c == null || c.symbolManager == null) return;
-
-    await c.clearSymbols();
-    _symbolIds.clear();
-
-    for (final r in _reports.values) {
-      final sym = await c.addSymbol(_reportSymbolOptions(r));
-      _symbolIds[r.id] = sym.id;
-    }
-    for (final l in _lfItems.values) {
-      final sym = await c.addSymbol(_lfSymbolOptions(l));
-      _symbolIds['lf_${l.id}'] = sym.id;
-    }
-    _log.log(
-      'MAP',
-      'symbols rebuilt: ${_reports.length} reports + '
-          '${_lfItems.length} lf = ${_symbolIds.length} pins',
-    );
-  }
-
-  SymbolOptions _reportSymbolOptions(Report r) => SymbolOptions(
-    geometry: LatLng(r.lat, r.lng),
-    iconImage: _reportPinName(r),
-    iconSize: 0.7,
-    iconAnchor: 'center',
-    draggable: false,
-    zIndex: 10,
-  );
-
-  SymbolOptions _lfSymbolOptions(LFItem l) => SymbolOptions(
-    geometry: LatLng(l.lat, l.lng),
-    iconImage: l.itemType == LFItemType.lost ? 'pin-lost' : 'pin-found',
-    iconSize: 0.7,
-    iconAnchor: 'center',
-    draggable: false,
-    zIndex: 10,
-  );
-
-  String _reportPinName(Report r) {
-    switch (r.status) {
-      case ReportStatus.resolved:
-        return 'pin-resolved';
-      case ReportStatus.inProgress:
-      case ReportStatus.acknowledged:
-        return 'pin-inprogress';
-      case ReportStatus.submitted:
-        return 'pin-submitted';
-      default:
-        return 'pin-default';
-    }
-  }
-
-  // ── Runtime pin images (Canvas → PNG → addImage) ──────────────────────────
-  Future<void> _registerPinImages(MapLibreMapController c) async {
-    for (final entry in _pinPalette.entries) {
-      try {
-        final bytes = await _drawPin(entry.value);
-        await c.addImage(entry.key, bytes);
-      } catch (e, st) {
-        _log.error('MAP', 'addImage(${entry.key}) failed: $e', st);
-      }
-    }
-    _imagesReady = true;
-    _log.log('MAP', 'registered ${_pinPalette.length} pin images');
-  }
-
-  Future<Uint8List> _drawPin(Color color) async {
-    const double s = 64;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const center = Offset(s / 2, s / 2);
-    canvas.drawCircle(
-      center,
-      30,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.95)
-        ..isAntiAlias = true,
-    );
-    canvas.drawCircle(
-      center,
-      26,
-      Paint()
-        ..color = color
-        ..isAntiAlias = true,
-    );
-    canvas.drawCircle(
-      center,
-      8.5,
-      Paint()
-        ..color = Colors.white
-        ..isAntiAlias = true,
-    );
-    final img = await recorder.endRecording().toImage(s.toInt(), s.toInt());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return data!.buffer.asUint8List();
-  }
-
-  // ── Map lifecycle ─────────────────────────────────────────────────────────
-  void _onMapCreated(MapLibreMapController controller) {
-    _controller = controller;
-    _controller!.onSymbolTapped.add(_onSymbolTapped);
-    _log.log('MAP', 'onMapCreated (controller ready)');
-  }
-
-  Future<void> _onStyleLoaded() async {
-    _log.log('MAP', 'onStyleLoaded — registering images + symbols');
-    final c = _controller;
-    if (c == null) return;
-    await _registerPinImages(c);
-    _mapReady = true;
-    await _rebuildSymbols();
-    // Prompt for location on open and snap to the user if they allow it.
-    unawaited(_goToMyLocation(initial: true));
-    // Fire-and-forget: probe Ola so the log records what it actually returns.
-    unawaited(_probeOla());
-  }
-
-  Future<void> _probeOla() async {
-    final key = dotenv.env['OLA_MAPS_API_KEY'] ?? '';
-    final url = '$kOlaVectorStyleUrl?api_key=$key';
-    _log.log('OLA', 'probing style.json (key present: ${key.isNotEmpty})');
-    try {
-      final resp = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
-      _log.log(
-        'OLA',
-        'style.json → HTTP ${resp.statusCode} (${resp.bodyBytes.length} B)',
-      );
-      if (resp.statusCode == 200) {
-        _log.log(
-          'OLA',
-          'Ola reachable, but maplibre_gl 0.26.2 has no transformRequest → '
-              'its sprite/glyph/tile sub-requests cannot be keyed. Using dark '
-              'raster base instead (this is why Ola vector rendered black).',
-        );
-      } else {
-        final head = resp.body.length > 180
-            ? resp.body.substring(0, 180)
-            : resp.body;
-        _log.log('OLA', 'non-200 body head: $head');
-      }
-    } catch (e, st) {
-      _log.error('OLA', e, st);
-    }
-  }
-
-  void _onSymbolTapped(Symbol symbol) {
-    final itemId = _symbolIds.entries
-        .firstWhere(
-          (e) => e.value == symbol.id,
-          orElse: () => const MapEntry('', ''),
-        )
-        .key;
-    if (itemId.isEmpty) return;
-    if (itemId.startsWith('lf_')) {
-      final item = _lfItems[itemId.substring(3)];
-      if (item != null) _showLfSheet(item);
-    } else {
-      final report = _reports[itemId];
-      if (report != null) _showReportSheet(report);
-    }
-  }
-
-  /// Center the camera on the user's real GPS position at street zoom.
-  ///
-  /// [initial] runs it silently on first style load: it prompts for permission
-  /// (so the dialog appears when the map opens) and, if granted, snaps to the
-  /// user — but stays quiet on failure so the district default remains visible.
-  /// Tapping the recenter FAB calls it with [initial] false, surfacing a
-  /// snackbar when there's no permission / no fix.
   Future<void> _goToMyLocation({bool initial = false}) async {
     if (_locating) return;
-    if (mounted) setState(() => _locating = true);
+    setState(() => _locating = true);
     try {
       final perm = await _loc.ensurePermission();
       if (!_loc.isGranted(perm)) {
-        _log.log('MAP', 'my-location: permission not granted ($perm)');
-        if (!initial) _snack('Location permission needed to center on you');
+        if (!initial && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission needed')),
+          );
+        }
         return;
       }
       final pos = await _loc.current();
-      if (pos == null) {
-        _log.log('MAP', 'my-location: no GPS fix');
-        if (!initial) _snack('Could not get your location — is GPS on?');
-        return;
+      if (pos != null) {
+        _currentCenterLat = pos.latitude;
+        _currentCenterLng = pos.longitude;
+        await _controller?.animateCamera(
+          lat: pos.latitude,
+          lng: pos.longitude,
+          zoom: 16.0,
+        );
+        _controller?.showCurrentLocation();
       }
-      _log.log(
-        'MAP',
-        'my-location → ${pos.latitude.toStringAsFixed(5)}, '
-            '${pos.longitude.toStringAsFixed(5)} @ zoom 16.5',
-      );
-      await _controller?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(pos.latitude, pos.longitude),
-            zoom: 16.5,
-          ),
-        ),
-      );
     } finally {
       if (mounted) setState(() => _locating = false);
     }
   }
 
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
+  // ── Sheets ────────────────────────────────────────────────────────────────
 
   void _showReportSheet(Report r) => showModalBottomSheet(
     context: context,
-    showDragHandle: true,
+    backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => _ReportBottomSheet(report: r),
+    builder: (_) => _ModernReportSheet(report: r),
   );
 
   void _showLfSheet(LFItem l) => showModalBottomSheet(
     context: context,
-    showDragHandle: true,
-    builder: (_) => _LfBottomSheet(item: l),
+    backgroundColor: Colors.transparent,
+    builder: (_) => _ModernLfSheet(item: l),
   );
-
-  /// Self-contained dark raster style — no API key, renders reliably.
-  String _darkStyleJson() => jsonEncode({
-    'version': 8,
-    'name': 'nivara-dark',
-    'sources': {
-      'dark': {
-        'type': 'raster',
-        'tiles': [kDarkRasterTileUrl],
-        'tileSize': 256,
-        'attribution': '© OpenStreetMap © CARTO',
-      },
-    },
-    'layers': [
-      {
-        'id': 'bg',
-        'type': 'background',
-        'paint': {'background-color': '#0b0f14'},
-      },
-      {'id': 'dark', 'type': 'raster', 'source': 'dark'},
-    ],
-  });
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return Scaffold(
+      backgroundColor: const Color(0xFF090D12),
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          MapLibreMap(
-            initialCameraPosition: CameraPosition(
-              target: LatLng(kDefaultLat, kDefaultLng),
-              zoom: kDefaultZoom,
-            ),
-            styleString: _styleString ?? _darkStyleJson(),
-            onMapCreated: _onMapCreated,
-            onStyleLoadedCallback: _onStyleLoaded,
-            onCameraIdle: () {
-              final target = _controller?.cameraPosition?.target;
-              if (target != null) {
-                _currentCenterLat = target.latitude;
-                _currentCenterLng = target.longitude;
+          // 1. Official Native Ola Map View
+          OlaNativeMapWidget(
+            initialLat: _currentCenterLat,
+            initialLng: _currentCenterLng,
+            initialZoom: 15.0,
+            onMapReady: _onMapReady,
+            onMarkerClicked: _onMarkerClicked,
+            onMapClicked: _onMapClicked,
+            onCameraIdle: (lat, lng) {
+              if (lat != null && lng != null) {
+                _currentCenterLat = lat;
+                _currentCenterLng = lng;
               }
             },
-            myLocationEnabled: true,
-            myLocationTrackingMode: MyLocationTrackingMode.none,
-            compassEnabled: true,
-            trackCameraPosition: true,
-            annotationOrder: const [AnnotationType.symbol],
-            annotationConsumeTapEvents: const [AnnotationType.symbol],
           ),
 
-          // ── Top Search & Filter Bar ──────────────────────────────────────
+          // 2. Futuristic Glassmorphic Top Bar & Autocomplete
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Search Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerHigh.withValues(alpha: 0.95),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(left: 12, right: 6),
-                          child: Icon(Icons.search, color: NivaraColors.primary, size: 20),
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchCtrl,
-                            onChanged: _onSearchChanged,
-                            decoration: InputDecoration(
-                              hintText: 'Search city landmarks or places…',
-                              hintStyle: TextStyle(color: scheme.outline, fontSize: 14),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  // Floating search card
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131A22).withValues(alpha: 0.88),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
                             ),
-                          ),
+                          ],
                         ),
-                        if (_searching)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                        child: Row(
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(left: 14, right: 8),
+                              child: Icon(
+                                Icons.search,
+                                color: Color(0xFF00E676),
+                                size: 22,
+                              ),
                             ),
-                          )
-                        else if (_searchCtrl.text.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              _onSearchChanged('');
-                            },
-                          ),
-                        IconButton(
-                          tooltip: 'Debug log',
-                          icon: Icon(
-                            _showLog ? Icons.close : Icons.bug_report,
-                            size: 20,
-                            color: _showLog ? NivaraColors.danger : scheme.outline,
-                          ),
-                          onPressed: () => setState(() => _showLog = !_showLog),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchCtrl,
+                                onChanged: _onSearchChanged,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Search city landmarks or places with Ola…',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.45),
+                                    fontSize: 13,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            ),
+                            if (_searching)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF00E676),
+                                  ),
+                                ),
+                              )
+                            else if (_searchCtrl.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: Colors.white70,
+                                ),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  _onSearchChanged('');
+                                },
+                              ),
+                            IconButton(
+                              tooltip: 'Debug log',
+                              icon: Icon(
+                                _showLog ? Icons.close : Icons.bug_report,
+                                size: 20,
+                                color: _showLog
+                                    ? NivaraColors.danger
+                                    : Colors.white38,
+                              ),
+                              onPressed: () => setState(() => _showLog = !_showLog),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
 
                   // Autocomplete dropdown
                   if (_showSuggestions && _predictions.isNotEmpty)
                     Container(
-                      margin: const EdgeInsets.only(top: 6),
-                      constraints: const BoxConstraints(maxHeight: 230),
+                      margin: const EdgeInsets.only(top: 8),
+                      constraints: const BoxConstraints(maxHeight: 250),
                       decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(14),
+                        color: const Color(0xFF131A22).withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            blurRadius: 10,
+                            color: Colors.black.withValues(alpha: 0.6),
+                            blurRadius: 20,
                           ),
                         ],
                       ),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        padding: EdgeInsets.zero,
-                        itemCount: _predictions.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(height: 1, indent: 48),
-                        itemBuilder: (context, i) {
-                          final p = _predictions[i];
-                          return ListTile(
-                            dense: true,
-                            leading: const Icon(
-                              Icons.location_on_outlined,
-                              size: 20,
-                              color: NivaraColors.primary,
-                            ),
-                            title: Text(
-                              p.mainText ?? p.description,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: _predictions.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            indent: 52,
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                          itemBuilder: (context, i) {
+                            final p = _predictions[i];
+                            return ListTile(
+                              dense: true,
+                              leading: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Color(0xFF00E676),
+                                ),
                               ),
-                            ),
-                            subtitle: p.secondaryText != null
-                                ? Text(
-                                    p.secondaryText!,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  )
-                                : null,
-                            onTap: () => _selectPrediction(p),
-                          );
-                        },
+                              title: Text(
+                                p.mainText ?? p.description,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: p.secondaryText != null
+                                  ? Text(
+                                      p.secondaryText!,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white.withValues(alpha: 0.5),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  : null,
+                              onTap: () => _selectPrediction(p),
+                            );
+                          },
+                        ),
                       ),
                     ),
 
                   const SizedBox(height: 8),
 
-                  // Nearby category filter chips
+                  // Nearby category filter pills
                   SizedBox(
-                    height: 34,
+                    height: 36,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _nearbyFilters.length,
@@ -699,18 +549,37 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
                       itemBuilder: (context, i) {
                         final f = _nearbyFilters[i];
                         final selected = _selectedFilterIdx == i;
-                        return ChoiceChip(
-                          label: Text('${f.icon} ${f.label}'),
-                          selected: selected,
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor:
-                              scheme.surfaceContainerHigh.withValues(alpha: 0.85),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
+                        return GestureDetector(
+                          onTap: () => _onNearbyFilterSelected(i),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 13,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? const Color(0xFF00E676).withValues(alpha: 0.2)
+                                  : const Color(0xFF131A22).withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: selected
+                                    ? const Color(0xFF00E676).withValues(alpha: 0.8)
+                                    : Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: Text(
+                              '${f.icon} ${f.label}',
+                              style: TextStyle(
+                                color: selected
+                                    ? const Color(0xFF00E676)
+                                    : Colors.white70,
+                                fontSize: 12,
+                                fontWeight:
+                                    selected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
                           ),
-                          onSelected: (_) => _onNearbyFilterSelected(i),
                         );
                       },
                     ),
@@ -718,26 +587,29 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
 
                   // Nearby POI suggestions horizontal list
                   if (_loadingNearby) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     const SizedBox(
                       height: 20,
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            width: 13,
+                            height: 13,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF00E676),
+                            ),
                           ),
                           SizedBox(width: 8),
                           Text(
-                            'Searching nearby landmarks…',
-                            style: TextStyle(fontSize: 11),
+                            'Searching landmarks via Ola…',
+                            style: TextStyle(color: Colors.white60, fontSize: 11),
                           ),
                         ],
                       ),
                     ),
                   ] else if (_nearbyPlaces.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     SizedBox(
                       height: 32,
                       child: ListView.separated(
@@ -747,16 +619,16 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
                         itemBuilder: (context, i) {
                           final p = _nearbyPlaces[i];
                           return ActionChip(
-                            backgroundColor:
-                                scheme.surfaceContainerHigh.withValues(alpha: 0.9),
+                            backgroundColor: const Color(0xFF16202B),
+                            side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                             label: Text(
                               p.mainText ?? p.description,
-                              style: const TextStyle(fontSize: 11),
+                              style: const TextStyle(color: Colors.white, fontSize: 11),
                             ),
                             avatar: const Icon(
                               Icons.near_me,
-                              size: 14,
-                              color: NivaraColors.accent,
+                              size: 13,
+                              color: Color(0xFF00E676),
                             ),
                             onPressed: () => _selectNearbyPlace(p),
                           );
@@ -769,24 +641,119 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
             ),
           ),
 
-          // Recenter FAB
+          // 3. Quick Spot Tap Inspector Floating Card
+          if (_selectedSpot != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 90,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131A22).withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E676).withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.place, color: Color(0xFF00E676), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _selectedSpot!.address,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_selectedSpot!.lat.toStringAsFixed(4)}, ${_selectedSpot!.lng.toStringAsFixed(4)}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.45),
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF00E676),
+                            foregroundColor: Colors.black,
+                            visualDensity: VisualDensity.compact,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() => _selectedSpot = null);
+                            context.push(Routes.report);
+                          },
+                          child: const Text('Report Here', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white60, size: 18),
+                          onPressed: () => setState(() => _selectedSpot = null),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // 4. GPS Recenter FAB
           Positioned(
-            bottom: 100,
-            right: 16,
+            bottom: 24,
+            right: 18,
             child: FloatingActionButton.small(
-              heroTag: 'recenter',
+              heroTag: 'civic_recenter_2026',
+              backgroundColor: const Color(0xFF151D28).withValues(alpha: 0.9),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              ),
               onPressed: _locating ? null : () => _goToMyLocation(),
-              backgroundColor: NivaraColors.primary,
               child: _locating
                   ? const SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: Color(0xFF00E676),
                       ),
                     )
-                  : const Icon(Icons.my_location, color: Colors.white),
+                  : const Icon(Icons.my_location, color: Color(0xFF00E676)),
             ),
           ),
 
@@ -797,21 +764,282 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   }
 }
 
-/// On-screen mirror of the file log — shows the resolved log path + last lines.
+/// 2026-Level Futuristic Report Inspection Sheet.
+class _ModernReportSheet extends StatelessWidget {
+  const _ModernReportSheet({required this.report});
+  final Report report;
+
+  @override
+  Widget build(BuildContext context) {
+    final cat = report.category;
+    final status = report.status;
+    final color = switch (status) {
+      ReportStatus.submitted => const Color(0xFFFFB300),
+      ReportStatus.inProgress => const Color(0xFF29B6F6),
+      ReportStatus.resolved => const Color(0xFF00E676),
+      _ => const Color(0xFF90A4AE),
+    };
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+          decoration: BoxDecoration(
+            color: const Color(0xFF10161E).withValues(alpha: 0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(categoryIcon(cat), color: color, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            report.title ?? cat.label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            report.address ?? '${report.lat.toStringAsFixed(4)}, ${report.lng.toStringAsFixed(4)}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: color.withValues(alpha: 0.6)),
+                      ),
+                      child: Text(
+                        status.label,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (report.description != null && report.description!.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    report.description!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        context.push(Routes.reportDetail, extra: report);
+                      },
+                      icon: const Icon(Icons.arrow_forward, color: Colors.black),
+                      label: const Text(
+                        'View Full Details & Proof',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 2026-Level Futuristic Lost & Found Sheet.
+class _ModernLfSheet extends StatelessWidget {
+  const _ModernLfSheet({required this.item});
+  final LFItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.isLost ? const Color(0xFFFF5252) : const Color(0xFF00E676);
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+          decoration: BoxDecoration(
+            color: const Color(0xFF10161E).withValues(alpha: 0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        item.isLost ? Icons.search : Icons.inventory_2,
+                        color: color,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            item.locationLabel ?? '${item.lat.toStringAsFixed(4)}, ${item.lng.toStringAsFixed(4)}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.push(Routes.lostFoundDetail, extra: item);
+                    },
+                    child: Text(
+                      'View ${item.isLost ? 'Lost' : 'Found'} Item Details',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// On-screen mirror of the file log.
 class _LogOverlay extends StatelessWidget {
   const _LogOverlay();
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top + 56;
+    final top = MediaQuery.of(context).padding.top + 64;
     return Positioned(
       top: top,
       left: 12,
       right: 12,
       bottom: 160,
       child: Material(
-        color: Colors.black.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.black.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -839,20 +1067,31 @@ class _LogOverlay extends StatelessWidget {
                 child: ValueListenableBuilder<int>(
                   valueListenable: DebugLogger.instance.revision,
                   builder: (context, _, child) {
-                    final lines = DebugLogger.instance.recent;
+                    final allLines = DebugLogger.instance.recent;
+                    final lines = allLines.length > 60
+                        ? allLines.sublist(allLines.length - 60)
+                        : allLines;
+                    if (lines.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Log is empty.',
+                          style: TextStyle(color: Colors.white38),
+                        ),
+                      );
+                    }
                     return ListView.builder(
                       reverse: true,
                       itemCount: lines.length,
-                      itemBuilder: (_, i) {
+                      itemBuilder: (context, i) {
                         final line = lines[lines.length - 1 - i];
-                        final isErr = line.contains('ERROR');
+                        final isErr = line.contains(' [E] ');
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 1),
+                          padding: const EdgeInsets.symmetric(vertical: 1.5),
                           child: Text(
                             line,
                             style: TextStyle(
                               color: isErr
-                                  ? const Color(0xFFFF8A80)
+                                  ? const Color(0xFFFF6B6B)
                                   : Colors.white70,
                               fontSize: 10.5,
                               fontFamily: 'monospace',
@@ -867,295 +1106,6 @@ class _LogOverlay extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ReportBottomSheet extends StatelessWidget {
-  const _ReportBottomSheet({required this.report});
-  final Report report;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(categoryIcon(report.category), color: NivaraColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  report.category.label,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              _StatusChip(status: report.status),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (report.title != null) ...[
-            Text(
-              report.title!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-          ],
-          Text(
-            report.description ?? '',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                Icons.location_on_outlined,
-                size: 16,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${report.lat.toStringAsFixed(4)}, ${report.lng.toStringAsFixed(4)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          if (report.address != null) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.place_outlined,
-                  size: 16,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    report.address!,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _InfoPill(icon: Icons.flag_outlined, text: report.severity.label),
-              const SizedBox(width: 8),
-              _InfoPill(
-                icon: report.source == 'SENSORWATCH' ? Icons.radar : Icons.edit,
-                text: report.source,
-              ),
-              const SizedBox(width: 8),
-              _InfoPill(
-                icon: Icons.verified_user_outlined,
-                text: report.isCommunityVerified ? 'Verified' : 'Unverified',
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              icon: const Icon(Icons.open_in_full),
-              label: const Text('View full report'),
-              onPressed: () {
-                Navigator.pop(context);
-                context.push(Routes.reportDetail, extra: report);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LfBottomSheet extends StatelessWidget {
-  const _LfBottomSheet({required this.item});
-  final LFItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isLost = item.itemType == LFItemType.lost;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isLost ? Icons.search_off : Icons.inventory_2,
-                color: isLost ? NivaraColors.danger : NivaraColors.success,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Chip(
-                label: Text(isLost ? 'LOST' : 'FOUND'),
-                backgroundColor:
-                    (isLost ? NivaraColors.danger : NivaraColors.success)
-                        .withValues(alpha: 0.15),
-                labelStyle: TextStyle(
-                  color: isLost ? NivaraColors.danger : NivaraColors.success,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            item.description,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                Icons.category_outlined,
-                size: 16,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                item.category.label,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(width: 16),
-              Icon(
-                Icons.contact_phone_outlined,
-                size: 16,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                item.contactMethod,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          if (item.rewardAmount != null && item.rewardAmount! > 0) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.card_giftcard, size: 16, color: NivaraColors.accent),
-                const SizedBox(width: 4),
-                Text(
-                  'Reward: ₹${item.rewardAmount}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: NivaraColors.accent,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.message_outlined),
-              label: const Text('Contact'),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
-  final ReportStatus status;
-
-  static const _colors = {
-    ReportStatus.submitted: NivaraColors.accent,
-    ReportStatus.acknowledged: NivaraColors.primary,
-    ReportStatus.inProgress: NivaraColors.primary,
-    ReportStatus.resolved: NivaraColors.success,
-    ReportStatus.closed: Colors.grey,
-    ReportStatus.duplicate: Colors.grey,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _colors[status] ?? NivaraColors.primary;
-    return Chip(
-      label: Text(
-        status.label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 11,
-        ),
-      ),
-      backgroundColor: color.withValues(alpha: 0.15),
-      visualDensity: VisualDensity.compact,
-      padding: EdgeInsets.zero,
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  const _InfoPill({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-        ],
       ),
     );
   }

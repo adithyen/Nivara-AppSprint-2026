@@ -33,6 +33,18 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    packaging {
+        jniLibs {
+            pickFirsts.add("**/libmaplibre.so")
+            pickFirsts.add("**/libc++_shared.so")
+            pickFirsts.add("lib/**/libmaplibre.so")
+            pickFirsts.add("lib/**/libc++_shared.so")
+        }
+        resources {
+            excludes.add("META-INF/*.kotlin_module")
+        }
+    }
 }
 
 kotlin {
@@ -47,4 +59,9 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation(files("libs/OlaMapSdk-1.8.4.aar"))
+    implementation(files("libs/Places-sdk-2.4.0.jar"))
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 }

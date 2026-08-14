@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../core/constants.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/ola_maps_service.dart';
-import '../../core/theme.dart';
+import '../../core/widgets/ola_map_view.dart';
 
 /// Result object returned by [LocationPickerScreen].
 class PickedLocation {
@@ -22,7 +21,7 @@ class PickedLocation {
   final String address;
 }
 
-/// Interactive Ola Map Location Picker with real-time Autocomplete,
+/// 2026-Level Futuristic Ola Map Location Picker with real-time Autocomplete,
 /// Nearby Search, and Reverse Geocoding.
 class LocationPickerScreen extends StatefulWidget {
   const LocationPickerScreen({
@@ -44,13 +43,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   final _ola = OlaMapsService.instance;
   final _locService = const LocationService();
 
-  MapLibreMapController? _controller;
-  String? _styleString;
-  bool _styleLoaded = false;
-
+  OlaNativeMapController? _controller;
   late double _currentLat;
   late double _currentLng;
-  String _currentAddress = 'Locating address…';
+  String _currentAddress = 'Pinpoint address…';
   bool _reverseGeocoding = false;
   bool _isMoving = false;
 
@@ -61,13 +57,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   bool _searching = false;
   bool _showSuggestions = false;
 
-  // Nearby categories
+  // Nearby discovery filters
   final List<({String label, String icon, String? type})> _nearbyFilters = [
-    (label: 'All Nearby', icon: '📍', type: null),
+    (label: 'All Landmarks', icon: '📍', type: null),
     (label: 'Hospitals', icon: '🏥', type: 'hospital'),
     (label: 'Police', icon: '👮', type: 'police'),
     (label: 'Transit', icon: '🚌', type: 'transit_station'),
-    (label: 'Govt Offices', icon: '🏛️', type: 'local_government_office'),
+    (label: 'Civic Offices', icon: '🏛️', type: 'local_government_office'),
   ];
   int _selectedFilterIdx = 0;
   List<OlaPlacePrediction> _nearbyPlaces = [];
@@ -81,7 +77,6 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (widget.initialAddress != null && widget.initialAddress!.isNotEmpty) {
       _currentAddress = widget.initialAddress!;
     }
-    _loadStyle();
   }
 
   @override
@@ -91,32 +86,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     super.dispose();
   }
 
-  Future<void> _loadStyle() async {
-    final style = await _ola.getAuthenticatedVectorStyleJson();
-    if (mounted) {
-      setState(() {
-        _styleString = style ?? _darkRasterFallback();
-        _styleLoaded = true;
-      });
-    }
-  }
-
-  String _darkRasterFallback() => jsonEncode({
-    'version': 8,
-    'name': 'nivara-dark',
-    'sources': {
-      'dark': {
-        'type': 'raster',
-        'tiles': [kDarkRasterTileUrl],
-        'tileSize': 256,
-      },
-    },
-    'layers': [
-      {'id': 'dark-layer', 'type': 'raster', 'source': 'dark'},
-    ],
-  });
-
-  void _onMapCreated(MapLibreMapController controller) {
+  void _onMapReady(OlaNativeMapController controller) {
     _controller = controller;
     if (widget.initialAddress == null) {
       _resolveAddress(_currentLat, _currentLng);
@@ -124,11 +94,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     _loadNearbyPlaces();
   }
 
-  void _onCameraIdle() {
-    final target = _controller?.cameraPosition?.target;
-    if (target != null) {
-      _currentLat = target.latitude;
-      _currentLng = target.longitude;
+  void _onCameraIdle(double? lat, double? lng) {
+    if (lat != null && lng != null) {
+      _currentLat = lat;
+      _currentLng = lng;
     }
     if (mounted) {
       setState(() => _isMoving = false);
@@ -163,7 +132,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     }
 
     setState(() => _searching = true);
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 280), () async {
       final results = await _ola.autocomplete(
         text,
         lat: _currentLat,
@@ -204,11 +173,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _currentLat = lat;
       _currentLng = lng;
       _currentAddress = addr;
-      await _controller?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: LatLng(lat, lng), zoom: 16.5),
-        ),
-      );
+      await _controller?.animateCamera(lat: lat, lng: lng, zoom: 16.5);
     }
   }
 
@@ -221,7 +186,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       lat: _currentLat,
       lng: _currentLng,
       types: filter.type,
-      radius: 2000,
+      radius: 2500,
     );
     if (!mounted) return;
     setState(() {
@@ -235,11 +200,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _currentLat = p.lat!;
       _currentLng = p.lng!;
       _currentAddress = p.description;
-      await _controller?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: LatLng(p.lat!, p.lng!), zoom: 16.5),
-        ),
-      );
+      await _controller?.animateCamera(lat: p.lat!, lng: p.lng!, zoom: 16.5);
     }
   }
 
@@ -260,13 +221,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _currentLat = pos.latitude;
       _currentLng = pos.longitude;
       await _controller?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(pos.latitude, pos.longitude),
-            zoom: 16.5,
-          ),
-        ),
+        lat: pos.latitude,
+        lng: pos.longitude,
+        zoom: 16.5,
       );
+      _controller?.showCurrentLocation();
     }
   }
 
@@ -282,29 +241,26 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return Scaffold(
+      backgroundColor: const Color(0xFF090D12),
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // 1. Ola Vector Map with Style1-Dark
-          if (_styleLoaded && _styleString != null)
-            MapLibreMap(
-              styleString: _styleString!,
-              initialCameraPosition: CameraPosition(
-                target: LatLng(_currentLat, _currentLng),
-                zoom: 15.0,
-              ),
-              onMapCreated: _onMapCreated,
-              onCameraIdle: _onCameraIdle,
-              trackCameraPosition: true,
-              myLocationEnabled: false,
-            )
-          else
-            const Center(child: CircularProgressIndicator()),
+          // 1. Native Ola Map View
+          OlaNativeMapWidget(
+            initialLat: _currentLat,
+            initialLng: _currentLng,
+            initialZoom: 15.5,
+            onMapReady: _onMapReady,
+            onCameraIdle: _onCameraIdle,
+            onMapClicked: (lat, lng) {
+              _currentLat = lat;
+              _currentLng = lng;
+              _controller?.animateCamera(lat: lat, lng: lng);
+            },
+          ),
 
-          // Camera move detection layer
+          // User pointer touch detection for pin bounce animation
           Positioned.fill(
             child: Listener(
               onPointerDown: (_) => setState(() => _isMoving = true),
@@ -312,46 +268,55 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             ),
           ),
 
-          // 2. Animated Center Pin Marker
+          // 2. Futuristic Animated Center Pin
           Center(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 36),
+              padding: const EdgeInsets.only(bottom: 38),
               child: AnimatedSlide(
-                duration: const Duration(milliseconds: 150),
-                offset: _isMoving ? const Offset(0, -0.2) : Offset.zero,
+                duration: const Duration(milliseconds: 140),
+                curve: Curves.easeOutCubic,
+                offset: _isMoving ? const Offset(0, -0.22) : Offset.zero,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(9),
                       decoration: BoxDecoration(
-                        color: NivaraColors.danger,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                        ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 10,
+                            color: const Color(0xFF00E676).withValues(alpha: 0.5),
+                            blurRadius: 16,
+                            spreadRadius: 2,
                             offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: const Icon(
                         Icons.location_on,
-                        color: Colors.white,
+                        color: Colors.black,
                         size: 24,
                       ),
                     ),
                     Container(
-                      width: 4,
-                      height: 10,
-                      color: NivaraColors.danger,
+                      width: 3,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E676),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                     Container(
-                      width: 10,
-                      height: 4,
+                      width: 14,
+                      height: 5,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(5),
                       ),
                     ),
                   ],
@@ -360,299 +325,397 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             ),
           ),
 
-          // 3. Top Floating App Bar & Search Input
+          // 3. Ultra-Modern Glassmorphic Search Bar
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131A22).withValues(alpha: 0.88),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchCtrl,
-                            onChanged: _onSearchChanged,
-                            decoration: InputDecoration(
-                              hintText: 'Search place, road or landmark…',
-                              hintStyle: TextStyle(color: scheme.outline),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 12,
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back, color: Colors.white),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchCtrl,
+                                onChanged: _onSearchChanged,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Search city, landmark or road…',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.45),
+                                    fontSize: 14,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
                               ),
                             ),
-                          ),
+                            if (_searching)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF00E676),
+                                  ),
+                                ),
+                              )
+                            else if (_searchCtrl.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18, color: Colors.white70),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  _onSearchChanged('');
+                                },
+                              ),
+                          ],
                         ),
-                        if (_searching)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        else if (_searchCtrl.text.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              _onSearchChanged('');
-                            },
-                          ),
-                      ],
+                      ),
                     ),
                   ),
 
                   // Autocomplete dropdown suggestions
                   if (_showSuggestions && _predictions.isNotEmpty)
                     Container(
-                      margin: const EdgeInsets.only(top: 6),
-                      constraints: const BoxConstraints(maxHeight: 240),
+                      margin: const EdgeInsets.only(top: 8),
+                      constraints: const BoxConstraints(maxHeight: 250),
                       decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(14),
+                        color: const Color(0xFF131A22).withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 10,
+                            color: Colors.black.withValues(alpha: 0.6),
+                            blurRadius: 18,
                           ),
                         ],
                       ),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        padding: EdgeInsets.zero,
-                        itemCount: _predictions.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(height: 1, indent: 48),
-                        itemBuilder: (context, i) {
-                          final p = _predictions[i];
-                          return ListTile(
-                            dense: true,
-                            leading: const Icon(
-                              Icons.location_on_outlined,
-                              size: 20,
-                              color: NivaraColors.primary,
-                            ),
-                            title: Text(
-                              p.mainText ?? p.description,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                            subtitle: p.secondaryText != null
-                                ? Text(
-                                    p.secondaryText!,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  )
-                                : null,
-                            onTap: () => _selectPrediction(p),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          // 4. GPS Recenter FAB
-          Positioned(
-            right: 16,
-            bottom: 230,
-            child: FloatingActionButton.small(
-              heroTag: 'recenter_picker',
-              backgroundColor: scheme.surfaceContainerHigh,
-              onPressed: _goToMyLocation,
-              child: const Icon(Icons.my_location, color: NivaraColors.primary),
-            ),
-          ),
-
-          // 5. Bottom Location Card with Nearby Places & Confirm Button
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLow,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 16,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Nearby search filter category chips
-                    SizedBox(
-                      height: 34,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _nearbyFilters.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (context, i) {
-                          final f = _nearbyFilters[i];
-                          final selected = _selectedFilterIdx == i;
-                          return ChoiceChip(
-                            label: Text('${f.icon} ${f.label}'),
-                            selected: selected,
-                            visualDensity: VisualDensity.compact,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight:
-                                  selected ? FontWeight.w700 : FontWeight.w500,
-                            ),
-                            onSelected: (_) {
-                              setState(() => _selectedFilterIdx = i);
-                              _loadNearbyPlaces();
-                            },
-                          );
-                        },
-                      ),
-                    ),
-
-                    // Nearby place suggestions list (if any)
-                    if (_loadingNearby) ...[
-                      const SizedBox(height: 8),
-                      const SizedBox(
-                        height: 20,
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            SizedBox(width: 8),
-                            Text('Finding nearby landmarks…', style: TextStyle(fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ] else if (_nearbyPlaces.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 32,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
                         child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _nearbyPlaces.take(6).length,
-                          separatorBuilder: (_, _) => const SizedBox(width: 6),
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: _predictions.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            indent: 52,
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
                           itemBuilder: (context, i) {
-                            final place = _nearbyPlaces[i];
-                            return ActionChip(
-                              label: Text(
-                                place.mainText ?? place.description,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            final p = _predictions[i];
+                            return ListTile(
+                              dense: true,
+                              leading: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Color(0xFF00E676),
+                                ),
                               ),
-                              avatar: const Icon(
-                                Icons.near_me,
-                                size: 14,
-                                color: NivaraColors.primary,
+                              title: Text(
+                                p.mainText ?? p.description,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
                               ),
-                              onPressed: () => _selectNearbyPlace(place),
+                              subtitle: p.secondaryText != null
+                                  ? Text(
+                                      p.secondaryText!,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white.withValues(alpha: 0.5),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  : null,
+                              onTap: () => _selectPrediction(p),
                             );
                           },
                         ),
                       ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // 4. GPS Recenter Floating FAB
+          Positioned(
+            right: 18,
+            bottom: 240,
+            child: FloatingActionButton.small(
+              heroTag: 'picker_recenter_2026',
+              backgroundColor: const Color(0xFF151D28).withValues(alpha: 0.9),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              onPressed: _goToMyLocation,
+              child: const Icon(Icons.my_location, color: Color(0xFF00E676), size: 20),
+            ),
+          ),
+
+          // 5. 2026-Level Futuristic Glassmorphic Bottom Panel
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10161E).withValues(alpha: 0.92),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    border: Border(
+                      top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        blurRadius: 24,
+                        offset: const Offset(0, -6),
+                      ),
                     ],
-
-                    const SizedBox(height: 14),
-
-                    // Resolved address & coordinates
-                    Row(
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.place,
-                          color: NivaraColors.accent,
-                          size: 22,
+                        // Nearby search filter pills
+                        SizedBox(
+                          height: 36,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _nearbyFilters.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 8),
+                            itemBuilder: (context, i) {
+                              final f = _nearbyFilters[i];
+                              final selected = _selectedFilterIdx == i;
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() => _selectedFilterIdx = i);
+                                  _loadNearbyPlaces();
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? const Color(0xFF00E676).withValues(alpha: 0.18)
+                                        : Colors.white.withValues(alpha: 0.06),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: selected
+                                          ? const Color(0xFF00E676).withValues(alpha: 0.7)
+                                          : Colors.white.withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${f.icon} ${f.label}',
+                                    style: TextStyle(
+                                      color: selected ? const Color(0xFF00E676) : Colors.white70,
+                                      fontSize: 12,
+                                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _reverseGeocoding
-                                    ? 'Updating address…'
-                                    : _currentAddress,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+
+                        // Nearby landmark suggestions
+                        if (_loadingNearby) ...[
+                          const SizedBox(height: 10),
+                          const SizedBox(
+                            height: 20,
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 13,
+                                  height: 13,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF00E676),
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Scanning nearby landmarks with Ola…',
+                                  style: TextStyle(color: Colors.white60, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (_nearbyPlaces.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            height: 32,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _nearbyPlaces.take(6).length,
+                              separatorBuilder: (_, _) => const SizedBox(width: 6),
+                              itemBuilder: (context, i) {
+                                final place = _nearbyPlaces[i];
+                                return ActionChip(
+                                  backgroundColor: const Color(0xFF19222D),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                                  label: Text(
+                                    place.mainText ?? place.description,
+                                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  avatar: const Icon(
+                                    Icons.near_me,
+                                    size: 13,
+                                    color: Color(0xFF00E676),
+                                  ),
+                                  onPressed: () => _selectNearbyPlace(place),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 14),
+
+                        // Resolved Address & Monospace GPS Coordinates
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.place,
+                                color: Color(0xFF00E676),
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _reverseGeocoding
+                                        ? 'Resolving address…'
+                                        : _currentAddress,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${_currentLat.toStringAsFixed(5)}° N, ${_currentLng.toStringAsFixed(5)}° E',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.45),
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Futuristic Gradient Confirm Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_currentLat.toStringAsFixed(5)}, ${_currentLng.toStringAsFixed(5)}',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: scheme.outline),
+                              onPressed: _confirm,
+                              icon: const Icon(Icons.check_circle, color: Colors.black),
+                              label: const Text(
+                                'Confirm Selected Location',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // Confirm button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: NivaraColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        onPressed: _confirm,
-                        icon: const Icon(Icons.check),
-                        label: const Text(
-                          'Confirm Location',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
