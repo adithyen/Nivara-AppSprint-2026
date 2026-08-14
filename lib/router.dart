@@ -19,6 +19,7 @@ import 'features/lostfound/match_screen.dart';
 import 'features/lostfound/report_found_screen.dart';
 import 'features/lostfound/report_lost_screen.dart';
 import 'features/map/civic_map.dart';
+import 'features/map/location_picker_screen.dart';
 import 'features/report/report_detail_screen.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
@@ -55,6 +56,7 @@ abstract final class Routes {
   static const adminReportDetail = '/admin/report';
   static const activityLog = '/activity';
   static const pendingSync = '/activity/sync';
+  static const locationPicker = '/map/picker';
 }
 
 /// The single [GoRouter] instance, built with an auth/role redirect guard.
@@ -212,6 +214,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.pendingSync,
         builder: (context, state) => const PendingSyncScreen(),
+      ),
+      GoRoute(
+        path: Routes.locationPicker,
+        builder: (context, state) => const LocationPickerScreen(),
       ),
     ],
   );

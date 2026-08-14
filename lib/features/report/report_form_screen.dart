@@ -8,16 +8,17 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import '../../core/constants.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/offline_queue_service.dart';
+import '../../core/services/ola_maps_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
+import '../map/location_picker_screen.dart';
 import 'category_grid.dart';
 
 /// Manual CivicReport filing. Pick a category, add details + severity, confirm
-/// the auto-captured GPS location, optionally attach photos, and submit — the
-/// row inserts into `reports` (the DB trigger fills location + department).
+/// or pick a custom location on Ola Maps, optionally attach photos, and submit.
 class ReportFormScreen extends StatefulWidget {
   const ReportFormScreen({super.key, this.initialCategory});
 
@@ -30,6 +31,7 @@ class ReportFormScreen extends StatefulWidget {
 
 class _ReportFormScreenState extends State<ReportFormScreen> {
   final _location = const LocationService();
+  final _ola = OlaMapsService.instance;
   final _picker = ImagePicker();
 
   final _titleCtrl = TextEditingController();
@@ -39,9 +41,14 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   ReportCategory? _category;
   Severity _severity = Severity.medium;
   Position? _pos;
+  double? _customLat;
+  double? _customLng;
   bool _locating = false;
   final List<XFile> _photos = [];
   bool _submitting = false;
+
+  double get _effectiveLat => _customLat ?? _pos?.latitude ?? kDefaultLat;
+  double get _effectiveLng => _customLng ?? _pos?.longitude ?? kDefaultLng;
 
   @override
   void initState() {
@@ -68,6 +75,38 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       _pos = pos;
       _locating = false;
     });
+
+    if (pos != null && _addressCtrl.text.trim().isEmpty) {
+      final addr = await _ola.reverseGeocode(
+        lat: pos.latitude,
+        lng: pos.longitude,
+      );
+      if (addr != null && mounted && _addressCtrl.text.trim().isEmpty) {
+        setState(() => _addressCtrl.text = addr);
+      }
+    }
+  }
+
+  Future<void> _pickLocationOnMap() async {
+    final result = await Navigator.of(context).push<PickedLocation>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialLat: _effectiveLat,
+          initialLng: _effectiveLng,
+          initialAddress: _addressCtrl.text.trim().isNotEmpty
+              ? _addressCtrl.text.trim()
+              : null,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _customLat = result.lat;
+        _customLng = result.lng;
+        _addressCtrl.text = result.address;
+      });
+    }
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
@@ -165,8 +204,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       severity: _severity,
       title: _titleCtrl.text.trim().isEmpty ? null : _titleCtrl.text.trim(),
       description: _descCtrl.text.trim(),
-      lat: _pos?.latitude ?? kDefaultLat,
-      lng: _pos?.longitude ?? kDefaultLng,
+      lat: _effectiveLat,
+      lng: _effectiveLng,
       address: _addressCtrl.text.trim().isEmpty
           ? null
           : _addressCtrl.text.trim(),
@@ -256,8 +295,11 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             const SizedBox(height: 8),
             _LocationCard(
               pos: _pos,
+              customLat: _customLat,
+              customLng: _customLng,
               locating: _locating,
               onRefresh: _fetchLocation,
+              onPickOnMap: _pickLocationOnMap,
             ),
             const SizedBox(height: 12),
             TextField(
@@ -348,54 +390,101 @@ class _SeveritySelector extends StatelessWidget {
 class _LocationCard extends StatelessWidget {
   const _LocationCard({
     required this.pos,
+    required this.customLat,
+    required this.customLng,
     required this.locating,
     required this.onRefresh,
+    required this.onPickOnMap,
   });
 
   final Position? pos;
+  final double? customLat;
+  final double? customLng;
   final bool locating;
   final VoidCallback onRefresh;
+  final VoidCallback onPickOnMap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isCustom = customLat != null && customLng != null;
+    final lat = isCustom ? customLat! : pos?.latitude;
+    final lng = isCustom ? customLng! : pos?.longitude;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isCustom
+              ? NivaraColors.primary.withValues(alpha: 0.5)
+              : scheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(
-            pos != null ? Icons.my_location : Icons.location_searching,
-            color: pos != null ? NivaraColors.success : scheme.outline,
+          Row(
+            children: [
+              Icon(
+                isCustom
+                    ? Icons.edit_location_alt
+                    : (pos != null ? Icons.my_location : Icons.location_searching),
+                color: isCustom
+                    ? NivaraColors.primary
+                    : (pos != null ? NivaraColors.success : scheme.outline),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: locating
+                    ? const Text('Getting your location…')
+                    : lat != null && lng != null
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            isCustom
+                                ? 'Selected custom location on map'
+                                : 'Auto GPS fix (±${pos?.accuracy.toStringAsFixed(0) ?? '0'} m)',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isCustom
+                                  ? NivaraColors.primary
+                                  : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Text('Location unavailable — using city default.'),
+              ),
+              IconButton(
+                tooltip: 'Refresh GPS location',
+                onPressed: locating ? null : onRefresh,
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: locating
-                ? const Text('Getting your location…')
-                : pos != null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${pos!.latitude.toStringAsFixed(5)}, '
-                        '${pos!.longitude.toStringAsFixed(5)}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        'Accuracy ±${pos!.accuracy.toStringAsFixed(0)} m',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  )
-                : const Text('Location unavailable — using city default.'),
-          ),
-          IconButton(
-            tooltip: 'Refresh location',
-            onPressed: locating ? null : onRefresh,
-            icon: const Icon(Icons.refresh),
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: onPickOnMap,
+              icon: const Icon(Icons.map_outlined, size: 18),
+              label: Text(
+                isCustom ? 'Change Location on Map' : 'Select on Ola Map',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
         ],
       ),

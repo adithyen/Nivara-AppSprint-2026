@@ -13,6 +13,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import '../../core/constants.dart';
 import '../../core/services/debug_logger.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/ola_maps_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../models/enums.dart';
@@ -21,20 +22,14 @@ import '../../models/report.dart';
 import '../../router.dart';
 import '../../features/report/category_grid.dart';
 
-/// Live civic map.
+/// Live civic map powered by Ola Maps.
 ///
-/// **Why a raster base, not Ola vector:** maplibre_gl 0.26.2 exposes no
-/// `transformRequest`, so the sprite/glyph/tile URLs *inside* Ola's returned
-/// `style.json` are fetched unauthenticated and rejected → the map renders
-/// black even when the top-level style URL returns 200. We therefore render a
-/// self-contained **dark raster** style (CARTO dark_all, no API key) that
-/// matches the intended "Style1-Dark" aesthetic, and still HTTP-probe the Ola
-/// endpoint on load so the on-device log records exactly what Ola returns.
-///
-/// Pins are drawn at runtime (Canvas → PNG) and registered with
-/// `controller.addImage` — the previous build referenced an unregistered
-/// `'marker'` image, which is why no pins appeared. Reports + Lost&Found stream
-/// in via Supabase Realtime and are rendered as Symbol annotations.
+/// Features:
+/// • Native vector rendering of Ola "Style1-Dark" with dynamically signed tiles/sprites/glyphs
+/// • Top floating Search Bar with Ola Places Autocomplete
+/// • Nearby Search POI chips for landmarks (hospitals, police, transit, civic offices)
+/// • Supabase Realtime synchronized civic complaint & Lost & Found markers
+/// • Long-press / Tap to inspect location address & file an issue directly
 class CivicMapScreen extends ConsumerStatefulWidget {
   const CivicMapScreen({super.key});
 
@@ -44,6 +39,7 @@ class CivicMapScreen extends ConsumerStatefulWidget {
 
 class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   static final _log = DebugLogger.instance;
+  final _ola = OlaMapsService.instance;
 
   MapLibreMapController? _controller;
   final _reports = <String, Report>{};
@@ -56,6 +52,29 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   bool _showLog = false;
   bool _locating = false;
   final _loc = const LocationService();
+
+  String? _styleString;
+  double _currentCenterLat = kDefaultLat;
+  double _currentCenterLng = kDefaultLng;
+
+  // Search & Autocomplete
+  final _searchCtrl = TextEditingController();
+  Timer? _debounceTimer;
+  List<OlaPlacePrediction> _predictions = [];
+  bool _searching = false;
+  bool _showSuggestions = false;
+
+  // Nearby discovery filters
+  final List<({String label, String icon, String? type})> _nearbyFilters = [
+    (label: 'All Reports', icon: '📍', type: null),
+    (label: 'Hospitals', icon: '🏥', type: 'hospital'),
+    (label: 'Police', icon: '👮', type: 'police'),
+    (label: 'Transit', icon: '🚌', type: 'transit_station'),
+    (label: 'Govt Offices', icon: '🏛️', type: 'local_government_office'),
+  ];
+  int _selectedFilterIdx = 0;
+  List<OlaPlacePrediction> _nearbyPlaces = [];
+  bool _loadingNearby = false;
 
   // Pin image name → fill colour. Registered once after the style loads.
   static const _grey = Color(0xFF95A5A6);
@@ -72,16 +91,118 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
   void initState() {
     super.initState();
     _log.log('MAP', 'CivicMapScreen initState');
+    _loadStyle();
     _seedFromRest();
     _subscribeRealtime();
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _searchCtrl.dispose();
     _controller?.onSymbolTapped.remove(_onSymbolTapped);
     _reportsSub?.cancel();
     _lfSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadStyle() async {
+    final style = await _ola.getAuthenticatedVectorStyleJson();
+    if (mounted) {
+      setState(() {
+        _styleString = style ?? _darkStyleJson();
+      });
+    }
+  }
+
+  void _onSearchChanged(String text) {
+    _debounceTimer?.cancel();
+    if (text.trim().isEmpty) {
+      setState(() {
+        _predictions = [];
+        _showSuggestions = false;
+        _searching = false;
+      });
+      return;
+    }
+
+    setState(() => _searching = true);
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      final results = await _ola.autocomplete(
+        text,
+        lat: _currentCenterLat,
+        lng: _currentCenterLng,
+      );
+      if (!mounted) return;
+      setState(() {
+        _predictions = results;
+        _showSuggestions = results.isNotEmpty;
+        _searching = false;
+      });
+    });
+  }
+
+  Future<void> _selectPrediction(OlaPlacePrediction p) async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _searchCtrl.text = p.mainText ?? p.description;
+      _showSuggestions = false;
+    });
+
+    double? lat = p.lat;
+    double? lng = p.lng;
+
+    if (lat == null || lng == null) {
+      final details = await _ola.getPlaceDetails(p.placeId);
+      if (details != null) {
+        lat = details.lat;
+        lng = details.lng;
+      }
+    }
+
+    if (lat != null && lng != null) {
+      _currentCenterLat = lat;
+      _currentCenterLng = lng;
+      await _controller?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: LatLng(lat, lng), zoom: 16.5),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onNearbyFilterSelected(int idx) async {
+    setState(() => _selectedFilterIdx = idx);
+    final filter = _nearbyFilters[idx];
+    if (filter.type == null) {
+      setState(() => _nearbyPlaces = []);
+      return;
+    }
+
+    setState(() => _loadingNearby = true);
+    final places = await _ola.nearbySearch(
+      lat: _currentCenterLat,
+      lng: _currentCenterLng,
+      types: filter.type,
+      radius: 3000,
+    );
+    if (!mounted) return;
+    setState(() {
+      _nearbyPlaces = places;
+      _loadingNearby = false;
+    });
+  }
+
+  Future<void> _selectNearbyPlace(OlaPlacePrediction p) async {
+    if (p.lat != null && p.lng != null) {
+      _currentCenterLat = p.lat!;
+      _currentCenterLng = p.lng!;
+      await _controller?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: LatLng(p.lat!, p.lng!), zoom: 16.5),
+        ),
+      );
+    }
   }
 
   // ── One-time REST seed ────────────────────────────────────────────────────
@@ -414,7 +535,10 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           MapLibreMap(
@@ -422,9 +546,16 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
               target: LatLng(kDefaultLat, kDefaultLng),
               zoom: kDefaultZoom,
             ),
-            styleString: _darkStyleJson(),
+            styleString: _styleString ?? _darkStyleJson(),
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
+            onCameraIdle: () {
+              final target = _controller?.cameraPosition?.target;
+              if (target != null) {
+                _currentCenterLat = target.latitude;
+                _currentCenterLng = target.longitude;
+              }
+            },
             myLocationEnabled: true,
             myLocationTrackingMode: MyLocationTrackingMode.none,
             compassEnabled: true,
@@ -433,7 +564,212 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
             annotationConsumeTapEvents: const [AnnotationType.symbol],
           ),
 
-          // Recenter
+          // ── Top Search & Filter Bar ──────────────────────────────────────
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Search Bar
+                  Container(
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHigh.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(left: 12, right: 6),
+                          child: Icon(Icons.search, color: NivaraColors.primary, size: 20),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchCtrl,
+                            onChanged: _onSearchChanged,
+                            decoration: InputDecoration(
+                              hintText: 'Search city landmarks or places…',
+                              hintStyle: TextStyle(color: scheme.outline, fontSize: 14),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        if (_searching)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        else if (_searchCtrl.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              _onSearchChanged('');
+                            },
+                          ),
+                        IconButton(
+                          tooltip: 'Debug log',
+                          icon: Icon(
+                            _showLog ? Icons.close : Icons.bug_report,
+                            size: 20,
+                            color: _showLog ? NivaraColors.danger : scheme.outline,
+                          ),
+                          onPressed: () => setState(() => _showLog = !_showLog),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Autocomplete dropdown
+                  if (_showSuggestions && _predictions.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      constraints: const BoxConstraints(maxHeight: 230),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        itemCount: _predictions.length,
+                        separatorBuilder: (_, _) =>
+                            const Divider(height: 1, indent: 48),
+                        itemBuilder: (context, i) {
+                          final p = _predictions[i];
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(
+                              Icons.location_on_outlined,
+                              size: 20,
+                              color: NivaraColors.primary,
+                            ),
+                            title: Text(
+                              p.mainText ?? p.description,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            subtitle: p.secondaryText != null
+                                ? Text(
+                                    p.secondaryText!,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : null,
+                            onTap: () => _selectPrediction(p),
+                          );
+                        },
+                      ),
+                    ),
+
+                  const SizedBox(height: 8),
+
+                  // Nearby category filter chips
+                  SizedBox(
+                    height: 34,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _nearbyFilters.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final f = _nearbyFilters[i];
+                        final selected = _selectedFilterIdx == i;
+                        return ChoiceChip(
+                          label: Text('${f.icon} ${f.label}'),
+                          selected: selected,
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor:
+                              scheme.surfaceContainerHigh.withValues(alpha: 0.85),
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                          onSelected: (_) => _onNearbyFilterSelected(i),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Nearby POI suggestions horizontal list
+                  if (_loadingNearby) ...[
+                    const SizedBox(height: 6),
+                    const SizedBox(
+                      height: 20,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Searching nearby landmarks…',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (_nearbyPlaces.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 32,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _nearbyPlaces.take(8).length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 6),
+                        itemBuilder: (context, i) {
+                          final p = _nearbyPlaces[i];
+                          return ActionChip(
+                            backgroundColor:
+                                scheme.surfaceContainerHigh.withValues(alpha: 0.9),
+                            label: Text(
+                              p.mainText ?? p.description,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            avatar: const Icon(
+                              Icons.near_me,
+                              size: 14,
+                              color: NivaraColors.accent,
+                            ),
+                            onPressed: () => _selectNearbyPlace(p),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          // Recenter FAB
           Positioned(
             bottom: 100,
             right: 16,
@@ -451,21 +787,6 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
                       ),
                     )
                   : const Icon(Icons.my_location, color: Colors.white),
-            ),
-          ),
-
-          // Debug-log toggle
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 12,
-            child: FloatingActionButton.small(
-              heroTag: 'debuglog',
-              backgroundColor: Colors.black87,
-              onPressed: () => setState(() => _showLog = !_showLog),
-              child: Icon(
-                _showLog ? Icons.close : Icons.bug_report,
-                color: Colors.white,
-              ),
             ),
           ),
 
