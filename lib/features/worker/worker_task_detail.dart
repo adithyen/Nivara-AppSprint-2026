@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
@@ -9,6 +10,7 @@ import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
+import '../../models/worker_progress_note.dart';
 import '../admin/status_style.dart';
 import '../report/category_grid.dart';
 import 'worker_repo.dart';
@@ -16,8 +18,14 @@ import 'worker_repo.dart';
 /// A field worker's view of one assigned report. They read the full context
 /// (citizen photos, evidence, location) and advance the task: Start work →
 /// Mark resolved, the latter attaching a resolution note and a proof photo.
-/// All writes go through the `worker_set_report_status` RPC, which verifies the
-/// task is actually assigned to this worker. Pops the updated [Report] back.
+/// All writes go through the `worker_set_report_status` RPC, which verifies
+/// the task is actually assigned to this worker. Pops the updated [Report] back.
+///
+/// New features:
+/// - **Navigate**: Opens Google Maps navigation to the issue location.
+/// - **Admin progress request banner**: If `progressRequestedAt` is set and
+///   it's newer than the last progress note, show a prominent alert.
+/// - **Send progress**: Worker can send custom progress note at any time.
 class WorkerTaskDetailScreen extends StatefulWidget {
   const WorkerTaskDetailScreen({super.key, required this.report});
 
@@ -30,6 +38,22 @@ class WorkerTaskDetailScreen extends StatefulWidget {
 class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
   late Report _report = widget.report;
   bool _working = false;
+  List<WorkerProgressNote> _progressNotes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProgressNotes();
+  }
+
+  Future<void> _loadProgressNotes() async {
+    try {
+      final notes = await WorkerRepo.fetchProgressNotes(_report.id);
+      if (mounted) setState(() => _progressNotes = notes);
+    } catch (_) {
+      /* optional */
+    }
+  }
 
   Future<void> _startWork() async {
     setState(() => _working = true);
@@ -85,6 +109,54 @@ class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
     }
   }
 
+  Future<void> _sendProgress() async {
+    final result = await showModalBottomSheet<_ProgressResult>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _ProgressSheet(),
+    );
+    if (result == null) return;
+
+    setState(() => _working = true);
+    try {
+      String? photoUrl;
+      if (result.photo != null) {
+        photoUrl = await _uploadProof(result.photo!);
+      }
+      await WorkerRepo.sendProgress(
+        reportId: _report.id,
+        note: result.note,
+        photoUrl: photoUrl,
+      );
+      if (!mounted) return;
+      setState(() => _working = false);
+      _snack('Progress sent.');
+      await _loadProgressNotes();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _working = false);
+      _snack('Could not send progress: $e');
+    }
+  }
+
+  Future<void> _navigate() async {
+    final lat = _report.lat;
+    final lng = _report.lng;
+    // Google Maps navigation URI
+    final uri = Uri.parse(
+      'google.navigation:q=$lat,$lng&mode=d',
+    );
+    final fallback = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      await launchUrl(fallback, mode: LaunchMode.externalApplication);
+    }
+  }
+
   /// Uploads a proof photo to Storage and returns its public URL.
   Future<String?> _uploadProof(XFile photo) async {
     try {
@@ -104,7 +176,6 @@ class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
           );
       return supabase.storage.from(kBucketPhotos).getPublicUrl(path);
     } catch (_) {
-      // Best-effort: resolve without the photo if the bucket refuses it.
       return null;
     }
   }
@@ -113,6 +184,15 @@ class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Whether the admin has requested progress more recently than the last note.
+  bool get _adminAskedForProgress {
+    final reqAt = _report.progressRequestedAt;
+    if (reqAt == null) return false;
+    if (_progressNotes.isEmpty) return true;
+    final lastNote = _progressNotes.last.createdAt;
+    return reqAt.isAfter(lastNote);
   }
 
   @override
@@ -163,7 +243,65 @@ class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              // Navigate button — prominent, always visible
+              FilledButton.icon(
+                onPressed: _navigate,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  backgroundColor: const Color(0xFF4285F4),
+                ),
+                icon: const Icon(Icons.navigation),
+                label: const Text('Navigate to location'),
+              ),
+              // Admin asked for progress banner
+              if (_adminAskedForProgress) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: NivaraColors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: NivaraColors.accent.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.notifications_active,
+                        color: NivaraColors.accent,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Admin requested a progress update',
+                              style: TextStyle(
+                                color: NivaraColors.accent,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              'Requested ${timeAgo(_report.progressRequestedAt!)}. Tap "Send progress" below.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                color: NivaraColors.accent.withValues(
+                                  alpha: 0.8,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
               if (r.hasEvidence) _EvidenceLine(report: r),
               if (r.photoUrls != null && r.photoUrls!.isNotEmpty) ...[
                 _PhotoStrip(urls: r.photoUrls!),
@@ -248,12 +386,26 @@ class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
                   ),
                 ),
               ],
+              // Progress notes sent by this worker
+              if (_progressNotes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _Section(
+                  title: 'Your progress updates',
+                  child: Column(
+                    children: [
+                      for (final note in _progressNotes)
+                        _ProgressNoteRow(note: note),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               _ActionBar(
                 status: r.status,
                 working: _working,
                 onStart: _startWork,
                 onResolve: _resolve,
+                onSendProgress: r.isOpen ? _sendProgress : null,
               ),
             ],
           ),
@@ -265,19 +417,21 @@ class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
 
 /// Worker actions keyed off the current status. Anything open-but-not-started
 /// offers "Start work"; in-progress offers "Mark resolved"; done shows a
-/// closing banner.
+/// closing banner. The Send Progress button is always available while open.
 class _ActionBar extends StatelessWidget {
   const _ActionBar({
     required this.status,
     required this.working,
     required this.onStart,
     required this.onResolve,
+    this.onSendProgress,
   });
 
   final ReportStatus status;
   final bool working;
   final VoidCallback onStart;
   final VoidCallback onResolve;
+  final VoidCallback? onSendProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -292,48 +446,213 @@ class _ActionBar extends StatelessWidget {
           )
         : Icon(icon);
 
-    switch (status) {
-      case ReportStatus.submitted:
-      case ReportStatus.acknowledged:
-        return FilledButton.icon(
-          onPressed: working ? null : onStart,
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-          icon: spinnerOr(Icons.engineering),
-          label: const Text('Start work'),
-        );
-      case ReportStatus.inProgress:
-        return FilledButton.icon(
-          onPressed: working ? null : onResolve,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            backgroundColor: NivaraColors.success,
+    return Column(
+      children: [
+        switch (status) {
+          ReportStatus.submitted ||
+          ReportStatus.acknowledged =>
+            FilledButton.icon(
+              onPressed: working ? null : onStart,
+              style:
+                  FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              icon: spinnerOr(Icons.engineering),
+              label: const Text('Start work'),
+            ),
+          ReportStatus.inProgress => FilledButton.icon(
+            onPressed: working ? null : onResolve,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              backgroundColor: NivaraColors.success,
+            ),
+            icon: spinnerOr(Icons.check_circle),
+            label: const Text('Mark resolved'),
           ),
-          icon: spinnerOr(Icons.check_circle),
-          label: const Text('Mark resolved'),
-        );
-      case ReportStatus.resolved:
-      case ReportStatus.closed:
-      case ReportStatus.duplicate:
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: NivaraColors.success.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.check_circle, color: NivaraColors.success),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Task complete. Thanks for the fix!',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+          ReportStatus.resolved ||
+          ReportStatus.closed ||
+          ReportStatus.duplicate =>
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: NivaraColors.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: NivaraColors.success),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Task complete. Thanks for the fix!',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        },
+        if (onSendProgress != null) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: working ? null : onSendProgress,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(Icons.update),
+            label: const Text('Send progress update'),
           ),
-        );
-    }
+        ],
+      ],
+    );
+  }
+}
+
+/// Bottom sheet to capture a progress note + optional photo.
+class _ProgressSheet extends StatefulWidget {
+  const _ProgressSheet();
+
+  @override
+  State<_ProgressSheet> createState() => _ProgressSheetState();
+}
+
+class _ProgressResult {
+  const _ProgressResult(this.note, this.photo);
+  final String? note;
+  final XFile? photo;
+}
+
+class _ProgressSheetState extends State<_ProgressSheet> {
+  final _note = TextEditingController();
+  XFile? _photo;
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pick(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 70,
+      maxWidth: 1600,
+    );
+    if (picked != null && mounted) setState(() => _photo = picked);
+  }
+
+  void _choosePhoto() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take a photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pick(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pick(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 4, 16, 16 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Send progress update',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Let the admin know what\'s happening with this task.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _note,
+            maxLines: 3,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Progress note',
+              hintText: 'What\'s the current status?',
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_photo == null)
+            OutlinedButton.icon(
+              onPressed: _choosePhoto,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+              icon: const Icon(Icons.add_a_photo_outlined),
+              label: const Text('Add photo (optional)'),
+            )
+          else
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    _photo!.path,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      width: 64,
+                      height: 64,
+                      color: scheme.surfaceContainerHighest,
+                      child: const Icon(Icons.image),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('Photo attached')),
+                TextButton(
+                  onPressed: () => setState(() => _photo = null),
+                  child: const Text('Remove'),
+                ),
+              ],
+            ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(
+              context,
+              _ProgressResult(_note.text.trim(), _photo),
+            ),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+            icon: const Icon(Icons.send),
+            label: const Text('Send update'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -481,6 +800,41 @@ class _ResolveSheetState extends State<_ResolveSheet> {
             ),
             icon: const Icon(Icons.check_circle),
             label: const Text('Mark resolved'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressNoteRow extends StatelessWidget {
+  const _ProgressNoteRow({required this.note});
+  final WorkerProgressNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.update, size: 14, color: scheme.outline),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (note.note?.trim().isNotEmpty == true)
+                  Text(note.note!.trim()),
+                Text(
+                  timeAgo(note.createdAt),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.outline,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

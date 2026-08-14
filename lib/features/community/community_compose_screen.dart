@@ -9,8 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../core/constants.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/offline_queue_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/connectivity_banner.dart';
 import '../../models/community_poll.dart';
 import '../../models/community_post.dart';
 import '../../models/enums.dart';
@@ -311,9 +313,17 @@ class _CommunityComposeScreenState
       _snack('${_isEdit ? 'Post updated' : 'Posted'}${photoNote ?? ''}.');
       context.pop(true);
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      _snack('Could not save: $e');
+      // Offline fallback
+      try {
+        await OfflineQueueService.enqueueCommunity(payload: payload);
+        if (!mounted) return;
+        _snack('Saved to Offline Queue (Pending Sync) — will sync when back online.');
+        context.pop(true);
+      } catch (queueErr) {
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        _snack('Could not save: $e');
+      }
     }
   }
 
@@ -328,9 +338,10 @@ class _CommunityComposeScreenState
     final color = communityTypeColor(_type);
     return Scaffold(
       appBar: AppBar(title: Text('${_isEdit ? 'Edit' : 'New'} ${_type.label}')),
-      body: AbsorbPointer(
-        absorbing: _submitting,
-        child: ListView(
+      body: WithConnectivityBanner(
+        child: AbsorbPointer(
+          absorbing: _submitting,
+          child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _Banner(type: _type, color: color),
@@ -506,6 +517,7 @@ class _CommunityComposeScreenState
             ),
             const SizedBox(height: 12),
           ],
+        ),
         ),
       ),
     );

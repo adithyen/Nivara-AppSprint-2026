@@ -7,6 +7,7 @@ import '../../core/utils.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../models/user_profile.dart';
+import '../../models/worker_progress_note.dart';
 import '../report/category_grid.dart';
 import '../worker/worker_repo.dart';
 import 'status_style.dart';
@@ -33,11 +34,13 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
   /// Display name of the currently assigned worker, resolved lazily from the
   /// `assigned_to` id so the Assignment card reads "Assigned to Ravi Kumar".
   String? _assigneeName;
+  List<WorkerProgressNote> _progressNotes = [];
 
   @override
   void initState() {
     super.initState();
     _loadAssignee();
+    _loadProgressNotes();
   }
 
   Future<void> _loadAssignee() async {
@@ -51,12 +54,23 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
     }
   }
 
+  Future<void> _loadProgressNotes() async {
+    try {
+      final notes = await WorkerRepo.fetchProgressNotes(_report.id);
+      if (mounted) setState(() => _progressNotes = notes);
+    } catch (_) {
+      /* progress notes are optional UI */
+    }
+  }
+
   Future<void> _openAssignSheet() async {
+    // Determine which department the report falls under to show relevant workers
+    final dept = _report.assignedDepartment;
     final worker = await showModalBottomSheet<UserProfile>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => const _AssignSheet(),
+      builder: (_) => _AssignSheet(department: dept),
     );
     if (worker != null) await _assignTo(worker);
   }
@@ -82,28 +96,33 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
     }
   }
 
+  Future<void> _requestProgress() async {
+    setState(() => _working = true);
+    try {
+      final updated = await WorkerRepo.requestProgress(_report.id);
+      if (!mounted) return;
+      setState(() {
+        _report = updated;
+        _working = false;
+      });
+      _snack('Progress requested from worker.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _working = false);
+      _snack('Could not request progress: $e');
+    }
+  }
+
   /// The status transitions offered from the current status.
+  /// Admin no longer has 'Start work' — they assign a worker instead.
   List<_Action> get _actions {
     switch (_report.status) {
       case ReportStatus.submitted:
         return const [
           _Action(ReportStatus.acknowledged, 'Acknowledge', Icons.visibility),
-          _Action(
-            ReportStatus.inProgress,
-            'Start work',
-            Icons.engineering,
-            primary: true,
-          ),
         ];
       case ReportStatus.acknowledged:
-        return const [
-          _Action(
-            ReportStatus.inProgress,
-            'Start work',
-            Icons.engineering,
-            primary: true,
-          ),
-        ];
+        return const [];
       case ReportStatus.inProgress:
         return const [
           _Action(
@@ -278,8 +297,24 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
                   assigneeId: r.assignedTo,
                   working: _working,
                   onAssign: _openAssignSheet,
+                  onRequestProgress: _report.status == ReportStatus.inProgress
+                      ? _requestProgress
+                      : null,
+                  progressRequestedAt: _report.progressRequestedAt,
                 ),
               ),
+              if (_progressNotes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _Section(
+                  title: 'Worker Progress Updates',
+                  child: Column(
+                    children: [
+                      for (final note in _progressNotes)
+                        _ProgressNoteCard(note: note),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               _Section(
                 title: 'Location',
@@ -580,20 +615,25 @@ class _MetaRow extends StatelessWidget {
   }
 }
 
-/// Current assignee (if any) plus the Assign / Reassign button. Handing a
-/// report to a worker also bumps SUBMITTED → ACKNOWLEDGED server-side.
+/// Current assignee (if any) plus the Assign / Reassign button and optional
+/// progress-request action. Handing a report to a worker also bumps
+/// SUBMITTED → ACKNOWLEDGED server-side.
 class _AssignmentBody extends StatelessWidget {
   const _AssignmentBody({
     required this.assigneeName,
     required this.assigneeId,
     required this.working,
     required this.onAssign,
+    this.onRequestProgress,
+    this.progressRequestedAt,
   });
 
   final String? assigneeName;
   final String? assigneeId;
   final bool working;
   final VoidCallback onAssign;
+  final VoidCallback? onRequestProgress;
+  final DateTime? progressRequestedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -632,15 +672,50 @@ class _AssignmentBody extends StatelessWidget {
             assigned ? 'Reassign to another worker' : 'Assign to worker',
           ),
         ),
+        if (onRequestProgress != null) ...[
+          const SizedBox(height: 8),
+          if (progressRequestedAt != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Progress requested ${timeAgo(progressRequestedAt!)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          OutlinedButton.icon(
+            onPressed: working ? null : onRequestProgress,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              foregroundColor: NivaraColors.accent,
+              side: BorderSide(color: NivaraColors.accent.withValues(alpha: 0.5)),
+            ),
+            icon: const Icon(Icons.notifications_active_outlined),
+            label: const Text('Ask for progress update'),
+          ),
+        ],
       ],
     );
   }
 }
 
-/// Bottom sheet listing every field worker for the official to pick from.
-/// Pops the chosen [UserProfile].
+/// Bottom sheet listing field workers filtered by the report's department.
+/// Workers on leave are shown but greyed out and un-tappable. Pops the chosen
+/// [UserProfile].
 class _AssignSheet extends StatefulWidget {
-  const _AssignSheet();
+  const _AssignSheet({this.department});
+  final AdminDepartment? department;
 
   @override
   State<_AssignSheet> createState() => _AssignSheetState();
@@ -658,7 +733,18 @@ class _AssignSheetState extends State<_AssignSheet> {
 
   Future<void> _load() async {
     try {
-      final list = await WorkerRepo.listWorkers();
+      final List<UserProfile> list;
+      if (widget.department != null) {
+        list = await WorkerRepo.listWorkersByDepartment(widget.department!);
+        // If no workers in this dept, fall back to all workers
+        if (list.isEmpty) {
+          final all = await WorkerRepo.listWorkers();
+          if (mounted) setState(() => _workers = all);
+          return;
+        }
+      } else {
+        list = await WorkerRepo.listWorkers();
+      }
       if (mounted) setState(() => _workers = list);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -669,17 +755,18 @@ class _AssignSheetState extends State<_AssignSheet> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final workers = _workers;
+    final deptLabel = widget.department?.label;
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
               child: Text(
                 'Assign to worker',
                 style: Theme.of(
@@ -687,6 +774,26 @@ class _AssignSheetState extends State<_AssignSheet> {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
+            if (deptLabel != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.apartment,
+                      size: 14,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$deptLabel department workers',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -701,8 +808,7 @@ class _AssignSheetState extends State<_AssignSheet> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Text(
-                  'No field workers found. Seed them with '
-                  'supabase/seed_demo_staff.sql.',
+                  'No field workers found. Run supabase/seed_workers_by_category.sql.',
                   style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
               )
@@ -715,29 +821,114 @@ class _AssignSheetState extends State<_AssignSheet> {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final w = workers[i];
+                    final onLeave = w.isOnLeave;
                     return ListTile(
+                      enabled: !onLeave,
                       leading: CircleAvatar(
-                        backgroundColor: NivaraColors.primary.withValues(
-                          alpha: 0.15,
-                        ),
-                        child: const Icon(
+                        backgroundColor: onLeave
+                            ? scheme.surfaceContainerHighest
+                            : NivaraColors.primary.withValues(alpha: 0.15),
+                        child: Icon(
                           Icons.engineering,
-                          color: NivaraColors.primary,
+                          color: onLeave
+                              ? scheme.outline
+                              : NivaraColors.primary,
                         ),
                       ),
                       title: Text(w.displayName),
                       subtitle: Text(
-                        w.department?.label ?? 'General',
-                        style: TextStyle(color: scheme.onSurfaceVariant),
+                        onLeave
+                            ? '${w.department?.label ?? 'General'} · On leave'
+                            : w.department?.label ?? 'General',
+                        style: TextStyle(
+                          color: onLeave
+                              ? NivaraColors.danger
+                              : scheme.onSurfaceVariant,
+                        ),
                       ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => Navigator.pop(context, w),
+                      trailing: onLeave
+                          ? Icon(
+                              Icons.do_not_disturb,
+                              color: NivaraColors.danger.withValues(alpha: 0.6),
+                            )
+                          : const Icon(Icons.chevron_right),
+                      onTap: onLeave ? null : () => Navigator.pop(context, w),
                     );
                   },
                 ),
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A card showing a single worker progress note in the admin detail view.
+class _ProgressNoteCard extends StatelessWidget {
+  const _ProgressNoteCard({required this.note});
+  final WorkerProgressNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.engineering,
+                size: 15,
+                color: NivaraColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Worker update',
+                style: TextStyle(
+                  color: NivaraColors.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                timeAgo(note.createdAt),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.outline,
+                ),
+              ),
+            ],
+          ),
+          if (note.note?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 6),
+            Text(note.note!.trim()),
+          ],
+          if (note.photoUrl != null) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                note.photoUrl!,
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (c, _, _) => Container(
+                  height: 80,
+                  color: scheme.surfaceContainerHighest,
+                  child: Icon(Icons.broken_image, color: scheme.outline),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

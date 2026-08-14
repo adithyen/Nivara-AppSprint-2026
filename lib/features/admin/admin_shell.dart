@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/services/offline_queue_service.dart';
 import '../../core/theme.dart';
 import '../../models/enums.dart';
 import '../../models/user_profile.dart';
 import '../../router.dart';
 import '../auth/auth_controller.dart';
+import 'admin_community_tab.dart';
 import 'admin_insights.dart';
 import 'admin_queue.dart';
-import 'manage_staff_screen.dart';
+import 'manage_team_screen.dart';
 
 /// The municipal (admin) app shell: a bottom-nav host over
 /// **Queue · Insights · Staff · Profile**.
@@ -34,9 +36,6 @@ class _AdminShellState extends ConsumerState<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(authControllerProvider).asData?.value;
-    final isSuper = profile?.isSuperadmin ?? false;
-
     final tabs = <_TabSpec>[
       const _TabSpec(
         title: 'Report queue',
@@ -52,14 +51,21 @@ class _AdminShellState extends ConsumerState<AdminShell> {
         label: 'Insights',
         body: AdminInsights(),
       ),
-      if (isSuper)
-        const _TabSpec(
-          title: 'Manage staff',
-          icon: Icons.groups_outlined,
-          selectedIcon: Icons.groups,
-          label: 'Staff',
-          body: ManageStaffScreen(),
-        ),
+      const _TabSpec(
+        title: 'Community',
+        icon: Icons.groups_outlined,
+        selectedIcon: Icons.groups,
+        label: 'Community',
+        body: AdminCommunityTab(),
+      ),
+      // Single Team tab replaces the old Workers + Staff tabs
+      const _TabSpec(
+        title: 'Team',
+        icon: Icons.badge_outlined,
+        selectedIcon: Icons.badge,
+        label: 'Team',
+        body: ManageTeamScreen(),
+      ),
       const _TabSpec(
         title: 'Profile',
         icon: Icons.account_circle_outlined,
@@ -151,6 +157,31 @@ class _AdminProfileTab extends ConsumerWidget {
       children: [
         _OfficerCard(profile: profile),
         const SizedBox(height: 20),
+        _ActionTile(
+          icon: Icons.history,
+          color: NivaraColors.primary,
+          title: 'My Activity',
+          subtitle: 'Timeline of your assignments, actions, and posts',
+          onTap: () => context.push(Routes.activityLog),
+        ),
+        const SizedBox(height: 12),
+        FutureBuilder<int>(
+          future: OfflineQueueService.pendingCount(),
+          builder: (context, snapshot) {
+            final count = snapshot.data ?? 0;
+            return _ActionTile(
+              icon: Icons.cloud_upload_outlined,
+              color: NivaraColors.accent,
+              title: 'Pending Sync',
+              subtitle: count == 0
+                  ? 'All actions synced'
+                  : '$count item${count == 1 ? '' : 's'} waiting to go online',
+              badge: count > 0 ? '$count' : null,
+              onTap: () => context.push(Routes.pendingSync),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
         _ActionTile(
           icon: Icons.palette_outlined,
           color: const Color(0xFF7B4BC4),
@@ -273,6 +304,7 @@ class _ActionTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.badge,
   });
 
   final IconData icon;
@@ -280,6 +312,7 @@ class _ActionTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
+  final String? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +326,33 @@ class _ActionTile extends StatelessWidget {
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: badge != null
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right),
+                ],
+              )
+            : const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
     );

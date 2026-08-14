@@ -8,8 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../core/constants.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/offline_queue_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../../router.dart';
@@ -220,9 +222,20 @@ class _LFFormScreenState extends State<LFFormScreen> {
       // Straight to the match list for the just-created item.
       context.pushReplacement(Routes.lostFoundMatch, extra: saved);
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      _snack('Could not submit: $e');
+      // Offline fallback
+      try {
+        await OfflineQueueService.enqueueLfItem(
+          payload: item.toInsertMap(),
+          photos: _photos.map((p) => File(p.path)).toList(),
+        );
+        if (!mounted) return;
+        Navigator.pop(context, true);
+        _snack('Saved to Offline Queue (Pending Sync) — will sync when back online.');
+      } catch (queueErr) {
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        _snack('Could not submit: $e');
+      }
     }
   }
 
@@ -239,9 +252,10 @@ class _LFFormScreenState extends State<LFFormScreen> {
       appBar: AppBar(
         title: Text(_isLost ? 'Report a lost item' : 'Report a found item'),
       ),
-      body: AbsorbPointer(
-        absorbing: _submitting,
-        child: ListView(
+      body: WithConnectivityBanner(
+        child: AbsorbPointer(
+          absorbing: _submitting,
+          child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _Banner(isLost: _isLost, accent: accent),
@@ -355,10 +369,12 @@ class _LFFormScreenState extends State<LFFormScreen> {
             const SizedBox(height: 12),
           ],
         ),
+        ),
       ),
     );
   }
 }
+
 
 class _Banner extends StatelessWidget {
   const _Banner({required this.isLost, required this.accent});

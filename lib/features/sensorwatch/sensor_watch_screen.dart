@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/categorize.dart';
 import '../../core/constants.dart';
 import '../../core/services/evidence_engine.dart';
+import '../../core/services/offline_queue_service.dart';
 import '../../core/services/sensor_watch_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/evidence_package.dart';
 import '../../models/report.dart';
@@ -107,6 +109,7 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
                     ),
                   ),
           ),
+          const ConnectivityBanner(),
         ],
       ),
     );
@@ -436,8 +439,30 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
       setState(() => _submittedId = inserted['id'] as String);
       _snack('Report filed — routed to the municipal queue.');
     } catch (e) {
-      if (!mounted) return;
-      _snack('Could not file report: $e');
+      // Offline fallback
+      try {
+        final impact = _pkg.accelZPeak - _pkg.accelZBaseline;
+        final report = Report(
+          id: '',
+          userId: uid,
+          category: categoryForDetection(_pkg.eventType),
+          severity: severityForImpact(impact),
+          lat: _pkg.lat,
+          lng: _pkg.lng,
+          source: 'SENSORWATCH',
+          detectionType: _pkg.eventType,
+          evidencePackage: _pkg,
+          evidenceHash: _pkg.evidenceHash,
+          createdAt: DateTime.now(),
+        );
+        await OfflineQueueService.enqueueReport(payload: report.toInsertMap());
+        if (!mounted) return;
+        setState(() => _submittedId = 'offline_queued');
+        _snack('Saved to Offline Queue (Pending Sync) — will sync when back online.');
+      } catch (queueErr) {
+        if (!mounted) return;
+        _snack('Could not file report: $e');
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

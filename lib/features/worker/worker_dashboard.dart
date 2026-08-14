@@ -12,13 +12,11 @@ import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../router.dart';
 import '../admin/status_style.dart';
-import '../auth/auth_controller.dart';
 import '../report/category_grid.dart';
 
-/// The field worker's home. Shows only the reports assigned to this worker —
-/// fetched once, then kept live via a filtered Realtime stream. Tapping a task
-/// opens the detail screen where the worker starts work and marks it resolved
-/// with a proof photo (all through the `worker_set_report_status` RPC).
+/// The field worker's task list — body-only widget used inside [WorkerShell].
+/// Shows only the reports assigned to this worker, fetched once then kept
+/// live via a filtered Realtime stream. Tapping a task opens the detail screen.
 class WorkerDashboard extends ConsumerStatefulWidget {
   const WorkerDashboard({super.key});
 
@@ -133,52 +131,19 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(authControllerProvider).asData?.value;
-    final dept = profile?.department?.label;
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 16,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('My Tasks'),
-            Text(
-              dept == null
-                  ? (profile?.displayName ?? 'Field worker')
-                  : '${profile?.displayName ?? 'Worker'} · $dept',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-                color: Colors.white70,
-              ),
-            ),
-          ],
+    return Column(
+      children: [
+        _FilterBar(
+          tasks: _tasks.values,
+          selectedKey: _filterKey,
+          onSelect: (k) => setState(() => _filterKey = k),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).signOut(),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _FilterBar(
-              tasks: _tasks.values,
-              selectedKey: _filterKey,
-              onSelect: (k) => setState(() => _filterKey = k),
-            ),
-            const SizedBox(height: 4),
-            Expanded(child: _buildList()),
-          ],
-        ),
-      ),
+        const SizedBox(height: 4),
+        Expanded(child: _buildList()),
+      ],
     );
   }
 

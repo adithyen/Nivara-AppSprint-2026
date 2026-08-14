@@ -7,8 +7,10 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../core/constants.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/offline_queue_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import 'category_grid.dart';
@@ -181,9 +183,20 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
         'Report submitted${photoNote ?? ''} — routed to the municipal queue.',
       );
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      _snack('Could not submit: $e');
+      // Offline fallback: save to local queue with photos in temp storage
+      try {
+        await OfflineQueueService.enqueueReport(
+          payload: report.toInsertMap(),
+          photos: _photos.map((p) => File(p.path)).toList(),
+        );
+        if (!mounted) return;
+        Navigator.pop(context, true);
+        _snack('Saved to Offline Queue (Pending Sync) — will sync when back online.');
+      } catch (queueErr) {
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        _snack('Could not submit: $e');
+      }
     }
   }
 
@@ -197,9 +210,10 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Report an issue')),
-      body: AbsorbPointer(
-        absorbing: _submitting,
-        child: ListView(
+      body: WithConnectivityBanner(
+        child: AbsorbPointer(
+          absorbing: _submitting,
+          child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _SectionLabel('1. What is the issue?'),
@@ -279,6 +293,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             ),
             const SizedBox(height: 12),
           ],
+        ),
         ),
       ),
     );

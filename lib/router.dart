@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/activity/activity_log_screen.dart';
+import 'features/activity/pending_sync_screen.dart';
 import 'features/admin/admin_report_detail.dart';
 import 'features/admin/admin_shell.dart';
 import 'features/auth/auth_controller.dart';
@@ -21,7 +23,7 @@ import 'features/report/report_detail_screen.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
 import 'features/settings/settings_screen.dart';
-import 'features/worker/worker_dashboard.dart';
+import 'features/home/worker_shell.dart';
 import 'features/worker/worker_task_detail.dart';
 import 'models/community_post.dart';
 import 'models/enums.dart';
@@ -51,6 +53,8 @@ abstract final class Routes {
   static const workerTask = '/worker/task';
   static const admin = '/admin';
   static const adminReportDetail = '/admin/report';
+  static const activityLog = '/activity';
+  static const pendingSync = '/activity/sync';
 }
 
 /// The single [GoRouter] instance, built with an auth/role redirect guard.
@@ -88,10 +92,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           : Routes.home;
       if (atAuth || atSplash) return landing;
 
-      // Keep each side to its own role. Citizens can't reach the municipal
-      // pages; officials and workers each stay on their own dashboard.
+      // Keep admins on /admin, workers on /worker — but workers CAN navigate
+      // to citizen sub-routes (map, report form, L&F, community, etc.).
       if (loc.startsWith(Routes.admin) && !profile.isAdmin) return landing;
-      if (loc.startsWith(Routes.worker) && !profile.isWorker) return landing;
+      // Only block workers from landing on /admin, not from citizen routes.
+      if (loc == Routes.worker && !profile.isWorker && !profile.isAdmin) return landing;
 
       return null;
     },
@@ -184,7 +189,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.worker,
-        builder: (context, state) => const WorkerDashboard(),
+        builder: (context, state) => const WorkerShell(),
       ),
       GoRoute(
         path: Routes.workerTask,
@@ -199,6 +204,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminReportDetail,
         builder: (context, state) =>
             AdminReportDetailScreen(report: state.extra as Report),
+      ),
+      GoRoute(
+        path: Routes.activityLog,
+        builder: (context, state) => const ActivityLogScreen(),
+      ),
+      GoRoute(
+        path: Routes.pendingSync,
+        builder: (context, state) => const PendingSyncScreen(),
       ),
     ],
   );

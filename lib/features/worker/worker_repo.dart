@@ -3,6 +3,8 @@ import '../../core/supabase_client.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../models/user_profile.dart';
+import '../../models/worker_application.dart';
+import '../../models/worker_progress_note.dart';
 
 /// Data access for the municipal staff side: listing field workers, resolving
 /// assignee names, a worker's own task list, and the two assignment RPCs.
@@ -13,14 +15,33 @@ import '../../models/user_profile.dart';
 class WorkerRepo {
   const WorkerRepo._();
 
-  /// All field workers, department first then name. Officials pick from this
-  /// list when assigning. RLS lets admins read every profile.
+  /// All active field workers (not resigned), department first then name.
+  /// Officials pick from this list when assigning. RLS lets admins read
+  /// every profile. Workers on leave are included but flagged.
   static Future<List<UserProfile>> listWorkers() async {
     final rows = await supabase
         .from(kTableProfiles)
         .select()
         .eq('role', UserRole.worker.wire)
+        .isFilter('resigned_at', null)
         .order('department')
+        .order('worker_number')
+        .order('display_name');
+    return rows.map<UserProfile>((r) => UserProfile.fromMap(r)).toList();
+  }
+
+  /// Workers for a specific department — used in the assign sheet so admin
+  /// sees category-relevant workers first.
+  static Future<List<UserProfile>> listWorkersByDepartment(
+    AdminDepartment dept,
+  ) async {
+    final rows = await supabase
+        .from(kTableProfiles)
+        .select()
+        .eq('role', UserRole.worker.wire)
+        .eq('department', dept.wire)
+        .isFilter('resigned_at', null)
+        .order('worker_number')
         .order('display_name');
     return rows.map<UserProfile>((r) => UserProfile.fromMap(r)).toList();
   }
@@ -124,5 +145,129 @@ class WorkerRepo {
     );
     final row = res is List ? res.first : res;
     return Report.fromMap(row as Map<String, dynamic>);
+  }
+
+  // ────────── Progress tracking ──────────────────────────────────────────────
+
+  /// Admin asks for a progress update on an in-flight task.
+  static Future<Report> requestProgress(String reportId) async {
+    final res = await supabase.rpc(
+      'admin_request_progress',
+      params: {'p_report_id': reportId},
+    );
+    final row = res is List ? res.first : res;
+    return Report.fromMap(row as Map<String, dynamic>);
+  }
+
+  /// Worker sends a custom progress update (note + optional photo).
+  static Future<WorkerProgressNote> sendProgress({
+    required String reportId,
+    String? note,
+    String? photoUrl,
+  }) async {
+    final res = await supabase.rpc(
+      'worker_send_progress',
+      params: {
+        'p_report_id': reportId,
+        if (note != null && note.trim().isNotEmpty) 'p_note': note.trim(),
+        'p_photo_url': ?photoUrl,
+      },
+    );
+    final row = res is List ? res.first : res;
+    return WorkerProgressNote.fromMap(row as Map<String, dynamic>);
+  }
+
+  /// Fetch all progress notes for a report (admin or assigned worker).
+  static Future<List<WorkerProgressNote>> fetchProgressNotes(
+    String reportId,
+  ) async {
+    final rows = await supabase
+        .from('worker_progress_notes')
+        .select()
+        .eq('report_id', reportId)
+        .order('created_at');
+    return rows
+        .map<WorkerProgressNote>((r) => WorkerProgressNote.fromMap(r))
+        .toList();
+  }
+
+  // ────────── Worker status ──────────────────────────────────────────────────
+
+  /// Worker marks themselves on leave — admin cannot assign them.
+  static Future<UserProfile> goOnLeave() async {
+    final res = await supabase.rpc('worker_go_on_leave');
+    final row = res is List ? res.first : res;
+    return UserProfile.fromMap(row as Map<String, dynamic>);
+  }
+
+  /// Worker marks themselves available again.
+  static Future<UserProfile> markAvailable() async {
+    final res = await supabase.rpc('worker_mark_available');
+    final row = res is List ? res.first : res;
+    return UserProfile.fromMap(row as Map<String, dynamic>);
+  }
+
+  /// Worker resigns — converts them back to citizen role.
+  static Future<UserProfile> resign() async {
+    final res = await supabase.rpc('worker_resign');
+    final row = res is List ? res.first : res;
+    return UserProfile.fromMap(row as Map<String, dynamic>);
+  }
+
+  // ────────── Admin worker management ───────────────────────────────────────
+
+  /// Admin soft-removes a worker (reverts to citizen, sets resigned_at).
+  static Future<void> removeWorker(String workerId) async {
+    await supabase.rpc(
+      'admin_remove_worker',
+      params: {'p_worker_id': workerId},
+    );
+  }
+
+  // ────────── Worker applications ───────────────────────────────────────────
+
+  /// Citizen submits a "Work with Nivara" application.
+  static Future<WorkerApplication> submitApplication({String? message}) async {
+    final res = await supabase.rpc(
+      'submit_worker_application',
+      params: {'p_message': ?message},
+    );
+    final row = res is List ? res.first : res;
+    return WorkerApplication.fromMap(row as Map<String, dynamic>);
+  }
+
+  /// Admin fetches all worker applications, newest first.
+  static Future<List<WorkerApplication>> listApplications() async {
+    final rows = await supabase
+        .from('worker_applications')
+        .select()
+        .order('created_at', ascending: false);
+    return rows
+        .map<WorkerApplication>((r) => WorkerApplication.fromMap(r))
+        .toList();
+  }
+
+  /// Admin approves or rejects an application.
+  static Future<WorkerApplication> reviewApplication({
+    required String applicationId,
+    required String status, // 'APPROVED' or 'REJECTED'
+  }) async {
+    final res = await supabase.rpc(
+      'admin_review_application',
+      params: {
+        'p_application_id': applicationId,
+        'p_status': status,
+      },
+    );
+    final row = res is List ? res.first : res;
+    return WorkerApplication.fromMap(row as Map<String, dynamic>);
+  }
+
+  /// Admin deletes a community post.
+  static Future<void> deleteCommunityPost(String postId) async {
+    await supabase.rpc(
+      'admin_delete_community_post',
+      params: {'p_post_id': postId},
+    );
   }
 }

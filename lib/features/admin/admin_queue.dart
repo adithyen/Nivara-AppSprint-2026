@@ -343,21 +343,19 @@ class _MetricFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: [
           for (final f in _kQueueFilters)
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: _MetricPill(
-                label: f.label,
-                count: reports.where(f.test).length,
-                color: f.color,
-                selected: f.key == selectedKey,
-                onTap: () => onSelect(f.key),
-              ),
+            _MetricPill(
+              label: f.label,
+              count: reports.where(f.test).length,
+              color: f.color,
+              selected: f.key == selectedKey,
+              onTap: () => onSelect(f.key),
             ),
         ],
       ),

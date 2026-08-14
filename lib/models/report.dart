@@ -40,6 +40,7 @@ class Report {
 
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final DateTime? progressRequestedAt;
 
   const Report({
     required this.id,
@@ -70,6 +71,7 @@ class Report {
     this.resolutionPhoto,
     required this.createdAt,
     this.updatedAt,
+    this.progressRequestedAt,
   });
 
   bool get isFromSensor => source == 'SENSORWATCH';
@@ -114,6 +116,7 @@ class Report {
       resolutionPhoto: map['resolution_photo'] as String?,
       createdAt: toDateTimeOrNull(map['created_at']) ?? DateTime.now(),
       updatedAt: toDateTimeOrNull(map['updated_at']),
+      progressRequestedAt: toDateTimeOrNull(map['progress_requested_at']),
     );
   }
 

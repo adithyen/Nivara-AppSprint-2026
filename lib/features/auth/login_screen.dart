@@ -11,10 +11,11 @@ import 'auth_controller.dart';
 /// Email + password sign-in. Navigation on success is handled by the router's
 /// redirect guard — this screen only drives the form + error display.
 ///
-/// The role toggle (Citizen / Official / Worker) reveals + prefills the demo
+/// The role toggle (Citizen / Officials) reveals + prefills the demo
 /// credentials for each side so testers can walk the full round-trip without
-/// setting up separate accounts.
-enum _LoginMode { citizen, official, worker }
+/// setting up separate accounts. Field workers log in here too (using their
+/// assigned credentials).
+enum _LoginMode { citizen, official }
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -44,8 +45,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _mode = mode;
       _error = null;
       // Clear any previously prefilled demo value before applying the new one.
-      const demoUsers = [kDemoAdminUsername, kDemoWorkerUsername];
-      const demoPasswords = [kDemoAdminPassword, kDemoWorkerPassword];
+      const demoUsers = [kDemoAdminUsername];
+      const demoPasswords = [kDemoAdminPassword];
       if (demoUsers.contains(_email.text)) _email.clear();
       if (demoPasswords.contains(_password.text)) _password.clear();
       switch (mode) {
@@ -54,9 +55,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         case _LoginMode.official:
           _email.text = kDemoAdminUsername;
           _password.text = kDemoAdminPassword;
-        case _LoginMode.worker:
-          _email.text = kDemoWorkerUsername;
-          _password.text = kDemoWorkerPassword;
       }
     });
   }
@@ -70,12 +68,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       final raw = _email.text.trim();
-      // Demo staff sign in with a username alias; map it to the real email.
+      // Demo admin sign in with a username alias; map it to the real email.
       final lower = raw.toLowerCase();
       final email = lower == kDemoAdminUsername
           ? kDemoAdminEmail
-          : lower == kDemoWorkerUsername
-          ? kDemoWorkerEmail
           : raw;
       await ref
           .read(authControllerProvider.notifier)
@@ -136,13 +132,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       ButtonSegment(
                         value: _LoginMode.official,
-                        label: Text('Official'),
+                        label: Text('Officials'),
                         icon: Icon(Icons.shield_outlined),
-                      ),
-                      ButtonSegment(
-                        value: _LoginMode.worker,
-                        label: Text('Worker'),
-                        icon: Icon(Icons.engineering),
                       ),
                     ],
                     selected: {_mode},
@@ -163,7 +154,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     autofillHints: isStaff ? null : const [AutofillHints.email],
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: isStaff ? 'Username' : 'Email',
+                      labelText: isStaff ? 'Email or username' : 'Email',
                       prefixIcon: Icon(
                         isStaff ? Icons.badge_outlined : Icons.email_outlined,
                       ),
@@ -172,10 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       final t = v?.trim() ?? '';
                       if (t.isEmpty) return 'Enter your email';
                       final lower = t.toLowerCase();
-                      if (lower == kDemoAdminUsername ||
-                          lower == kDemoWorkerUsername) {
-                        return null;
-                      }
+                      if (lower == kDemoAdminUsername) return null;
                       if (!t.contains('@') || !t.contains('.')) {
                         return 'Enter a valid email';
                       }
@@ -230,7 +218,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : Text(switch (_mode) {
                             _LoginMode.citizen => 'Sign in',
                             _LoginMode.official => 'Sign in as official',
-                            _LoginMode.worker => 'Sign in as worker',
                           }),
                   ),
                   const SizedBox(height: 8),
@@ -259,12 +246,6 @@ class _DemoStaffCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isWorker = mode == _LoginMode.worker;
-    final title = isWorker
-        ? 'Demo field worker (prefilled)'
-        : 'Demo official (prefilled)';
-    final username = isWorker ? kDemoWorkerUsername : kDemoAdminUsername;
-    final password = isWorker ? kDemoWorkerPassword : kDemoAdminPassword;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -285,7 +266,7 @@ class _DemoStaffCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  'Demo official (prefilled)',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: scheme.onSecondaryContainer,
                     fontWeight: FontWeight.bold,
@@ -293,9 +274,16 @@ class _DemoStaffCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Username: $username\nPassword: $password',
+                  'Username: $kDemoAdminUsername\nPassword: $kDemoAdminPassword',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: scheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Field workers: use your assigned email (e.g. pothole_worker1@nivara.app) with password worker123',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSecondaryContainer.withValues(alpha: 0.8),
                   ),
                 ),
               ],

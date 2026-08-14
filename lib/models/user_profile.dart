@@ -19,6 +19,11 @@ class UserProfile {
   final int reportsCount;
   final int findsCount;
 
+  /// Worker-specific metadata
+  final bool isOnLeave;
+  final int? workerNumber;
+  final DateTime? resignedAt;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -36,6 +41,9 @@ class UserProfile {
     this.civicScore = 0,
     this.reportsCount = 0,
     this.findsCount = 0,
+    this.isOnLeave = false,
+    this.workerNumber,
+    this.resignedAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -48,6 +56,9 @@ class UserProfile {
 
   /// Any municipal account (official or field worker) — i.e. not a citizen.
   bool get isStaff => isAdmin || isWorker;
+
+  /// Worker is active (not on leave and not resigned).
+  bool get isAvailable => isWorker && !isOnLeave && resignedAt == null;
 
   factory UserProfile.fromMap(Map<String, dynamic> map) => UserProfile(
     id: map['id'] as String,
@@ -63,6 +74,9 @@ class UserProfile {
     civicScore: toInt(map['civic_score']),
     reportsCount: toInt(map['reports_count']),
     findsCount: toInt(map['finds_count']),
+    isOnLeave: (map['is_on_leave'] as bool?) ?? false,
+    workerNumber: map['worker_number'] as int?,
+    resignedAt: toDateTimeOrNull(map['resigned_at']),
     createdAt: toDateTimeOrNull(map['created_at']),
     updatedAt: toDateTimeOrNull(map['updated_at']),
   );
@@ -83,6 +97,7 @@ class UserProfile {
     String? phone,
     String? city,
     String? ward,
+    bool? isOnLeave,
   }) => UserProfile(
     id: id,
     displayName: displayName ?? this.displayName,
@@ -97,6 +112,9 @@ class UserProfile {
     civicScore: civicScore,
     reportsCount: reportsCount,
     findsCount: findsCount,
+    isOnLeave: isOnLeave ?? this.isOnLeave,
+    workerNumber: workerNumber,
+    resignedAt: resignedAt,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
