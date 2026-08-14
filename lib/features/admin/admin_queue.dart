@@ -239,7 +239,7 @@ class _AdminQueueState extends State<AdminQueue> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         itemCount: items.length,
         separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (_, i) => _QueueCard(

@@ -89,7 +89,7 @@ class _AdminInsightsState extends State<AdminInsights> {
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
         children: [
           _StatGrid(
             cards: [

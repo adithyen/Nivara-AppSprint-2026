@@ -249,7 +249,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 110),
         children: [
           _ComposerPrompt(onPick: _compose),
           const SizedBox(height: 20),

@@ -204,7 +204,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
           _IdentityCard(profile: profile),
           const SizedBox(height: 20),

@@ -136,7 +136,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
           // Greeting header
           StaggeredEntrance(
@@ -231,7 +231,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 14,
               mainAxisSpacing: 14,
-              childAspectRatio: 1.12,
+              childAspectRatio: 1.15,
               children: [
                 _FeatureModuleTile(
                   icon: Icons.sensors_rounded,
@@ -620,33 +620,48 @@ class _FeatureModuleTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.16),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 22),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: color.withValues(alpha: 0.3)),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                Icon(
+                  Icons.arrow_outward_rounded,
+                  color: Colors.white.withValues(alpha: 0.3),
+                  size: 16,
+                ),
+              ],
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 11.5,
+                    height: 1.2,
                   ),
                 ),
               ],

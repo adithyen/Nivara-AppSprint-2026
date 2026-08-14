@@ -110,7 +110,7 @@ class _PulseTabState extends ConsumerState<PulseTab> {
       onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
           _RadiusCard(
             radiusKm: _radiusKm,

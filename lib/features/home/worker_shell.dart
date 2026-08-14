@@ -68,9 +68,12 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
       extendBody: true,
       backgroundColor: NivaraColors.canvasDark,
       body: WithConnectivityBanner(
-        child: IndexedStack(
-          index: _index,
-          children: [for (final t in _tabs) t.body],
+        child: SafeArea(
+          bottom: false,
+          child: IndexedStack(
+            index: _index,
+            children: [for (final t in _tabs) t.body],
+          ),
         ),
       ),
       bottomNavigationBar: _buildGlassNavBar(),

@@ -74,9 +74,12 @@ class _AdminShellState extends ConsumerState<AdminShell> {
       extendBody: true,
       backgroundColor: NivaraColors.canvasDark,
       body: WithConnectivityBanner(
-        child: IndexedStack(
-          index: index,
-          children: [for (final t in tabs) t.body],
+        child: SafeArea(
+          bottom: false,
+          child: IndexedStack(
+            index: index,
+            children: [for (final t in tabs) t.body],
+          ),
         ),
       ),
       bottomNavigationBar: _buildGlassNavBar(tabs, index),

@@ -168,9 +168,11 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
       );
     }
     return RefreshIndicator(
+      color: NivaraColors.primary,
+      backgroundColor: const Color(0xFF10161E),
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         itemCount: items.length,
         separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (_, i) =>

@@ -239,7 +239,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
                     itemCount: _posts.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (_, i) {

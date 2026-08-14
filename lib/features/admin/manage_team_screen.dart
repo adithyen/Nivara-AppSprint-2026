@@ -285,7 +285,7 @@ class _ManageTeamScreenState extends ConsumerState<ManageTeamScreen>
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 110),
                     itemCount: _visible.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
@@ -326,7 +326,7 @@ class _ManageTeamScreenState extends ConsumerState<ManageTeamScreen>
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 110),
         itemCount: _apps.length,
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (_, i) {
