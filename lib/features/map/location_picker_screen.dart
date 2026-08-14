@@ -106,15 +106,17 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     }
   }
 
+  int _geocodeSeq = 0;
+
   Future<void> _resolveAddress(double lat, double lng) async {
-    if (_reverseGeocoding) return;
+    final seq = ++_geocodeSeq;
     setState(() => _reverseGeocoding = true);
     final addr = await _ola.reverseGeocode(lat: lat, lng: lng);
-    if (!mounted) return;
+    if (!mounted || seq != _geocodeSeq) return;
     setState(() {
       _reverseGeocoding = false;
       _currentAddress = addr ??
-          'Location at ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+          '${lat.toStringAsFixed(5)}° N, ${lng.toStringAsFixed(5)}° E';
     });
   }
 

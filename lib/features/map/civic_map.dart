@@ -96,7 +96,12 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
       final rows = await supabase.from(kTableReports).select();
       for (final r in rows) {
         try {
-          _reports[r['id'] as String] = Report.fromMap(r);
+          final rep = Report.fromMap(r);
+          if (rep.status != ReportStatus.resolved &&
+              rep.status != ReportStatus.closed &&
+              rep.status != ReportStatus.duplicate) {
+            _reports[rep.id] = rep;
+          }
         } catch (_) {}
       }
     } catch (e) {
@@ -127,7 +132,14 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
         .listen((rows) {
           for (final r in rows) {
             try {
-              _reports[r['id'] as String] = Report.fromMap(r);
+              final rep = Report.fromMap(r);
+              if (rep.status == ReportStatus.resolved ||
+                  rep.status == ReportStatus.closed ||
+                  rep.status == ReportStatus.duplicate) {
+                _reports.remove(rep.id);
+              } else {
+                _reports[rep.id] = rep;
+              }
             } catch (_) {}
           }
           if (_mapReady) _syncMarkersToOlaMap();
@@ -152,19 +164,22 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
 
     await c.clearMarkers();
 
-    // Add reports
+    // Add only active/open reports (resolved are filtered out)
     for (final r in _reports.values) {
+      if (r.status == ReportStatus.resolved ||
+          r.status == ReportStatus.closed ||
+          r.status == ReportStatus.duplicate) {
+        continue;
+      }
       final color = switch (r.status) {
         ReportStatus.submitted => const Color(0xFFFFB300),
         ReportStatus.inProgress => const Color(0xFF29B6F6),
-        ReportStatus.resolved => const Color(0xFF00E676),
         _ => const Color(0xFF90A4AE),
       };
       await c.addMarker(
         id: 'report_${r.id}',
         lat: r.lat,
         lng: r.lng,
-        snippet: r.title ?? r.category.label,
         color: color,
       );
     }
@@ -648,82 +663,113 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
               right: 16,
               bottom: 90,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(22),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131A22).withValues(alpha: 0.94),
-                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0xFF131A22).withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(
-                        color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                        color: const Color(0xFF00E676).withValues(alpha: 0.5),
+                        width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
+                          color: Colors.black.withValues(alpha: 0.6),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(9),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00E676).withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.place, color: Color(0xFF00E676), size: 22),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(9),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00E676).withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.place, color: Color(0xFF00E676), size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _selectedSpot!.address,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${_selectedSpot!.lat.toStringAsFixed(5)}° N, ${_selectedSpot!.lng.toStringAsFixed(5)}° E',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.5),
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              icon: const Icon(Icons.close, color: Colors.white60, size: 20),
+                              onPressed: () => setState(() => _selectedSpot = null),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _selectedSpot!.address,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_selectedSpot!.lat.toStringAsFixed(4)}, ${_selectedSpot!.lng.toStringAsFixed(4)}',
+                              onPressed: () {
+                                final spot = _selectedSpot!;
+                                setState(() => _selectedSpot = null);
+                                context.push(
+                                  Routes.report,
+                                  extra: spot,
+                                );
+                              },
+                              icon: const Icon(Icons.add_location_alt, color: Colors.black, size: 20),
+                              label: const Text(
+                                'Report Issue At This Location',
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.45),
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13.5,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF00E676),
-                            foregroundColor: Colors.black,
-                            visualDensity: VisualDensity.compact,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          onPressed: () {
-                            setState(() => _selectedSpot = null);
-                            context.push(Routes.report);
-                          },
-                          child: const Text('Report Here', style: TextStyle(fontWeight: FontWeight.w800)),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white60, size: 18),
-                          onPressed: () => setState(() => _selectedSpot = null),
                         ),
                       ],
                     ),

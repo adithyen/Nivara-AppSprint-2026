@@ -17,8 +17,12 @@ import '../../models/report.dart';
 import '../map/location_picker_screen.dart';
 import 'category_grid.dart';
 
-/// Manual CivicReport filing. Pick a category, add details + severity, confirm
-/// or pick a custom location on Ola Maps, optionally attach photos, and submit.
+/// Manual CivicReport filing.
+///
+/// Flow:
+/// 1. Category Selection: User picks a category from a modern searchable grid.
+/// 2. Details Form: Immediately opens details form with preselected category banner,
+///    Ola Map location picker, photo evidence, and submit.
 class ReportFormScreen extends StatefulWidget {
   const ReportFormScreen({super.key, this.initialCategory});
 
@@ -37,6 +41,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final _categoryFilterCtrl = TextEditingController();
 
   ReportCategory? _category;
   Severity _severity = Severity.medium;
@@ -62,6 +67,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _addressCtrl.dispose();
+    _categoryFilterCtrl.dispose();
     super.dispose();
   }
 
@@ -118,69 +124,63 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     if (x != null && mounted) setState(() => _photos.add(x));
   }
 
-  void _choosePhotoSource() {
-    showModalBottomSheet<void>(
+  Future<void> _choosePhotoSource() async {
+    if (_photos.length >= 3) {
+      _snack('Maximum 3 photos per report.');
+      return;
+    }
+    showModalBottomSheet<ImageSource>(
       context: context,
-      showDragHandle: true,
-      builder: (_) => SafeArea(
+      builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Take a photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickPhoto(ImageSource.camera);
-              },
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Choose from gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickPhoto(ImageSource.gallery);
-              },
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
           ],
         ),
       ),
-    );
+    ).then((src) {
+      if (src != null) _pickPhoto(src);
+    });
   }
 
-  /// Uploads chosen photos to Storage. Best-effort: if the bucket isn't set up
-  /// the caller catches the error and submits without photos.
   Future<List<String>> _uploadPhotos(String uid) async {
     final urls = <String>[];
-    final stamp = DateTime.now().millisecondsSinceEpoch;
-    for (var i = 0; i < _photos.length; i++) {
-      final bytes = await _photos[i].readAsBytes();
-      final path = '$uid/${stamp}_$i.jpg';
-      await supabase.storage
-          .from(kBucketPhotos)
-          .uploadBinary(
+    for (final x in _photos) {
+      final bytes = await x.readAsBytes();
+      final ext = x.path.split('.').last;
+      final path = '$uid/${DateTime.now().millisecondsSinceEpoch}_${urls.length}.$ext';
+      await supabase.storage.from(kBucketPhotos).uploadBinary(
             path,
             bytes,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
-              upsert: true,
-            ),
+            fileOptions: const FileOptions(upsert: false),
           );
-      urls.add(supabase.storage.from(kBucketPhotos).getPublicUrl(path));
+      final publicUrl =
+          supabase.storage.from(kBucketPhotos).getPublicUrl(path);
+      urls.add(publicUrl);
     }
     return urls;
   }
 
   Future<void> _submit() async {
-    final uid = currentUserId;
     if (_category == null) {
-      _snack('Please choose a category.');
+      _snack('Please pick a category.');
       return;
     }
     if (_descCtrl.text.trim().isEmpty) {
       _snack('Please describe the issue.');
       return;
     }
+    final uid = currentUserId;
     if (uid == null) {
       _snack('Please sign in first.');
       return;
@@ -247,95 +247,289 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_category == null) {
+      return _buildCategorySelectionScreen();
+    }
+    return _buildDetailsFormScreen();
+  }
+
+  // ── Step 1: Dedicated Category Selection Screen ───────────────────────────
+  Widget _buildCategorySelectionScreen() {
+    final query = _categoryFilterCtrl.text.trim().toLowerCase();
+    final filteredCategories = ReportCategory.values.where((c) {
+      if (query.isEmpty) return true;
+      return c.label.toLowerCase().contains(query);
+    }).toList();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Report an issue')),
+      appBar: AppBar(
+        title: const Text('Select Issue Category'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: WithConnectivityBanner(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                controller: _categoryFilterCtrl,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Search categories (e.g. pothole, light, drain)…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _categoryFilterCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _categoryFilterCtrl.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: filteredCategories.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No category found matching "$query"',
+                        style: const TextStyle(color: Colors.white60),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 0.92,
+                      ),
+                      itemCount: filteredCategories.length,
+                      itemBuilder: (context, i) {
+                        final cat = filteredCategories[i];
+                        return InkWell(
+                          onTap: () {
+                            // Immediately transition to the details form!
+                            setState(() => _category = cat);
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF141C26),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(10),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: NivaraColors.primary.withValues(alpha: 0.14),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    categoryIcon(cat),
+                                    color: NivaraColors.primary,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  cat.label,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Step 2: Details Form Screen ───────────────────────────────────────────
+  Widget _buildDetailsFormScreen() {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Report Details'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (widget.initialCategory != null) {
+              Navigator.of(context).pop();
+            } else {
+              setState(() => _category = null);
+            }
+          },
+        ),
+      ),
       body: WithConnectivityBanner(
         child: AbsorbPointer(
           absorbing: _submitting,
           child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _SectionLabel('1. What is the issue?'),
-            const SizedBox(height: 8),
-            CategoryGrid(
-              selected: _category,
-              onSelect: (c) => setState(() => _category = c),
-            ),
-            const SizedBox(height: 20),
-            _SectionLabel('2. Details'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _titleCtrl,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Title (optional)',
-                hintText: 'e.g. Deep pothole near junction',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descCtrl,
-              maxLines: 4,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                hintText: 'Describe what you see and any hazard it poses.',
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('Severity', style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 8),
-            _SeveritySelector(
-              value: _severity,
-              onChanged: (s) => setState(() => _severity = s),
-            ),
-            const SizedBox(height: 20),
-            _SectionLabel('3. Location'),
-            const SizedBox(height: 8),
-            _LocationCard(
-              pos: _pos,
-              customLat: _customLat,
-              customLng: _customLng,
-              locating: _locating,
-              onRefresh: _fetchLocation,
-              onPickOnMap: _pickLocationOnMap,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _addressCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Landmark / address (optional)',
-                prefixIcon: Icon(Icons.place_outlined),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _SectionLabel('4. Photos (optional)'),
-            const SizedBox(height: 8),
-            _PhotoStrip(
-              photos: _photos,
-              onAdd: _choosePhotoSource,
-              onRemove: (i) => setState(() => _photos.removeAt(i)),
-            ),
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              onPressed: _submitting ? null : _submit,
-              icon: _submitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Category Pill Card with Change option
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: NivaraColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: NivaraColors.primary.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: NivaraColors.primary.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
                       ),
-                    )
-                  : const Icon(Icons.send),
-              label: Text(_submitting ? 'Submitting…' : 'Submit report'),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
+                      child: Icon(
+                        categoryIcon(_category!),
+                        color: NivaraColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Issue Category',
+                            style: TextStyle(fontSize: 11, color: Colors.white60),
+                          ),
+                          Text(
+                            _category!.label,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        side: BorderSide(
+                          color: NivaraColors.primary.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      onPressed: () => setState(() => _category = null),
+                      icon: const Icon(Icons.swap_horiz, size: 16),
+                      label: const Text('Change'),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              _SectionLabel('1. Issue Details'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _titleCtrl,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Title (optional)',
+                  hintText: 'e.g. Deep pothole near junction',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _descCtrl,
+                maxLines: 4,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Description *',
+                  hintText: 'Describe what you see and any hazard it poses.',
+                  alignLabelWithHint: true,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+              Text('Severity', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              _SeveritySelector(
+                value: _severity,
+                onChanged: (s) => setState(() => _severity = s),
+              ),
+
+              const SizedBox(height: 20),
+              _SectionLabel('2. Location'),
+              const SizedBox(height: 8),
+              _LocationCard(
+                pos: _pos,
+                customLat: _customLat,
+                customLng: _customLng,
+                locating: _locating,
+                onRefresh: _fetchLocation,
+                onPickOnMap: _pickLocationOnMap,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _addressCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Landmark / address (optional)',
+                  prefixIcon: Icon(Icons.place_outlined),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              _SectionLabel('3. Photos (optional)'),
+              const SizedBox(height: 8),
+              _PhotoStrip(
+                photos: _photos,
+                onAdd: _choosePhotoSource,
+                onRemove: (i) => setState(() => _photos.removeAt(i)),
+              ),
+
+              const SizedBox(height: 28),
+              FilledButton.icon(
+                onPressed: _submitting ? null : _submit,
+                icon: _submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
+                label: Text(_submitting ? 'Submitting…' : 'Submit report'),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
@@ -347,42 +541,29 @@ class _SectionLabel extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: Theme.of(
-      context,
-    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-  );
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+    );
+  }
 }
 
 class _SeveritySelector extends StatelessWidget {
   const _SeveritySelector({required this.value, required this.onChanged});
-
   final Severity value;
   final ValueChanged<Severity> onChanged;
 
-  static const _colors = {
-    Severity.low: NivaraColors.success,
-    Severity.medium: NivaraColors.accent,
-    Severity.high: NivaraColors.danger,
-    Severity.emergency: NivaraColors.danger,
-  };
-
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      children: [
-        for (final s in Severity.values)
-          ChoiceChip(
-            label: Text(s.label),
-            selected: s == value,
-            selectedColor: (_colors[s] ?? NivaraColors.primary).withValues(
-              alpha: 0.18,
-            ),
-            onSelected: (_) => onChanged(s),
-          ),
-      ],
+    return SegmentedButton<Severity>(
+      segments: Severity.values
+          .map((s) => ButtonSegment(value: s, label: Text(s.label)))
+          .toList(),
+      selected: {value},
+      onSelectionChanged: (set) => onChanged(set.first),
     );
   }
 }
@@ -390,8 +571,8 @@ class _SeveritySelector extends StatelessWidget {
 class _LocationCard extends StatelessWidget {
   const _LocationCard({
     required this.pos,
-    required this.customLat,
-    required this.customLng,
+    this.customLat,
+    this.customLng,
     required this.locating,
     required this.onRefresh,
     required this.onPickOnMap,
@@ -404,89 +585,85 @@ class _LocationCard extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onPickOnMap;
 
+  bool get _hasCustom => customLat != null && customLng != null;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isCustom = customLat != null && customLng != null;
-    final lat = isCustom ? customLat! : pos?.latitude;
-    final lng = isCustom ? customLng! : pos?.longitude;
+    final lat = customLat ?? pos?.latitude;
+    final lng = customLng ?? pos?.longitude;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isCustom
-              ? NivaraColors.primary.withValues(alpha: 0.5)
-              : scheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(
-                isCustom
-                    ? Icons.edit_location_alt
-                    : (pos != null ? Icons.my_location : Icons.location_searching),
-                color: isCustom
-                    ? NivaraColors.primary
-                    : (pos != null ? NivaraColors.success : scheme.outline),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: locating
-                    ? const Text('Getting your location…')
-                    : lat != null && lng != null
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          Text(
-                            isCustom
-                                ? 'Selected custom location on map'
-                                : 'Auto GPS fix (±${pos?.accuracy.toStringAsFixed(0) ?? '0'} m)',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isCustom
-                                  ? NivaraColors.primary
-                                  : scheme.onSurfaceVariant,
+    return Card(
+      elevation: 0,
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Icon(
+                  _hasCustom ? Icons.edit_location_alt : Icons.my_location,
+                  color: _hasCustom ? NivaraColors.primary : scheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: locating
+                      ? const Text('Acquiring GPS location…')
+                      : lat == null
+                          ? const Text(
+                              'Location unavailable — pick on Ola Map or enable GPS.',
+                              style: TextStyle(fontSize: 13),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _hasCustom
+                                      ? 'Selected on Ola Map'
+                                      : 'GPS location captured',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    color: _hasCustom
+                                        ? NivaraColors.primary
+                                        : null,
+                                  ),
+                                ),
+                                Text(
+                                  '${lat.toStringAsFixed(5)}, ${lng!.toStringAsFixed(5)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      )
-                    : const Text('Location unavailable — using city default.'),
-              ),
-              IconButton(
-                tooltip: 'Refresh GPS location',
-                onPressed: locating ? null : onRefresh,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                ),
+                if (locating)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Recalculate GPS location',
+                    onPressed: onRefresh,
+                  ),
+              ],
+            ),
+            const Divider(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onPickOnMap,
+                icon: const Icon(Icons.map, size: 18),
+                label: Text(
+                  _hasCustom ? 'Change on Ola Map' : 'Select on Ola Map',
                 ),
               ),
-              onPressed: onPickOnMap,
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: Text(
-                isCustom ? 'Change Location on Map' : 'Select on Ola Map',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -510,14 +687,13 @@ class _PhotoStrip extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          _AddButton(onTap: onAdd),
           for (var i = 0; i < photos.length; i++)
             Padding(
-              padding: const EdgeInsets.only(left: 10),
+              padding: const EdgeInsets.only(right: 8),
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     child: Image.file(
                       File(photos[i].path),
                       width: 96,
@@ -530,48 +706,53 @@ class _PhotoStrip extends StatelessWidget {
                     right: 2,
                     child: GestureDetector(
                       onTap: () => onRemove(i),
-                      child: const CircleAvatar(
-                        radius: 12,
-                        backgroundColor: Colors.black54,
-                        child: Icon(Icons.close, size: 15, color: Colors.white),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: const Icon(
+                          Icons.close,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+          if (photos.length < 3)
+            InkWell(
+              onTap: onAdd,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_a_photo,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add (${photos.length}/3)',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
-      ),
-    );
-  }
-}
-
-class _AddButton extends StatelessWidget {
-  const _AddButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 96,
-        height: 96,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add_a_photo, color: scheme.outline),
-            const SizedBox(height: 4),
-            Text('Add', style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
       ),
     );
   }

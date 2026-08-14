@@ -125,7 +125,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.report,
-        builder: (context, state) => const ReportFormScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is ReportCategory) {
+            return ReportFormScreen(initialCategory: extra);
+          }
+          return const ReportFormScreen();
+        },
       ),
       GoRoute(
         path: Routes.reportDetail,

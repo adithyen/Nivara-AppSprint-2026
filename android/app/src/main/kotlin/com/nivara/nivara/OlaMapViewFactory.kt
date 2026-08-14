@@ -87,11 +87,12 @@ class OlaNativeView(
         olaMap?.setOnOlaMapsCameraIdleListener(object :
             OlaMapsCameraListenerManager.OnOlaMapsCameraIdleListener {
             override fun onOlaMapsCameraIdle() {
-                val center = olaMap?.getCurrentLocation()
+                val cameraPos = olaMap?.getCurrentOlaCameraPosition()
+                val target = cameraPos?.target
                 val args = mutableMapOf<String, Any?>()
-                if (center != null) {
-                    args["lat"] = center.latitude
-                    args["lng"] = center.longitude
+                if (target != null) {
+                    args["lat"] = target.latitude
+                    args["lng"] = target.longitude
                 }
                 channel.invokeMethod("onCameraIdle", args)
             }
@@ -142,9 +143,9 @@ class OlaNativeView(
                     val opts = OlaMarkerOptions.Builder()
                         .setMarkerId(id)
                         .setPosition(OlaLatLng(lat, lng))
-                        .setSnippet(snippet)
                         .setIconBitmap(bitmap)
                         .setIsIconClickable(true)
+                        .setIsInfoWindowDismissOnClick(true)
                         .setIsAnimationEnable(true)
                         .build()
 
