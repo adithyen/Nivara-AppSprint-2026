@@ -8,20 +8,28 @@ import '../../core/services/location_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../models/community_poll.dart';
 import '../../models/community_post.dart';
 import '../../models/enums.dart';
 import '../../router.dart';
 import '../lostfound/lf_contact.dart';
 
-/// The **Community** tab — a neighbourhood board of posts from nearby users.
-///
-/// Body-only (the [Scaffold]/[AppBar] belong to the shell). Loads OPEN posts
-/// via the `community_posts_near` PostGIS RPC — city-wide posts plus located
-/// posts whose visibility radius covers the viewer — then hydrates poll options
-/// and the viewer's own votes so tallies render live. A composer prompt sits at
-/// the top with the four templates (Post · Poll · Job · Announcement); authors
-/// get an edit/close/delete menu on their own posts.
+Color communityTypeColor(CommunityPostType t) => switch (t) {
+  CommunityPostType.general => NivaraColors.primary,
+  CommunityPostType.poll => const Color(0xFF00E5FF),
+  CommunityPostType.job => NivaraColors.accent,
+  CommunityPostType.announcement => NivaraColors.danger,
+};
+
+IconData communityTypeIcon(CommunityPostType t) => switch (t) {
+  CommunityPostType.general => Icons.chat_bubble_outline_rounded,
+  CommunityPostType.poll => Icons.poll_outlined,
+  CommunityPostType.job => Icons.work_outline_rounded,
+  CommunityPostType.announcement => Icons.campaign_rounded,
+};
+
+/// 2026-Level Flagship Civic Community Tab.
 class CommunityTab extends ConsumerStatefulWidget {
   const CommunityTab({super.key});
 
@@ -36,7 +44,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
   Position? _pos;
   List<CommunityPost> _posts = const [];
   Map<String, List<CommunityPollOption>> _pollOptions = const {};
-  Map<String, String> _myVotes = const {}; // postId → optionId
+  Map<String, String> _myVotes = const {};
 
   double get _lat => _pos?.latitude ?? kDefaultLat;
   double get _lng => _pos?.longitude ?? kDefaultLng;
@@ -101,7 +109,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
     final map = <String, List<CommunityPollOption>>{};
     for (final r in rows as List) {
       final opt = CommunityPollOption.fromMap(r as Map<String, dynamic>);
-      (map[opt.postId] ??= []).add(opt);
+      map.putIfAbsent(opt.postId, () => []).add(opt);
     }
     return map;
   }
@@ -109,54 +117,61 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
   Future<Map<String, String>> _fetchMyVotes(List<String> pollIds) async {
     final uid = currentUserId;
     if (uid == null) return {};
-    final rows = await supabase
-        .from(kTableCommunityPollVotes)
-        .select('post_id, option_id')
-        .eq('user_id', uid)
-        .inFilter('post_id', pollIds);
-    return {
-      for (final r in rows as List)
-        r['post_id'] as String: r['option_id'] as String,
-    };
-  }
-
-  Future<void> _compose(
-    CommunityPostType type, {
-    CommunityPost? existing,
-  }) async {
-    final created = await context.push<bool>(
-      Routes.communityCompose,
-      extra: (type: type, existing: existing),
-    );
-    if (created == true) await _load();
+    try {
+      final rows = await supabase
+          .from(kTableCommunityPollVotes)
+          .select('post_id, option_id')
+          .eq('user_id', uid)
+          .inFilter('post_id', pollIds);
+      final map = <String, String>{};
+      for (final r in rows as List) {
+        map[r['post_id'] as String] = r['option_id'] as String;
+      }
+      return map;
+    } catch (_) {
+      return {};
+    }
   }
 
   Future<void> _vote(CommunityPost post, CommunityPollOption option) async {
-    // Optimistic: reflect the vote immediately, then reconcile from the server.
-    final prev = _myVotes[post.id];
-    if (prev == option.id) return;
-    try {
-      await supabase.rpc(
-        'community_vote',
-        params: {'p_post_id': post.id, 'p_option_id': option.id},
-      );
-    } catch (_) {
-      if (mounted) _snack('Could not record your vote.');
+    final uid = currentUserId;
+    if (uid == null) {
+      _snack('Sign in to vote in polls.');
       return;
     }
-    await _load();
-  }
-
-  Future<void> _close(CommunityPost post) async {
+    if (_myVotes.containsKey(post.id)) {
+      _snack('You have already voted in this poll.');
+      return;
+    }
     try {
-      await supabase
-          .from(kTableCommunityPosts)
-          .update({'status': CommunityPostStatus.closed.wire})
-          .eq('id', post.id);
-      await _load();
-      if (mounted) _snack('Post closed.');
-    } catch (_) {
-      if (mounted) _snack('Could not close the post.');
+      await supabase.from(kTableCommunityPollVotes).insert({
+        'post_id': post.id,
+        'option_id': option.id,
+        'user_id': uid,
+      });
+      setState(() {
+        final current = Map<String, String>.from(_myVotes);
+        current[post.id] = option.id;
+        _myVotes = current;
+
+        final opts = _pollOptions[post.id];
+        if (opts != null) {
+          final updated = opts
+              .map(
+                (o) => o.id == option.id
+                    ? o.copyWith(voteCount: o.voteCount + 1)
+                    : o,
+              )
+              .toList();
+          final allOpts =
+              Map<String, List<CommunityPollOption>>.from(_pollOptions);
+          allOpts[post.id] = updated;
+          _pollOptions = allOpts;
+        }
+      });
+      _snack('Vote recorded.');
+    } catch (e) {
+      _snack('Could not vote: $e');
     }
   }
 
@@ -164,8 +179,9 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF131A24),
         title: const Text('Delete post?'),
-        content: const Text('This permanently removes your post.'),
+        content: const Text('This will permanently delete this post and its poll data.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -174,7 +190,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NivaraColors.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -182,11 +198,39 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
     if (ok != true) return;
     try {
       await supabase.from(kTableCommunityPosts).delete().eq('id', post.id);
-      await _load();
-      if (mounted) _snack('Post deleted.');
-    } catch (_) {
-      if (mounted) _snack('Could not delete the post.');
+      _load();
+    } catch (e) {
+      _snack('Could not delete: $e');
     }
+  }
+
+  Future<void> _closeJob(CommunityPost post) async {
+    try {
+      await supabase
+          .from(kTableCommunityPosts)
+          .update({'status': 'CLOSED'})
+          .eq('id', post.id);
+      _load();
+      _snack('Job marked closed.');
+    } catch (e) {
+      _snack('Could not update: $e');
+    }
+  }
+
+  void _compose(CommunityPostType template) async {
+    final changed = await context.push<bool>(
+      Routes.communityCompose,
+      extra: (template: template, lat: _lat, lng: _lng),
+    );
+    if (changed == true) _load();
+  }
+
+  void _edit(CommunityPost post) async {
+    final changed = await context.push<bool>(
+      Routes.communityCompose,
+      extra: (post: post, lat: _lat, lng: _lng),
+    );
+    if (changed == true) _load();
   }
 
   void _snack(String msg) {
@@ -197,92 +241,134 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
 
   @override
   Widget build(BuildContext context) {
-    final uid = currentUserId;
+    final myUid = currentUserId;
+
     return RefreshIndicator(
+      color: NivaraColors.primary,
+      backgroundColor: const Color(0xFF10161E),
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
         children: [
-          _ComposerPrompt(onSelect: (t) => _compose(t)),
-          const SizedBox(height: 18),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_posts.isEmpty)
-            const _EmptyCommunity()
-          else
-            ..._posts.map(
-              (p) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _PostCard(
-                  post: p,
-                  isMine: p.authorId == uid,
-                  distanceMeters: p.hasLocation
-                      ? haversineMeters(_lat, _lng, p.lat!, p.lng!)
-                      : null,
-                  options: _pollOptions[p.id] ?? const [],
-                  myVote: _myVotes[p.id],
-                  onVote: (o) => _vote(p, o),
-                  onEdit: () => _compose(p.type, existing: p),
-                  onClose: () => _close(p),
-                  onDelete: () => _delete(p),
+          _ComposerPrompt(onPick: _compose),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              const Text(
+                'Neighborhood Feed',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            ),
+              const Spacer(),
+              if (!_loading && _posts.isNotEmpty)
+                Text(
+                  '${_posts.length} posts',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 36),
+              child: Center(
+                child: CircularProgressIndicator(color: NivaraColors.primary),
+              ),
+            )
+          else if (_posts.isEmpty)
+            const _EmptyFeed()
+          else
+            ..._posts.map((p) {
+              final isMine = myUid != null && p.authorId == myUid;
+              final dist = (p.lat != null && p.lng != null)
+                  ? haversineMeters(_lat, _lng, p.lat!, p.lng!)
+                  : null;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _PostCard(
+                  post: p,
+                  isMine: isMine,
+                  distanceMeters: dist,
+                  options: _pollOptions[p.id] ?? const [],
+                  myVote: _myVotes[p.id],
+                  onVote: (opt) => _vote(p, opt),
+                  onEdit: () => _edit(p),
+                  onClose: () => _closeJob(p),
+                  onDelete: () => _delete(p),
+                ),
+              );
+            }),
         ],
       ),
     );
   }
 }
 
-// ── Type styling ────────────────────────────────────────────────────────────
-IconData communityTypeIcon(CommunityPostType t) => switch (t) {
-  CommunityPostType.general => Icons.forum_outlined,
-  CommunityPostType.poll => Icons.bar_chart,
-  CommunityPostType.job => Icons.work_outline,
-  CommunityPostType.announcement => Icons.campaign_outlined,
-};
-
-Color communityTypeColor(CommunityPostType t) => switch (t) {
-  CommunityPostType.general => NivaraColors.primary,
-  CommunityPostType.poll => NivaraColors.accent,
-  CommunityPostType.job => NivaraColors.success,
-  CommunityPostType.announcement => NivaraColors.danger,
-};
-
-/// The "start a post" strip at the top of the feed — one button per template.
 class _ComposerPrompt extends StatelessWidget {
-  const _ComposerPrompt({required this.onSelect});
-  final ValueChanged<CommunityPostType> onSelect;
+  const _ComposerPrompt({required this.onPick});
+  final ValueChanged<CommunityPostType> onPick;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF10161E),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Share with your neighbourhood',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          const Text(
+            'Share with your community',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
+          const SizedBox(height: 4),
+          Text(
+            'Post questions, start polls, offer jobs, or broadcast alerts.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
             children: [
-              for (final t in CommunityPostType.values)
-                _TemplateButton(type: t, onTap: () => onSelect(t)),
+              _TemplateButton(
+                type: CommunityPostType.general,
+                onTap: () => onPick(CommunityPostType.general),
+              ),
+              const SizedBox(width: 8),
+              _TemplateButton(
+                type: CommunityPostType.poll,
+                onTap: () => onPick(CommunityPostType.poll),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _TemplateButton(
+                type: CommunityPostType.job,
+                onTap: () => onPick(CommunityPostType.job),
+              ),
+              const SizedBox(width: 8),
+              _TemplateButton(
+                type: CommunityPostType.announcement,
+                onTap: () => onPick(CommunityPostType.announcement),
+              ),
             ],
           ),
         ],
@@ -299,34 +385,30 @@ class _TemplateButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = communityTypeColor(type);
-    return SizedBox(
-      width: (MediaQuery.sizeOf(context).width - 32 - 28 - 10) / 2,
-      child: Material(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Icon(communityTypeIcon(type), color: color, size: 20),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    type.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
+    return Expanded(
+      child: BouncyTap(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(communityTypeIcon(type), color: color, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                type.label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12.5,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -334,9 +416,6 @@ class _TemplateButton extends StatelessWidget {
   }
 }
 
-/// One post in the feed. Renders the type badge, author, body, optional photo,
-/// inline poll (with live tallies + the viewer's choice), location + distance,
-/// and a one-tap contact. The author sees an overflow menu.
 class _PostCard extends StatelessWidget {
   const _PostCard({
     required this.post,
@@ -367,7 +446,6 @@ class _PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final color = communityTypeColor(post.type);
     final photo = (post.photoUrls?.isNotEmpty ?? false)
         ? post.photoUrls!.first
@@ -375,14 +453,18 @@ class _PostCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF10161E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withValues(alpha: 0.25),
+          width: 1.2,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 6, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
             child: Row(
               children: [
                 Icon(communityTypeIcon(post.type), size: 16, color: color),
@@ -391,21 +473,22 @@ class _PostCard extends StatelessWidget {
                   post.type.label,
                   style: TextStyle(
                     color: color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11.5,
                   ),
                 ),
                 const Spacer(),
                 Text(
                   timeAgo(post.createdAt),
                   style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.45),
+                    fontSize: 11.5,
                   ),
                 ),
                 if (isMine)
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: 20),
+                    icon: const Icon(Icons.more_vert_rounded, size: 18, color: Colors.white60),
+                    color: const Color(0xFF131A24),
                     onSelected: (v) {
                       switch (v) {
                         case 'edit':
@@ -420,31 +503,16 @@ class _PostCard extends StatelessWidget {
                       if (_editable)
                         const PopupMenuItem(
                           value: 'edit',
-                          child: ListTile(
-                            leading: Icon(Icons.edit_outlined),
-                            title: Text('Edit'),
-                            contentPadding: EdgeInsets.zero,
-                          ),
+                          child: Text('Edit Post', style: TextStyle(color: Colors.white)),
                         ),
                       if (post.type == CommunityPostType.job)
                         const PopupMenuItem(
                           value: 'close',
-                          child: ListTile(
-                            leading: Icon(Icons.check_circle_outline),
-                            title: Text('Mark closed'),
-                            contentPadding: EdgeInsets.zero,
-                          ),
+                          child: Text('Mark Closed', style: TextStyle(color: Colors.white)),
                         ),
                       const PopupMenuItem(
                         value: 'delete',
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.delete_outline,
-                            color: NivaraColors.danger,
-                          ),
-                          title: Text('Delete'),
-                          contentPadding: EdgeInsets.zero,
-                        ),
+                        child: Text('Delete', style: TextStyle(color: NivaraColors.danger)),
                       ),
                     ],
                   )
@@ -454,7 +522,7 @@ class _PostCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(14, isMine ? 0 : 4, 14, 14),
+            padding: EdgeInsets.fromLTRB(16, isMine ? 0 : 6, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -469,8 +537,8 @@ class _PostCard extends StatelessWidget {
                             : '?',
                         style: TextStyle(
                           color: color,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
                         ),
                       ),
                     ),
@@ -478,7 +546,8 @@ class _PostCard extends StatelessWidget {
                     Text(
                       post.authorName,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                     ),
@@ -487,70 +556,69 @@ class _PostCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   post.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15.5,
                   ),
                 ),
                 if (post.body != null && post.body!.trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Text(post.body!.trim()),
+                  Text(
+                    post.body!.trim(),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 13.5,
+                      height: 1.35,
+                    ),
+                  ),
                 ],
                 if (photo != null) ...[
                   const SizedBox(height: 12),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     child: Image.network(
                       photo,
-                      width: double.infinity,
                       height: 180,
+                      width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
                     ),
                   ),
                 ],
                 if (post.isPoll && options.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _PollBody(
+                  const SizedBox(height: 14),
+                  _PollWidget(
                     options: options,
                     myVote: myVote,
-                    color: color,
                     onVote: onVote,
                   ),
                 ],
-                if (distanceMeters != null || post.locationLabel != null) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.place_outlined,
-                        size: 15,
-                        color: scheme.onSurfaceVariant,
-                      ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    if (distanceMeters != null) ...[
+                      const Icon(Icons.near_me_rounded, size: 13, color: NivaraColors.primary),
                       const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          [
-                            if (post.locationLabel != null &&
-                                post.locationLabel!.trim().isNotEmpty)
-                              post.locationLabel!.trim(),
-                            if (distanceMeters != null)
-                              '${formatDistance(distanceMeters!)} away',
-                          ].join(' · '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: scheme.onSurfaceVariant,
-                            fontSize: 12.5,
-                          ),
+                      Text(
+                        formatDistance(distanceMeters!),
+                        style: const TextStyle(
+                          color: NivaraColors.primary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
-                  ),
-                ],
-                if (post.hasContact) ...[
-                  const SizedBox(height: 12),
-                  _ContactButton(post: post),
-                ],
+                    const Spacer(),
+                    if (post.contactValue != null &&
+                        post.contactValue!.isNotEmpty &&
+                        post.contactMethod != null)
+                      _ContactPill(
+                        method: LFContactMethod.fromWire(post.contactMethod),
+                        value: post.contactValue!,
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -560,203 +628,164 @@ class _PostCard extends StatelessWidget {
   }
 }
 
-/// Inline poll: each option is a tappable bar showing its share of the vote.
-class _PollBody extends StatelessWidget {
-  const _PollBody({
+class _PollWidget extends StatelessWidget {
+  const _PollWidget({
     required this.options,
     required this.myVote,
-    required this.color,
     required this.onVote,
   });
 
   final List<CommunityPollOption> options;
   final String? myVote;
-  final Color color;
   final ValueChanged<CommunityPollOption> onVote;
 
   @override
   Widget build(BuildContext context) {
-    final total = options.fold<int>(0, (s, o) => s + o.voteCount);
-    final voted = myVote != null;
+    final total = options.fold<int>(0, (sum, o) => sum + o.voteCount);
+    final hasVoted = myVote != null;
+
     return Column(
-      children: [
-        for (final o in options)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _PollOptionBar(
-              option: o,
-              total: total,
-              selected: myVote == o.id,
-              revealed: voted,
-              color: color,
-              onTap: () => onVote(o),
-            ),
-          ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            '$total ${total == 1 ? 'vote' : 'votes'}'
-            '${voted ? '' : ' · tap to vote'}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-      ],
-    );
-  }
-}
+      children: options.map((opt) {
+        final isChosen = myVote == opt.id;
+        final pct = total == 0 ? 0.0 : (opt.voteCount / total);
 
-class _PollOptionBar extends StatelessWidget {
-  const _PollOptionBar({
-    required this.option,
-    required this.total,
-    required this.selected,
-    required this.revealed,
-    required this.color,
-    required this.onTap,
-  });
-
-  final CommunityPollOption option;
-  final int total;
-  final bool selected;
-  final bool revealed;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final pct = total == 0 ? 0.0 : option.voteCount / total;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Stack(
-        children: [
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: scheme.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: selected ? color : scheme.outlineVariant,
-                width: selected ? 2 : 1,
-              ),
-            ),
-          ),
-          if (revealed)
-            Positioned.fill(
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: pct.clamp(0.0, 1.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: selected ? 0.28 : 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: BouncyTap(
+            onTap: hasVoted ? null : () => onVote(opt),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF131A24),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isChosen
+                      ? NivaraColors.primary
+                      : Colors.white.withValues(alpha: 0.08),
                 ),
               ),
-            ),
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (selected)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.check_circle, size: 16, color: color),
-                    ),
-                  Expanded(
-                    child: Text(
-                      option.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        opt.label,
+                        style: TextStyle(
+                          color: isChosen ? NivaraColors.primary : Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
+                      if (hasVoted)
+                        Text(
+                          '${(pct * 100).round()}%',
+                          style: TextStyle(
+                            color: isChosen ? NivaraColors.primary : Colors.white60,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
                   ),
-                  if (revealed) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      '${(pct * 100).round()}%',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                  if (hasVoted) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: pct,
+                        minHeight: 6,
+                        backgroundColor: Colors.white.withValues(alpha: 0.06),
+                        color: isChosen ? NivaraColors.primary : Colors.white38,
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 }
 
-class _ContactButton extends StatelessWidget {
-  const _ContactButton({required this.post});
-  final CommunityPost post;
+class _ContactPill extends StatelessWidget {
+  const _ContactPill({required this.method, required this.value});
+  final LFContactMethod method;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    final m = post.contactMethodEnum;
-    if (m == null) return const SizedBox.shrink();
-    final color = lfContactColor(m);
-    return OutlinedButton.icon(
-      onPressed: () async {
-        final ok = await launchLFContact(m, post.contactValue!);
-        if (!ok && context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Could not open ${m.label}.')));
-        }
-      },
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(color: color.withValues(alpha: 0.5)),
-      ),
-      icon: Icon(lfContactIcon(m), size: 18),
-      label: Text(
-        '${lfContactActionLabel(m)} · ${lfContactDisplay(m, post.contactValue!)}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-}
-
-class _EmptyCommunity extends StatelessWidget {
-  const _EmptyCommunity();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.groups_outlined, size: 40, color: scheme.outline),
-          const SizedBox(height: 10),
-          Text(
-            'No posts nearby yet',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurfaceVariant,
+    return BouncyTap(
+      onTap: () => launchLFContact(method, value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: NivaraColors.primary.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.5)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.chat_bubble_outline_rounded, size: 12, color: NivaraColors.primary),
+            SizedBox(width: 4),
+            Text(
+              'Contact',
+              style: TextStyle(
+                color: NivaraColors.primary,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Start the conversation — post, run a poll, or list a job.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyFeed extends StatelessWidget {
+  const _EmptyFeed();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+              child: const Icon(Icons.forum_rounded, size: 48, color: Colors.white38),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'No Community Posts Yet',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Be the first to post a question, start a poll, or announce a civic update.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 12.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,22 +1,18 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
+import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/connectivity_banner.dart';
 import '../community/community_tab.dart';
 import '../profile/profile_tab.dart';
 import '../pulse/pulse_tab.dart';
 import 'home_tab.dart';
 
-/// The citizen app shell: a four-tab bottom-nav host
-/// (**Home · Pulse · Community · Profile**).
-///
-/// Each tab is a *body-only* widget; this shell owns the single [Scaffold],
-/// the per-tab [AppBar] title, and the Material 3 [NavigationBar]. Tabs are
-/// kept alive across switches with an [IndexedStack] so scroll position and
-/// in-flight loads survive a tab change.
-///
-/// The tab set is built once in [initState]; M2 will append a fifth "Work" tab
-/// here when the signed-in profile is a worker.
+/// 2026-Level Flagship Citizen App Shell with floating glass bottom navigation bar.
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -31,28 +27,28 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     _TabSpec(
       title: kAppName,
       icon: Icons.home_outlined,
-      selectedIcon: Icons.home,
+      selectedIcon: Icons.home_rounded,
       label: 'Home',
       body: HomeTab(),
     ),
     _TabSpec(
-      title: 'Around you',
-      icon: Icons.monitor_heart_outlined,
-      selectedIcon: Icons.monitor_heart,
+      title: 'City Pulse',
+      icon: Icons.graphic_eq_outlined,
+      selectedIcon: Icons.graphic_eq_rounded,
       label: 'Pulse',
       body: PulseTab(),
     ),
     _TabSpec(
-      title: 'Community',
-      icon: Icons.groups_outlined,
-      selectedIcon: Icons.groups,
+      title: 'Civic Community',
+      icon: Icons.forum_outlined,
+      selectedIcon: Icons.forum_rounded,
       label: 'Community',
       body: CommunityTab(),
     ),
     _TabSpec(
-      title: 'Profile',
-      icon: Icons.person_outline,
-      selectedIcon: Icons.person,
+      title: 'Citizen Profile',
+      icon: Icons.person_outline_rounded,
+      selectedIcon: Icons.person_rounded,
       label: 'Profile',
       body: ProfileTab(),
     ),
@@ -61,29 +57,113 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_tabs[_index].title)),
-      body: IndexedStack(
-        index: _index,
-        children: [for (final t in _tabs) t.body],
+      extendBody: true,
+      backgroundColor: NivaraColors.canvasDark,
+      body: WithConnectivityBanner(
+        child: IndexedStack(
+          index: _index,
+          children: [for (final t in _tabs) t.body],
+        ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          for (final t in _tabs)
-            NavigationDestination(
-              icon: Icon(t.icon),
-              selectedIcon: Icon(t.selectedIcon),
-              label: t.label,
+      bottomNavigationBar: _buildGlassNavBar(),
+    );
+  }
+
+  Widget _buildGlassNavBar() {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+        height: 66,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.55),
+              blurRadius: 28,
+              offset: const Offset(0, 10),
             ),
-        ],
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10161E).withValues(alpha: 0.88),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(_tabs.length, (i) {
+                  final t = _tabs[i];
+                  final isSelected = _index == i;
+                  return BouncyTap(
+                    scaleFactor: 0.92,
+                    onTap: () {
+                      if (_index != i) {
+                        HapticFeedback.lightImpact();
+                        setState(() => _index = i);
+                      }
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSelected ? 16 : 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? NivaraColors.primary.withValues(alpha: 0.18)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(18),
+                        border: isSelected
+                            ? Border.all(
+                                color: NivaraColors.primary.withValues(alpha: 0.6),
+                                width: 1.2,
+                              )
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSelected ? t.selectedIcon : t.icon,
+                            color: isSelected ? NivaraColors.primary : Colors.white60,
+                            size: 22,
+                          ),
+                          if (isSelected) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              t.label,
+                              style: const TextStyle(
+                                color: NivaraColors.primary,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-/// Static description of one shell tab. [body] is a body-only widget (no
-/// Scaffold/AppBar of its own).
 class _TabSpec {
   const _TabSpec({
     required this.title,

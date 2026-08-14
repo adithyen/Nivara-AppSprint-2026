@@ -12,6 +12,7 @@ import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../router.dart';
 import '../admin/status_style.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../report/category_grid.dart';
 
 /// The field worker's task list — body-only widget used inside [WorkerShell].
@@ -304,76 +305,90 @@ class _TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final sev = severityColor(report.severity);
     final title = report.title?.trim().isNotEmpty == true
         ? report.title!.trim()
         : report.category.label;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: sev.withValues(alpha: 0.15),
-                    child: Icon(categoryIcon(report.category), color: sev),
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10161E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: sev.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                  child: Icon(categoryIcon(report.category), color: sev, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${report.category.label} · ${report.severity.label}',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${report.category.label} · ${report.severity.label}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 12,
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                StatusChip(report.status, dense: true),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.place_outlined, size: 14, color: Colors.white60),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    report.address?.trim().isNotEmpty == true
+                        ? report.address!.trim()
+                        : '${report.lat.toStringAsFixed(4)}, ${report.lng.toStringAsFixed(4)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 12,
                     ),
                   ),
-                  StatusChip(report.status, dense: true),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(Icons.place_outlined, size: 15, color: scheme.outline),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      report.address?.trim().isNotEmpty == true
-                          ? report.address!.trim()
-                          : '${report.lat.toStringAsFixed(4)}, ${report.lng.toStringAsFixed(4)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  timeAgo(report.createdAt),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 11,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    timeAgo(report.createdAt),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: scheme.outline),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

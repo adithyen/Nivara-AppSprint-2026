@@ -26,6 +26,21 @@ class CommunityPollOption {
         voteCount: toInt(map['vote_count']),
       );
 
+  CommunityPollOption copyWith({
+    String? id,
+    String? postId,
+    String? label,
+    int? position,
+    int? voteCount,
+  }) =>
+      CommunityPollOption(
+        id: id ?? this.id,
+        postId: postId ?? this.postId,
+        label: label ?? this.label,
+        position: position ?? this.position,
+        voteCount: voteCount ?? this.voteCount,
+      );
+
   /// Insert payload for an option created alongside its poll. [id] and
   /// [voteCount] are server-managed, so they're omitted.
   Map<String, dynamic> toInsertMap() => {

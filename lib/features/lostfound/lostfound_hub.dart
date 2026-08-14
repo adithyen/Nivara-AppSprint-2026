@@ -6,15 +6,13 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../../router.dart';
 import 'item_card.dart';
 
-/// Lost & Found hub: two prominent entry points (report lost / report found)
-/// over a live feed of recent active items. Tapping an item opens its match
-/// list so the user can eyeball counterparts. The feed streams from `lf_items`
-/// via Supabase Realtime — new posts appear without a manual refresh.
+/// 2026-Level Flagship Lost & Found Hub.
 class LostFoundHub extends StatefulWidget {
   const LostFoundHub({super.key});
 
@@ -27,7 +25,7 @@ class _LostFoundHubState extends State<LostFoundHub> {
   StreamSubscription? _sub;
   bool _loaded = false;
   String? _error;
-  LFItemType? _filter; // null = all
+  LFItemType? _filter;
 
   @override
   void initState() {
@@ -41,10 +39,6 @@ class _LostFoundHubState extends State<LostFoundHub> {
     super.dispose();
   }
 
-  /// One-time fetch so the feed always populates (works regardless of whether
-  /// Realtime is enabled), then subscribe for live updates on top. If the
-  /// stream errors (e.g. Realtime not enabled for lf_items yet), we keep the
-  /// fetched rows and simply forgo live refresh — the feature still works.
   Future<void> _load() async {
     try {
       final rows = await supabase
@@ -56,9 +50,7 @@ class _LostFoundHubState extends State<LostFoundHub> {
         try {
           final item = LFItem.fromMap(r);
           _items[item.id] = item;
-        } catch (_) {
-          /* skip malformed row */
-        }
+        } catch (_) {}
       }
       if (mounted) setState(() => _loaded = true);
     } catch (e) {
@@ -87,17 +79,11 @@ class _LostFoundHubState extends State<LostFoundHub> {
                 } else {
                   _items.remove(item.id);
                 }
-              } catch (_) {
-                /* skip malformed row */
-              }
+              } catch (_) {}
             }
-            // A successful stream event means live data is flowing — clear any
-            // earlier fetch error.
             if (mounted) setState(() => _error = null);
           },
-          onError: (_) {
-            // Realtime likely disabled for lf_items — keep the fetched feed.
-          },
+          onError: (_) {},
         );
   }
 
@@ -117,8 +103,9 @@ class _LostFoundHubState extends State<LostFoundHub> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: NivaraColors.canvasDark,
       appBar: AppBar(
-        title: const Text('Lost & Found'),
+        title: const Text('Lost & Found Radar'),
         actions: [
           IconButton(
             tooltip: 'My listings',
@@ -130,23 +117,23 @@ class _LostFoundHubState extends State<LostFoundHub> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
             child: Row(
               children: [
                 Expanded(
                   child: _ActionButton(
-                    icon: Icons.search_off,
-                    label: 'I lost\nsomething',
+                    icon: Icons.search_off_rounded,
+                    label: 'I Lost\nSomething',
                     color: NivaraColors.danger,
                     onTap: () => context.push(Routes.reportLost),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: _ActionButton(
-                    icon: Icons.inventory_2,
-                    label: 'I found\nsomething',
-                    color: NivaraColors.success,
+                    icon: Icons.inventory_2_rounded,
+                    label: 'I Found\nSomething',
+                    color: NivaraColors.primary,
                     onTap: () => context.push(Routes.reportFound),
                   ),
                 ),
@@ -154,13 +141,15 @@ class _LostFoundHubState extends State<LostFoundHub> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             child: Row(
               children: [
-                Text(
-                  'Recent activity',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                const Text(
+                  'Active Listings',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const Spacer(),
@@ -180,25 +169,25 @@ class _LostFoundHubState extends State<LostFoundHub> {
 
   Widget _buildFeed() {
     if (!_loaded) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: NivaraColors.primary));
     }
     if (_error != null) {
       return _EmptyState(
-        icon: Icons.cloud_off,
+        icon: Icons.cloud_off_rounded,
         title: 'Could not load items',
-        subtitle: 'Realtime may be disabled for lf_items.\n$_error',
+        subtitle: 'Check network connection or retry.\n$_error',
       );
     }
     final items = _visible;
     if (items.isEmpty) {
       return const _EmptyState(
-        icon: Icons.travel_explore,
-        title: 'Nothing here yet',
+        icon: Icons.travel_explore_rounded,
+        title: 'No Active Listings',
         subtitle: 'Be the first — report a lost or found item above.',
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (_, i) {
@@ -227,37 +216,47 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10161E),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: color.withValues(alpha: 0.35),
+            width: 1.2,
           ),
-          child: Column(
-            children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: color.withValues(alpha: 0.18),
-                child: Icon(icon, color: color, size: 28),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 10),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                  height: 1.15,
-                ),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 13.5,
+                height: 1.2,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -283,11 +282,31 @@ class _FilterChips extends StatelessWidget {
 
   Widget _chip(BuildContext context, String label, LFItemType? type) {
     final selected = value == type;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      visualDensity: VisualDensity.compact,
-      onSelected: (_) => onChanged(type),
+    return BouncyTap(
+      onTap: () => onChanged(type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected
+              ? NivaraColors.primary.withValues(alpha: 0.2)
+              : const Color(0xFF131A24),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? NivaraColors.primary
+                : Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? NivaraColors.primary : Colors.white70,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -304,28 +323,37 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: scheme.outline),
-            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+              child: Icon(icon, size: 48, color: Colors.white38),
+            ),
+            const SizedBox(height: 14),
             Text(
               title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 12.5,
+              ),
             ),
           ],
         ),

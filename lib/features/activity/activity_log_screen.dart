@@ -400,43 +400,55 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final color = entry.color(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+        color: const Color(0xFF10161E),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: CircleAvatar(
-          radius: 20,
-          backgroundColor: color.withValues(alpha: 0.12),
-          child: Icon(entry.icon, color: color, size: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.16),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(entry.icon, color: color, size: 20),
         ),
         title: Text(
           entry.title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 2),
             Text(
               entry.subtitle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 12.5,
+              ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(
               timeAgo(entry.at),
               style: TextStyle(
-                color: scheme.outline,
+                color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 11,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -455,25 +467,27 @@ class _StatusBadge extends StatelessWidget {
 
   Color _color() => switch (status.toUpperCase()) {
     'RESOLVED' => NivaraColors.success,
-    'IN_PROGRESS' => NivaraColors.accent,
-    'ACKNOWLEDGED' => NivaraColors.primary,
-    _ => Colors.grey,
+    'IN_PROGRESS' => NivaraColors.primaryBlue,
+    'ACKNOWLEDGED' => NivaraColors.accent,
+    _ => Colors.white60,
   };
 
   @override
   Widget build(BuildContext context) {
+    final c = _color();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _color().withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        color: c.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.withValues(alpha: 0.5)),
       ),
       child: Text(
         status.replaceAll('_', ' '),
         style: TextStyle(
-          color: _color(),
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
+          color: c,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

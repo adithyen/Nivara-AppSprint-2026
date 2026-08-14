@@ -1,9 +1,13 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/services/offline_queue_service.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/user_profile.dart';
 import '../../router.dart';
@@ -13,17 +17,7 @@ import 'admin_insights.dart';
 import 'admin_queue.dart';
 import 'manage_team_screen.dart';
 
-/// The municipal (admin) app shell: a bottom-nav host over
-/// **Queue · Insights · Staff · Profile**.
-///
-/// Mirrors the citizen [HomeShell]: each tab is a *body-only* widget, this shell
-/// owns the single [Scaffold], the per-tab [AppBar] title, and the Material 3
-/// [NavigationBar], and tabs stay alive across switches via an [IndexedStack].
-///
-/// The **Staff** tab (role management) appears only for superadmins — the tab
-/// set is rebuilt from the signed-in profile, and the server's `set_user_role`
-/// RPC enforces the same rule authoritatively. Role access to the whole shell is
-/// gated by the router guard (citizens/workers can't reach `/admin`) and by RLS.
+/// 2026-Level Municipal Command Center Shell with floating glass navbar.
 class AdminShell extends ConsumerStatefulWidget {
   const AdminShell({super.key});
 
@@ -38,72 +32,152 @@ class _AdminShellState extends ConsumerState<AdminShell> {
   Widget build(BuildContext context) {
     final tabs = <_TabSpec>[
       const _TabSpec(
-        title: 'Report queue',
+        title: 'Dispatch Queue',
         icon: Icons.inbox_outlined,
-        selectedIcon: Icons.inbox,
+        selectedIcon: Icons.inbox_rounded,
         label: 'Queue',
         body: AdminQueue(),
       ),
       const _TabSpec(
-        title: 'Insights',
+        title: 'City Insights',
         icon: Icons.insights_outlined,
-        selectedIcon: Icons.insights,
+        selectedIcon: Icons.insights_rounded,
         label: 'Insights',
         body: AdminInsights(),
       ),
       const _TabSpec(
-        title: 'Community',
+        title: 'Municipal Forum',
         icon: Icons.groups_outlined,
-        selectedIcon: Icons.groups,
+        selectedIcon: Icons.groups_rounded,
         label: 'Community',
         body: AdminCommunityTab(),
       ),
-      // Single Team tab replaces the old Workers + Staff tabs
       const _TabSpec(
-        title: 'Team',
+        title: 'Staff & Field Team',
         icon: Icons.badge_outlined,
-        selectedIcon: Icons.badge,
+        selectedIcon: Icons.badge_rounded,
         label: 'Team',
         body: ManageTeamScreen(),
       ),
       const _TabSpec(
-        title: 'Profile',
-        icon: Icons.account_circle_outlined,
-        selectedIcon: Icons.account_circle,
+        title: 'Admin Profile',
+        icon: Icons.shield_outlined,
+        selectedIcon: Icons.shield_rounded,
         label: 'Profile',
         body: _AdminProfileTab(),
       ),
     ];
 
-    // The Staff tab appears/disappears with role; keep the index in range.
     final index = _index.clamp(0, tabs.length - 1);
 
     return Scaffold(
-      appBar: AppBar(title: Text(tabs[index].title)),
-      body: SafeArea(
+      extendBody: true,
+      backgroundColor: NivaraColors.canvasDark,
+      body: WithConnectivityBanner(
         child: IndexedStack(
           index: index,
           children: [for (final t in tabs) t.body],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          for (final t in tabs)
-            NavigationDestination(
-              icon: Icon(t.icon),
-              selectedIcon: Icon(t.selectedIcon),
-              label: t.label,
+      bottomNavigationBar: _buildGlassNavBar(tabs, index),
+    );
+  }
+
+  Widget _buildGlassNavBar(List<_TabSpec> tabs, int index) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        height: 66,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.55),
+              blurRadius: 28,
+              offset: const Offset(0, 10),
             ),
-        ],
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10161E).withValues(alpha: 0.88),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(tabs.length, (i) {
+                  final t = tabs[i];
+                  final isSelected = index == i;
+                  return BouncyTap(
+                    scaleFactor: 0.92,
+                    onTap: () {
+                      if (_index != i) {
+                        HapticFeedback.lightImpact();
+                        setState(() => _index = i);
+                      }
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSelected ? 12 : 8,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? NivaraColors.accent.withValues(alpha: 0.18)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(18),
+                        border: isSelected
+                            ? Border.all(
+                                color: NivaraColors.accent.withValues(alpha: 0.7),
+                                width: 1.2,
+                              )
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSelected ? t.selectedIcon : t.icon,
+                            color: isSelected ? NivaraColors.accent : Colors.white60,
+                            size: 20,
+                          ),
+                          if (isSelected) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              t.label,
+                              style: const TextStyle(
+                                color: NivaraColors.accent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-/// Static description of one shell tab. [body] is a body-only widget (no
-/// Scaffold/AppBar of its own).
 class _TabSpec {
   const _TabSpec({
     required this.title,
@@ -120,8 +194,6 @@ class _TabSpec {
   final Widget body;
 }
 
-/// The admin **Profile** tab — officer identity (name, role, department,
-/// jurisdiction), appearance settings, and sign-out. Body-only.
 class _AdminProfileTab extends ConsumerWidget {
   const _AdminProfileTab();
 
@@ -129,16 +201,18 @@ class _AdminProfileTab extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text('You\'ll need to sign in again to manage reports.'),
+        backgroundColor: const Color(0xFF131A24),
+        title: const Text('Sign out of Command Center?'),
+        content: const Text('You will need to sign in again to dispatch reports.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: NivaraColors.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign out'),
+            child: const Text('Sign out', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -153,15 +227,15 @@ class _AdminProfileTab extends ConsumerWidget {
     final profile = ref.watch(authControllerProvider).asData?.value;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       children: [
         _OfficerCard(profile: profile),
         const SizedBox(height: 20),
         _ActionTile(
-          icon: Icons.history,
+          icon: Icons.history_rounded,
           color: NivaraColors.primary,
-          title: 'My Activity',
-          subtitle: 'Timeline of your assignments, actions, and posts',
+          title: 'Admin Activity & Audit',
+          subtitle: 'Timeline of your assignments, approvals, and posts',
           onTap: () => context.push(Routes.activityLog),
         ),
         const SizedBox(height: 12),
@@ -172,10 +246,10 @@ class _AdminProfileTab extends ConsumerWidget {
             return _ActionTile(
               icon: Icons.cloud_upload_outlined,
               color: NivaraColors.accent,
-              title: 'Pending Sync',
+              title: 'Pending Sync Queue',
               subtitle: count == 0
-                  ? 'All actions synced'
-                  : '$count item${count == 1 ? '' : 's'} waiting to go online',
+                  ? 'All actions synced to cloud'
+                  : '$count item${count == 1 ? '' : 's'} waiting to sync',
               badge: count > 0 ? '$count' : null,
               onTap: () => context.push(Routes.pendingSync),
             );
@@ -191,9 +265,9 @@ class _AdminProfileTab extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         _ActionTile(
-          icon: Icons.logout,
+          icon: Icons.logout_rounded,
           color: NivaraColors.danger,
-          title: 'Sign out',
+          title: 'Sign Out',
           subtitle: 'End your session on this device',
           onTap: () => _signOut(context, ref),
         ),
@@ -208,7 +282,7 @@ class _OfficerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = profile?.displayName ?? 'Officer';
+    final name = profile?.displayName ?? 'Municipal Officer';
     final role = (profile?.role ?? UserRole.admin).label;
     final dept = profile?.department?.label;
     final area = [
@@ -219,21 +293,43 @@ class _OfficerCard extends StatelessWidget {
     ].join(', ');
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [NivaraColors.primary, Color(0xFF124D77)],
+          colors: [Color(0xFF1E2A38), Color(0xFF10161E)],
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: NivaraColors.accent.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white.withValues(alpha: 0.2),
-            child: const Icon(Icons.shield, color: Colors.white, size: 30),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [NivaraColors.accent, Color(0xFFFF9100)],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: NivaraColors.accent.withValues(alpha: 0.4),
+                  blurRadius: 14,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.shield_rounded, color: Colors.black, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -244,7 +340,7 @@ class _OfficerCard extends StatelessWidget {
                   name,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -255,15 +351,18 @@ class _OfficerCard extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: NivaraColors.accent.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: NivaraColors.accent.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Text(
                     dept == null ? role : '$role · $dept',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                      color: NivaraColors.accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11.5,
                     ),
                   ),
                 ),
@@ -273,8 +372,8 @@ class _OfficerCard extends StatelessWidget {
                     children: [
                       const Icon(
                         Icons.place_outlined,
-                        color: Colors.white70,
-                        size: 15,
+                        color: Colors.white60,
+                        size: 14,
                       ),
                       const SizedBox(width: 4),
                       Flexible(
@@ -282,7 +381,7 @@ class _OfficerCard extends StatelessWidget {
                           area,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white70),
+                          style: const TextStyle(color: Colors.white60, fontSize: 11.5),
                         ),
                       ),
                     ],
@@ -316,44 +415,74 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.15),
-          child: Icon(icon, color: color),
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF131A24),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: badge != null
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      badge!,
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
-              )
-            : const Icon(Icons.chevron_right),
-        onTap: onTap,
+              ),
+            ),
+            if (badge != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withValues(alpha: 0.6)),
+                ),
+                child: Text(
+                  badge!,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+          ],
+        ),
       ),
     );
   }

@@ -5,18 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../router.dart';
 import 'auth_controller.dart';
 
-/// Email + password sign-in. Navigation on success is handled by the router's
-/// redirect guard — this screen only drives the form + error display.
-///
-/// The role toggle (Citizen / Officials) reveals + prefills the demo
-/// credentials for each side so testers can walk the full round-trip without
-/// setting up separate accounts. Field workers log in here too (using their
-/// assigned credentials).
 enum _LoginMode { citizen, official }
 
+/// 2026-Level Cyber-Civic Portal Login Screen.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -44,7 +40,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _mode = mode;
       _error = null;
-      // Clear any previously prefilled demo value before applying the new one.
       const demoUsers = [kDemoAdminUsername];
       const demoPasswords = [kDemoAdminPassword];
       if (demoUsers.contains(_email.text)) _email.clear();
@@ -68,7 +63,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       final raw = _email.text.trim();
-      // Demo admin sign in with a username alias; map it to the real email.
       final lower = raw.toLowerCase();
       final email = lower == kDemoAdminUsername
           ? kDemoAdminEmail
@@ -76,7 +70,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref
           .read(authControllerProvider.notifier)
           .signIn(email: email, password: _password.text);
-      // Redirect guard navigates away on success.
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
@@ -90,203 +83,394 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final isStaff = _mode != _LoginMode.citizen;
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Icon(
-                    Icons.location_city,
-                    size: 56,
-                    color: NivaraColors.primary,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    kAppName,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    kAppTagline,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  SegmentedButton<_LoginMode>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(
-                        value: _LoginMode.citizen,
-                        label: Text('Citizen'),
-                        icon: Icon(Icons.person_outline),
-                      ),
-                      ButtonSegment(
-                        value: _LoginMode.official,
-                        label: Text('Officials'),
-                        icon: Icon(Icons.shield_outlined),
-                      ),
-                    ],
-                    selected: {_mode},
-                    onSelectionChanged: _loading
-                        ? null
-                        : (s) => _setMode(s.first),
-                  ),
-                  if (isStaff) ...[
-                    const SizedBox(height: 16),
-                    _DemoStaffCard(mode: _mode),
-                  ],
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: _email,
-                    keyboardType: isStaff
-                        ? TextInputType.text
-                        : TextInputType.emailAddress,
-                    autofillHints: isStaff ? null : const [AutofillHints.email],
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: isStaff ? 'Email or username' : 'Email',
-                      prefixIcon: Icon(
-                        isStaff ? Icons.badge_outlined : Icons.email_outlined,
-                      ),
-                    ),
-                    validator: (v) {
-                      final t = v?.trim() ?? '';
-                      if (t.isEmpty) return 'Enter your email';
-                      final lower = t.toLowerCase();
-                      if (lower == kDemoAdminUsername) return null;
-                      if (!t.contains('@') || !t.contains('.')) {
-                        return 'Enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _password,
-                    obscureText: _obscure,
-                    autofillHints: isStaff
-                        ? null
-                        : const [AutofillHints.password],
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                    ),
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Enter your password' : null,
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      _error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _loading ? null : _submit,
-                    child: _loading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(switch (_mode) {
-                            _LoginMode.citizen => 'Sign in',
-                            _LoginMode.official => 'Sign in as official',
-                          }),
-                  ),
-                  const SizedBox(height: 8),
-                  if (!isStaff)
-                    TextButton(
-                      onPressed: _loading
-                          ? null
-                          : () => context.go(Routes.signup),
-                      child: const Text("Don't have an account? Sign up"),
-                    ),
-                ],
+      backgroundColor: NivaraColors.canvasDark,
+      body: Stack(
+        children: [
+          // Background ambient gradient orbs
+          Positioned(
+            top: -60,
+            right: -60,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: NivaraColors.primary.withValues(alpha: 0.12),
               ),
             ),
           ),
-        ),
+          Positioned(
+            bottom: 40,
+            left: -80,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: NivaraColors.primaryBlue.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Glowing Brand Header
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                              blurRadius: 28,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.location_city_rounded,
+                          size: 40,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        kAppName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        kAppTagline,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // Glassmorphic Role Switcher
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10161E),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: BouncyTap(
+                                onTap: _loading ? null : () => _setMode(_LoginMode.citizen),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _mode == _LoginMode.citizen
+                                        ? NivaraColors.primary.withValues(alpha: 0.2)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: _mode == _LoginMode.citizen
+                                        ? Border.all(color: NivaraColors.primary.withValues(alpha: 0.7))
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.person_rounded,
+                                        size: 18,
+                                        color: _mode == _LoginMode.citizen
+                                            ? NivaraColors.primary
+                                            : Colors.white60,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Citizen',
+                                        style: TextStyle(
+                                          color: _mode == _LoginMode.citizen
+                                              ? NivaraColors.primary
+                                              : Colors.white60,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: BouncyTap(
+                                onTap: _loading ? null : () => _setMode(_LoginMode.official),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _mode == _LoginMode.official
+                                        ? NivaraColors.accent.withValues(alpha: 0.2)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: _mode == _LoginMode.official
+                                        ? Border.all(color: NivaraColors.accent.withValues(alpha: 0.7))
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.shield_rounded,
+                                        size: 18,
+                                        color: _mode == _LoginMode.official
+                                            ? NivaraColors.accent
+                                            : Colors.white60,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Officials',
+                                        style: TextStyle(
+                                          color: _mode == _LoginMode.official
+                                              ? NivaraColors.accent
+                                              : Colors.white60,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      if (isStaff) ...[
+                        const SizedBox(height: 16),
+                        _DemoStaffCard(mode: _mode),
+                      ],
+
+                      const SizedBox(height: 20),
+
+                      // Email / Username input
+                      TextFormField(
+                        controller: _email,
+                        keyboardType: isStaff
+                            ? TextInputType.text
+                            : TextInputType.emailAddress,
+                        autofillHints: isStaff ? null : const [AutofillHints.email],
+                        textInputAction: TextInputAction.next,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          labelText: isStaff ? 'Email or username' : 'Email',
+                          prefixIcon: Icon(
+                            isStaff ? Icons.badge_outlined : Icons.email_outlined,
+                            color: Colors.white60,
+                          ),
+                        ),
+                        validator: (v) {
+                          final t = v?.trim() ?? '';
+                          if (t.isEmpty) return 'Enter your email';
+                          final lower = t.toLowerCase();
+                          if (lower == kDemoAdminUsername) return null;
+                          if (!t.contains('@') || !t.contains('.')) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Password input
+                      TextFormField(
+                        controller: _password,
+                        obscureText: _obscure,
+                        autofillHints: isStaff
+                            ? null
+                            : const [AutofillHints.password],
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submit(),
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white60),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscure
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: Colors.white60,
+                            ),
+                            onPressed: () => setState(() => _obscure = !_obscure),
+                          ),
+                        ),
+                        validator: (v) =>
+                            (v == null || v.isEmpty) ? 'Enter your password' : null,
+                      ),
+
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: NivaraColors.danger.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: NivaraColors.danger.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.error_outline_rounded,
+                                color: NivaraColors.danger,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(
+                                    color: NivaraColors.danger,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+
+                      // Gradient Submit Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: _loading ? null : _submit,
+                            child: _loading
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Colors.black,
+                                    ),
+                                  )
+                                : Text(
+                                    isStaff ? 'Enter Command Portal' : 'Sign In as Citizen',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Create Account Link
+                      if (!isStaff)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Don't have an account? ",
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _loading ? null : () => context.go(Routes.signup),
+                              child: const Text(
+                                'Sign Up',
+                                style: TextStyle(
+                                  color: NivaraColors.primary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Shows the prefilled demo credentials for the selected staff role.
 class _DemoStaffCard extends StatelessWidget {
   const _DemoStaffCard({required this.mode});
   final _LoginMode mode;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
+    return GlassCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      borderRadius: 16,
+      borderColor: NivaraColors.accent.withValues(alpha: 0.3),
+      child: const Row(
         children: [
-          Icon(
-            Icons.info_outline,
-            size: 20,
-            color: scheme.onSecondaryContainer,
-          ),
-          const SizedBox(width: 10),
+          Icon(Icons.info_outline_rounded, color: NivaraColors.accent, size: 20),
+          SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Demo official (prefilled)',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: scheme.onSecondaryContainer,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Username: $kDemoAdminUsername\nPassword: $kDemoAdminPassword',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSecondaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Field workers: use your assigned email (e.g. pothole_worker1@nivara.app) with password worker123',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSecondaryContainer.withValues(alpha: 0.8),
-                  ),
-                ),
-              ],
+            child: Text(
+              'Demo Official credentials pre-filled for rapid inspection.',
+              style: TextStyle(
+                color: NivaraColors.accent,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

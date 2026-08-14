@@ -204,29 +204,28 @@ class _QueueTile extends StatelessWidget {
   final VoidCallback onDismiss;
 
   String get _typeLabel => switch (entry.type) {
-    'report' => 'Manual Report',
-    'lf_item' => 'Lost & Found',
+    'report' => 'Civic Report',
+    'lf_item' => 'Lost & Found Item',
     'community' => 'Community Post',
-    'confirmation' => 'Confirmation',
-    'worker_note' => 'Progress Note',
+    'confirmation' => 'Civic Confirmation',
+    'worker_note' => 'Field Progress Note',
     _ when entry.type.endsWith('_photo_error') => 'Photo Missing',
     _ => entry.type,
   };
 
   IconData get _typeIcon => switch (entry.type) {
-    'report' => Icons.report_problem_outlined,
-    'lf_item' => Icons.search,
-    'community' => Icons.groups_outlined,
-    'confirmation' => Icons.thumb_up_outlined,
-    'worker_note' => Icons.note_outlined,
-    _ => Icons.cloud_off,
+    'report' => Icons.report_problem_rounded,
+    'lf_item' => Icons.search_rounded,
+    'community' => Icons.groups_rounded,
+    'confirmation' => Icons.thumb_up_rounded,
+    'worker_note' => Icons.note_rounded,
+    _ => Icons.cloud_off_rounded,
   };
 
   bool get _isPhotoError => entry.hasPhotoError;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final color = _isPhotoError ? NivaraColors.danger : NivaraColors.accent;
     final fmt = DateFormat('d MMM · HH:mm');
 
@@ -237,79 +236,103 @@ class _QueueTile extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: NivaraColors.danger.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(14),
+          color: NivaraColors.danger.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(18),
         ),
-        child: const Icon(Icons.delete_outline, color: NivaraColors.danger),
+        child: const Icon(Icons.delete_outline_rounded, color: NivaraColors.danger),
       ),
       onDismissed: (_) => onDismiss(),
       child: Container(
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFF10161E),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: _isPhotoError
-                ? NivaraColors.danger.withValues(alpha: 0.4)
-                : scheme.outlineVariant.withValues(alpha: 0.3),
+                ? NivaraColors.danger.withValues(alpha: 0.45)
+                : Colors.white.withValues(alpha: 0.08),
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ListTile(
-              leading: CircleAvatar(
-                radius: 20,
-                backgroundColor: color.withValues(alpha: 0.12),
-                child: Icon(_typeIcon, color: color, size: 18),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(_typeIcon, color: color, size: 20),
               ),
               title: Text(
                 _typeLabel,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
               subtitle: Text(
                 'Queued ${fmt.format(entry.queuedAt)}',
                 style: TextStyle(
-                  color: scheme.onSurfaceVariant,
+                  color: Colors.white.withValues(alpha: 0.55),
                   fontSize: 12,
                 ),
               ),
-              trailing: Chip(
-                label: Text(
-                  entry.localPhotoPaths.isNotEmpty ? '📷 +photo' : 'Text only',
-                  style: const TextStyle(fontSize: 11),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (entry.localPhotoPaths.isNotEmpty
+                          ? NivaraColors.primary
+                          : Colors.white60)
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: (entry.localPhotoPaths.isNotEmpty
+                            ? NivaraColors.primary
+                            : Colors.white60)
+                        .withValues(alpha: 0.4),
+                  ),
                 ),
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
+                child: Text(
+                  entry.localPhotoPaths.isNotEmpty ? '📷 +photo' : 'Text only',
+                  style: TextStyle(
+                    color: entry.localPhotoPaths.isNotEmpty
+                        ? NivaraColors.primary
+                        : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
-            // Photo error warning
             if (_isPhotoError)
               Container(
                 margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: NivaraColors.danger.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
+                  color: NivaraColors.danger.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: NivaraColors.danger.withValues(alpha: 0.3),
+                    color: NivaraColors.danger.withValues(alpha: 0.35),
                   ),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.photo_camera_outlined,
                       color: NivaraColors.danger,
                       size: 18,
                     ),
-                    const SizedBox(width: 8),
-                    const Expanded(
+                    SizedBox(width: 8),
+                    Expanded(
                       child: Text(
-                        'Photo was cleared from temp storage. '
-                        'This item was submitted without the photo — '
-                        'please resubmit with a new photo if needed.',
+                        'Photo cleared from temp storage. Submitted as text-only.',
                         style: TextStyle(
                           color: NivaraColors.danger,
-                          fontSize: 12,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),

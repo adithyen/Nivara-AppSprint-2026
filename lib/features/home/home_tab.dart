@@ -6,21 +6,16 @@ import '../../core/civic_level.dart';
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/civic_level_view.dart';
+import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/staggered_entrance.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../router.dart';
 import '../auth/auth_controller.dart';
 
-/// The **Home** tab of the citizen shell — the landing dashboard.
-///
-/// Body only: the surrounding [Scaffold]/[AppBar]/bottom-nav belong to
-/// [HomeShell]. Stats are computed **live** from the database (the profile
-/// counters have no maintaining triggers, so they'd read 0). We count the
-/// signed-in user's reports, confirmations and finds, derive a civic-impact
-/// score client-side, and show a community-pulse strip over the 50 latest
-/// reports. The full recent-report feed lives on the Pulse tab (kept out of
-/// Home to avoid duplication). Pull-to-refresh re-runs everything.
+/// 2026-Level Flagship Citizen Home Dashboard.
 class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({super.key});
 
@@ -35,8 +30,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   int _myFinds = 0;
   List<Report> _recent = const [];
 
-  /// Derived, not stored: a transparent function of the user's own activity.
-  /// Labelled as "estimated" in the UI so it's never mistaken for a DB value.
   int get _civicScore => _myReports * 10 + _myConfirms * 5 + _myFinds * 15;
 
   int get _openCount => _recent
@@ -60,8 +53,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   Future<void> _load() async {
     final uid = ref.read(authControllerProvider).asData?.value?.id;
 
-    // Kick everything off in parallel, then await — each guarded so one failure
-    // doesn't blank the whole dashboard.
     final reportsFut = _countMyRows(kTableReports, uid);
     final confirmsFut = _countMyConfirms(uid);
     final findsFut = _countMyFinds(uid);
@@ -140,73 +131,138 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     final profile = ref.watch(authControllerProvider).asData?.value;
 
     return RefreshIndicator(
+      color: NivaraColors.primary,
+      backgroundColor: const Color(0xFF10161E),
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
         children: [
-          Text(
-            'Welcome, ${profile?.displayName ?? 'Citizen'}',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            kAppTagline,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.outline,
+          // Greeting header
+          StaggeredEntrance(
+            index: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome, ${profile?.displayName ?? 'Citizen'}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      kAppTagline,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF131A24),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  ),
+                  child: const Icon(
+                    Icons.shield_outlined,
+                    color: NivaraColors.primary,
+                    size: 22,
+                  ),
+                ),
+              ],
             ),
           ),
+
           const SizedBox(height: 20),
-          _ImpactCard(
-            loading: _loading,
-            score: _civicScore,
-            reports: _myReports,
-            confirms: _myConfirms,
-            finds: _myFinds,
+
+          // Hero Civic Impact Glass Card
+          StaggeredEntrance(
+            index: 1,
+            child: _ImpactCard(
+              loading: _loading,
+              score: _civicScore,
+              reports: _myReports,
+              confirms: _myConfirms,
+              finds: _myFinds,
+            ),
           ),
-          const SizedBox(height: 20),
-          _SectionHeader('Community pulse'),
-          const SizedBox(height: 10),
-          _PulseCard(
-            loading: _loading,
-            open: _openCount,
-            inProgress: _inProgressCount,
-            resolved: _resolvedCount,
-            sample: _recent.length,
+
+          const SizedBox(height: 22),
+
+          // Community Pulse Strip
+          StaggeredEntrance(
+            index: 2,
+            child: _PulseCard(
+              loading: _loading,
+              open: _openCount,
+              inProgress: _inProgressCount,
+              resolved: _resolvedCount,
+              sample: _recent.length,
+            ),
           ),
-          const SizedBox(height: 20),
-          _SectionHeader('Modules'),
-          const SizedBox(height: 10),
-          _ModuleCard(
-            icon: Icons.radar,
-            color: NivaraColors.primary,
-            title: 'SensorWatch',
-            subtitle: 'Passive pothole detection with tamper-proof evidence',
-            onTap: () => context.push(Routes.sensorWatch),
+
+          const SizedBox(height: 26),
+
+          // Section Title
+          const StaggeredEntrance(
+            index: 3,
+            child: _SectionHeader('Civic Modules'),
           ),
+
           const SizedBox(height: 12),
-          _ModuleCard(
-            icon: Icons.report,
-            color: NivaraColors.accent,
-            title: 'CivicReport',
-            subtitle: 'File a complaint across 19 civic categories',
-            onTap: () => context.push(Routes.report),
-          ),
-          const SizedBox(height: 12),
-          _ModuleCard(
-            icon: Icons.map,
-            color: NivaraColors.success,
-            title: 'CivicMap',
-            subtitle: 'Live map of reports and Lost & Found pins',
-            onTap: () => context.push(Routes.map),
-          ),
-          const SizedBox(height: 12),
-          _ModuleCard(
-            icon: Icons.travel_explore,
-            color: NivaraColors.danger,
-            title: 'Lost & Found',
-            subtitle: 'Report lost or found items, auto-matched nearby',
-            onTap: () => context.push(Routes.lostFound),
+
+          // 2x2 Feature Modules Grid
+          StaggeredEntrance(
+            index: 4,
+            child: GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: 1.12,
+              children: [
+                _FeatureModuleTile(
+                  icon: Icons.sensors_rounded,
+                  color: NivaraColors.primary,
+                  title: 'SensorWatch',
+                  subtitle: 'Passive road jolt telemetry',
+                  onTap: () => context.push(Routes.sensorWatch),
+                ),
+                _FeatureModuleTile(
+                  icon: Icons.campaign_rounded,
+                  color: NivaraColors.accent,
+                  title: 'CivicReport',
+                  subtitle: 'Report 19 issue categories',
+                  onTap: () => context.push(Routes.report),
+                ),
+                _FeatureModuleTile(
+                  icon: Icons.map_rounded,
+                  color: NivaraColors.primaryBlue,
+                  title: 'CivicMap',
+                  subtitle: 'Real-time Ola live map',
+                  onTap: () => context.push(Routes.map),
+                ),
+                _FeatureModuleTile(
+                  icon: Icons.travel_explore_rounded,
+                  color: NivaraColors.danger,
+                  title: 'Lost & Found',
+                  subtitle: 'Radar item matching',
+                  onTap: () => context.push(Routes.lostFound),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -214,7 +270,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   }
 }
 
-/// Hero card: derived civic-impact score + the three activity counts feeding it.
 class _ImpactCard extends StatelessWidget {
   const _ImpactCard({
     required this.loading,
@@ -233,49 +288,68 @@ class _ImpactCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [NivaraColors.primary, Color(0xFF124D77)],
+          colors: [Color(0xFF101B2B), Color(0xFF0D141E)],
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: NivaraColors.primary.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: NivaraColors.primary.withValues(alpha: 0.12),
+            blurRadius: 28,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.workspace_premium,
-                color: Colors.white,
-                size: 22,
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: NivaraColors.primary.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.workspace_premium_rounded,
+                  color: NivaraColors.primary,
+                  size: 20,
+                ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Civic impact',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              const SizedBox(width: 10),
+              const Text(
+                'Civic Standing & Impact',
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
+                  fontSize: 15,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               loading
                   ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
+                      padding: EdgeInsets.symmetric(vertical: 6),
                       child: SizedBox(
-                        width: 28,
-                        height: 28,
+                        width: 24,
+                        height: 24,
                         child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: Colors.white,
+                          strokeWidth: 2.5,
+                          color: NivaraColors.primary,
                         ),
                       ),
                     )
@@ -283,48 +357,50 @@ class _ImpactCard extends StatelessWidget {
                       '$score',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 44,
+                        fontSize: 42,
                         fontWeight: FontWeight.w900,
                         height: 1,
+                        letterSpacing: -1,
                       ),
                     ),
               const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  'points',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontWeight: FontWeight.w600,
-                  ),
+              Text(
+                'XP Points',
+                style: TextStyle(
+                  color: NivaraColors.primary.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 10),
           CivicLevelBar(standing: civicStandingFor(score), onDark: true),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           Row(
             children: [
               _ImpactStat(
-                icon: Icons.report_outlined,
+                icon: Icons.report_gmailerrorred_rounded,
                 value: reports,
                 label: 'Reports',
                 loading: loading,
+                color: NivaraColors.accent,
               ),
               _ImpactDivider(),
               _ImpactStat(
-                icon: Icons.thumb_up_alt_outlined,
+                icon: Icons.thumb_up_alt_rounded,
                 value: confirms,
                 label: 'Confirms',
                 loading: loading,
+                color: NivaraColors.primary,
               ),
               _ImpactDivider(),
               _ImpactStat(
-                icon: Icons.volunteer_activism_outlined,
+                icon: Icons.volunteer_activism_rounded,
                 value: finds,
                 label: 'Finds',
                 loading: loading,
+                color: NivaraColors.primaryBlue,
               ),
             ],
           ),
@@ -340,25 +416,27 @@ class _ImpactStat extends StatelessWidget {
     required this.value,
     required this.label,
     required this.loading,
+    required this.color,
   });
 
   final IconData icon;
   final int value;
   final String label;
   final bool loading;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 20),
+          Icon(icon, color: color, size: 20),
           const SizedBox(height: 6),
           Text(
             loading ? '—' : '$value',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 19,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -366,8 +444,9 @@ class _ImpactStat extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.65),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -380,12 +459,11 @@ class _ImpactDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: 1,
-    height: 40,
-    color: Colors.white.withValues(alpha: 0.2),
+    height: 36,
+    color: Colors.white.withValues(alpha: 0.12),
   );
 }
 
-/// Open / In-progress / Resolved tallies across the 50 latest reports.
 class _PulseCard extends StatelessWidget {
   const _PulseCard({
     required this.loading,
@@ -403,26 +481,22 @@ class _PulseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      borderRadius: 22,
       child: Column(
         children: [
           Row(
             children: [
               _PulseStat(
                 value: loading ? null : open,
-                label: 'Open',
+                label: 'Active',
                 color: NivaraColors.accent,
               ),
               _PulseStat(
                 value: loading ? null : inProgress,
-                label: 'In progress',
-                color: NivaraColors.primary,
+                label: 'In Action',
+                color: NivaraColors.primaryBlue,
               ),
               _PulseStat(
                 value: loading ? null : resolved,
@@ -432,10 +506,14 @@ class _PulseCard extends StatelessWidget {
             ],
           ),
           if (!loading && sample > 0) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
-              'Across the $sample most recent reports',
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11.5),
+              'Live telemetry over $sample city reports',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ],
@@ -464,15 +542,19 @@ class _PulseStat extends StatelessWidget {
             value == null ? '—' : '$value',
             style: TextStyle(
               color: color,
-              fontSize: 26,
+              fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.65),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -488,43 +570,89 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(
-        context,
-      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 17,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.2,
+      ),
     );
   }
 }
 
-/// A tappable module entry on the citizen home.
-class _ModuleCard extends StatelessWidget {
-  const _ModuleCard({
+class _FeatureModuleTile extends StatelessWidget {
+  const _FeatureModuleTile({
     required this.icon,
     required this.color,
     required this.title,
     required this.subtitle,
-    this.onTap,
+    required this.onTap,
   });
 
   final IconData icon;
   final Color color;
   final String title;
   final String subtitle;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.15),
-          child: Icon(icon, color: color),
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10161E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withValues(alpha: 0.35),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

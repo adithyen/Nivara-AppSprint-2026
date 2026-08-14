@@ -1,34 +1,32 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 
-/// Material icon for each civic category. Kept in one place so the grid, report
-/// tiles, and map pins can all share a consistent visual language.
 IconData categoryIcon(ReportCategory c) => switch (c) {
-  ReportCategory.pothole => Icons.dangerous,
-  ReportCategory.brokenFootpath => Icons.directions_walk,
+  ReportCategory.pothole => Icons.dangerous_rounded,
+  ReportCategory.brokenFootpath => Icons.directions_walk_rounded,
   ReportCategory.openManhole => Icons.circle_outlined,
-  ReportCategory.fallenTree => Icons.park,
-  ReportCategory.waterlogging => Icons.water,
-  ReportCategory.roadSign => Icons.signpost,
-  ReportCategory.garbage => Icons.delete,
-  ReportCategory.blockedDrain => Icons.water_damage,
-  ReportCategory.sewage => Icons.plumbing,
-  ReportCategory.streetLight => Icons.lightbulb,
-  ReportCategory.damagedPole => Icons.electrical_services,
-  ReportCategory.powerIssue => Icons.power,
-  ReportCategory.waterSupply => Icons.water_drop,
-  ReportCategory.pipeLeak => Icons.plumbing,
-  ReportCategory.encroachment => Icons.fence,
-  ReportCategory.brokenProperty => Icons.broken_image,
-  ReportCategory.strayAnimals => Icons.pets,
-  ReportCategory.noise => Icons.volume_up,
-  ReportCategory.other => Icons.more_horiz,
+  ReportCategory.fallenTree => Icons.park_rounded,
+  ReportCategory.waterlogging => Icons.water_rounded,
+  ReportCategory.roadSign => Icons.signpost_rounded,
+  ReportCategory.garbage => Icons.delete_rounded,
+  ReportCategory.blockedDrain => Icons.water_damage_rounded,
+  ReportCategory.sewage => Icons.plumbing_rounded,
+  ReportCategory.streetLight => Icons.lightbulb_rounded,
+  ReportCategory.damagedPole => Icons.electrical_services_rounded,
+  ReportCategory.powerIssue => Icons.power_rounded,
+  ReportCategory.waterSupply => Icons.water_drop_rounded,
+  ReportCategory.pipeLeak => Icons.plumbing_rounded,
+  ReportCategory.encroachment => Icons.fence_rounded,
+  ReportCategory.brokenProperty => Icons.broken_image_rounded,
+  ReportCategory.strayAnimals => Icons.pets_rounded,
+  ReportCategory.noise => Icons.volume_up_rounded,
+  ReportCategory.other => Icons.more_horiz_rounded,
 };
 
-/// A tappable 3-column grid of all 19 civic categories. [selected] is
-/// highlighted; tapping one calls [onSelect].
+/// 2026-Level Cyber-Civic Category Grid.
 class CategoryGrid extends StatelessWidget {
   const CategoryGrid({
     super.key,
@@ -73,48 +71,63 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: selected
-          ? NivaraColors.primary.withValues(alpha: 0.12)
-          : scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected ? NivaraColors.primary : Colors.transparent,
-              width: 2,
-            ),
+    return BouncyTap(
+      onTap: onTap,
+      scaleFactor: 0.92,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: selected
+              ? NivaraColors.primary.withValues(alpha: 0.16)
+              : const Color(0xFF10161E),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? NivaraColors.primary
+                : Colors.white.withValues(alpha: 0.08),
+            width: selected ? 1.5 : 1.0,
           ),
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: NivaraColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (selected ? NivaraColors.primary : Colors.white)
+                    .withValues(alpha: selected ? 0.2 : 0.06),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
                 categoryIcon(category),
-                color: selected
-                    ? NivaraColors.primary
-                    : scheme.onSurfaceVariant,
-                size: 26,
+                color: selected ? NivaraColors.primary : Colors.white70,
+                size: 22,
               ),
-              const SizedBox(height: 6),
-              Text(
-                category.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: selected ? NivaraColors.primary : null,
-                  fontWeight: selected ? FontWeight.w600 : null,
-                  height: 1.1,
-                ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              category.label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected ? NivaraColors.primary : Colors.white,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                fontSize: 11.5,
+                height: 1.15,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

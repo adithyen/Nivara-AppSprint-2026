@@ -8,18 +8,15 @@ import '../../core/services/location_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../router.dart';
 import '../admin/status_style.dart';
 import '../report/category_grid.dart';
 
-/// The **Pulse** tab — the civic state of the neighbourhood around you.
-///
-/// Pulls reports within an adjustable radius of the viewer's GPS (default 5 km,
-/// 1–100 km) via the `reports_near` PostGIS RPC, tallies them into
-/// Open / In-progress / Resolved, and lists the most recent ones with their
-/// distance. Changing the radius or pulling to refresh re-runs the query.
+/// 2026-Level Neighborhood City Pulse Dashboard.
 class PulseTab extends ConsumerStatefulWidget {
   const PulseTab({super.key});
 
@@ -108,10 +105,12 @@ class _PulseTabState extends ConsumerState<PulseTab> {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
+      color: NivaraColors.primary,
+      backgroundColor: const Color(0xFF10161E),
       onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
         children: [
           _RadiusCard(
             radiusKm: _radiusKm,
@@ -121,7 +120,8 @@ class _PulseTabState extends ConsumerState<PulseTab> {
             onChangeEnd: (_) => _load(),
           ),
           const SizedBox(height: 20),
-          _SectionHeader('Issues within ${_radiusKm.round()} km'),
+
+          _SectionHeader('Live Telemetry within ${_radiusKm.round()} km'),
           const SizedBox(height: 10),
           _AreaStatsCard(
             loading: _loading,
@@ -130,22 +130,48 @@ class _PulseTabState extends ConsumerState<PulseTab> {
             resolved: _resolvedCount,
             total: _reports.length,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+
           Row(
             children: [
-              Expanded(child: _SectionHeader('Recent in your area')),
+              Expanded(child: _SectionHeader('Recent Nearby Issues')),
               if (_reports.isNotEmpty)
-                TextButton(
-                  onPressed: () => context.push(Routes.map),
-                  child: const Text('View map'),
+                BouncyTap(
+                  onTap: () => context.push(Routes.map),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: NivaraColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.map_rounded, size: 14, color: NivaraColors.primary),
+                        SizedBox(width: 4),
+                        Text(
+                          'View on Map',
+                          style: TextStyle(
+                            color: NivaraColors.primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
+
           if (_loading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(
+                child: CircularProgressIndicator(color: NivaraColors.primary),
+              ),
             )
           else if (_reports.isEmpty)
             _EmptyArea(radiusKm: _radiusKm)
@@ -168,8 +194,6 @@ class _PulseTabState extends ConsumerState<PulseTab> {
   }
 }
 
-/// Radius selector: a slider (1–100 km) plus quick presets. Value shown live;
-/// the query re-runs on release (or preset tap).
 class _RadiusCard extends StatelessWidget {
   const _RadiusCard({
     required this.radiusKm,
@@ -189,69 +213,110 @@ class _RadiusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF10161E),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.my_location, color: NivaraColors.primary),
-              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: NivaraColors.primary.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.radar_rounded, color: NivaraColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   locating
-                      ? 'Locating you…'
+                      ? 'Acquiring GPS fix…'
                       : usingDefault
-                      ? 'Using city default location'
-                      : 'Around your location',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                          ? 'Using city center'
+                          : 'Proximity Filter',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: NivaraColors.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(20),
+                  color: NivaraColors.primary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.5)),
                 ),
                 child: Text(
-                  '${radiusKm.round()} km',
+                  '${radiusKm.round()} km radius',
                   style: const TextStyle(
                     color: NivaraColors.primary,
                     fontWeight: FontWeight.w800,
+                    fontSize: 12,
                   ),
                 ),
               ),
             ],
           ),
-          Slider(
-            value: radiusKm,
-            min: 1,
-            max: 100,
-            divisions: 99,
-            label: '${radiusKm.round()} km',
-            onChanged: onChanged,
-            onChangeEnd: onChangeEnd,
+          const SizedBox(height: 12),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: NivaraColors.primary,
+              thumbColor: NivaraColors.primary,
+              overlayColor: NivaraColors.primary.withValues(alpha: 0.2),
+            ),
+            child: Slider(
+              value: radiusKm,
+              min: 1,
+              max: 100,
+              divisions: 99,
+              label: '${radiusKm.round()} km',
+              onChanged: onChanged,
+              onChangeEnd: onChangeEnd,
+            ),
           ),
           Wrap(
             spacing: 8,
             children: [
               for (final p in _presets)
-                ChoiceChip(
-                  label: Text('${p.round()} km'),
-                  selected: radiusKm.round() == p.round(),
-                  onSelected: (_) {
+                BouncyTap(
+                  onTap: () {
                     onChanged(p);
                     onChangeEnd(p);
                   },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: radiusKm.round() == p.round()
+                          ? NivaraColors.primary.withValues(alpha: 0.2)
+                          : const Color(0xFF16202C),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: radiusKm.round() == p.round()
+                            ? NivaraColors.primary
+                            : Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Text(
+                      '${p.round()} km',
+                      style: TextStyle(
+                        color: radiusKm.round() == p.round()
+                            ? NivaraColors.primary
+                            : Colors.white70,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -261,7 +326,6 @@ class _RadiusCard extends StatelessWidget {
   }
 }
 
-/// Open / In-progress / Resolved tallies for the current radius.
 class _AreaStatsCard extends StatelessWidget {
   const _AreaStatsCard({
     required this.loading,
@@ -279,26 +343,22 @@ class _AreaStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 18),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+      borderRadius: 22,
       child: Column(
         children: [
           Row(
             children: [
               _Stat(
                 value: loading ? null : open,
-                label: 'Open',
+                label: 'Active',
                 color: NivaraColors.accent,
               ),
               _Stat(
                 value: loading ? null : inProgress,
-                label: 'In progress',
-                color: NivaraColors.primary,
+                label: 'In Progress',
+                color: NivaraColors.primaryBlue,
               ),
               _Stat(
                 value: loading ? null : resolved,
@@ -308,12 +368,12 @@ class _AreaStatsCard extends StatelessWidget {
             ],
           ),
           if (!loading) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               total == 0
-                  ? 'No reports in this area yet'
-                  : '$total ${total == 1 ? 'report' : 'reports'} in range',
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                  ? 'No reports in this area'
+                  : '$total total issue${total == 1 ? '' : 's'} recorded',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11.5),
             ),
           ],
         ],
@@ -338,7 +398,7 @@ class _Stat extends StatelessWidget {
             value == null ? '—' : '$value',
             style: TextStyle(
               color: color,
-              fontSize: 28,
+              fontSize: 26,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -346,7 +406,11 @@ class _Stat extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -354,7 +418,6 @@ class _Stat extends StatelessWidget {
   }
 }
 
-/// A recent-report row with distance-from-you, taps through to detail.
 class _AreaReportTile extends StatelessWidget {
   const _AreaReportTile({
     required this.report,
@@ -368,74 +431,81 @@ class _AreaReportTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final sev = severityColor(report.severity);
     final status = statusColor(report.status);
     final title = report.title?.trim().isNotEmpty == true
         ? report.title!.trim()
         : report.category.label;
 
-    return Material(
-      color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: sev.withValues(alpha: 0.15),
-                child: Icon(
-                  categoryIcon(report.category),
-                  color: sev,
-                  size: 20,
-                ),
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10161E),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: sev.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${formatDistance(distanceMeters)} away · ${timeAgo(report.createdAt)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Icon(
+                categoryIcon(report.category),
+                color: sev,
+                size: 20,
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: status.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  report.status.label,
-                  style: TextStyle(
-                    color: status,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${formatDistance(distanceMeters)} away · ${timeAgo(report.createdAt)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+              decoration: BoxDecoration(
+                color: status.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: status.withValues(alpha: 0.5)),
+              ),
+              child: Text(
+                report.status.label,
+                style: TextStyle(
+                  color: status,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -448,30 +518,31 @@ class _EmptyArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFF10161E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         children: [
-          Icon(Icons.location_off_outlined, size: 36, color: scheme.outline),
-          const SizedBox(height: 8),
+          const Icon(Icons.location_off_rounded, size: 36, color: Colors.white38),
+          const SizedBox(height: 10),
           Text(
-            'Nothing within ${radiusKm.round()} km',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurfaceVariant,
+            'No issues reported within ${radiusKm.round()} km',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              fontSize: 14.5,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
-            'Widen the radius, or be the first to report here.',
+            'Widen the radius or be the first to report an issue in your area.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5),
           ),
         ],
       ),
@@ -486,8 +557,11 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     title,
-    style: Theme.of(
-      context,
-    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    style: const TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.w800,
+      fontSize: 16,
+      letterSpacing: -0.2,
+    ),
   );
 }
