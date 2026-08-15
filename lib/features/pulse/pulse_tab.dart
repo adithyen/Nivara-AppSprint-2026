@@ -213,12 +213,24 @@ class _RadiusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,10 +240,10 @@ class _RadiusCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: NivaraColors.primary.withValues(alpha: 0.16),
+                  color: primary.withValues(alpha: isDark ? 0.16 : 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.radar_rounded, color: NivaraColors.primary, size: 20),
+                child: Icon(Icons.radar_rounded, color: primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -241,8 +253,8 @@ class _RadiusCard extends StatelessWidget {
                       : usingDefault
                           ? 'Using city center'
                           : 'Proximity Filter',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF111827),
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -251,14 +263,14 @@ class _RadiusCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: NivaraColors.primary.withValues(alpha: 0.16),
+                  color: primary.withValues(alpha: isDark ? 0.16 : 0.12),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.5)),
+                  border: Border.all(color: primary.withValues(alpha: 0.5)),
                 ),
                 child: Text(
                   '${radiusKm.round()} km radius',
-                  style: const TextStyle(
-                    color: NivaraColors.primary,
+                  style: TextStyle(
+                    color: primary,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
@@ -269,9 +281,9 @@ class _RadiusCard extends StatelessWidget {
           const SizedBox(height: 12),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              activeTrackColor: NivaraColors.primary,
-              thumbColor: NivaraColors.primary,
-              overlayColor: NivaraColors.primary.withValues(alpha: 0.2),
+              activeTrackColor: primary,
+              thumbColor: primary,
+              overlayColor: primary.withValues(alpha: 0.2),
             ),
             child: Slider(
               value: radiusKm,
@@ -297,21 +309,21 @@ class _RadiusCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: radiusKm.round() == p.round()
-                          ? NivaraColors.primary.withValues(alpha: 0.2)
-                          : const Color(0xFF16202C),
+                          ? primary.withValues(alpha: isDark ? 0.2 : 0.15)
+                          : (isDark ? const Color(0xFF16202C) : const Color(0xFFF1F5F9)),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: radiusKm.round() == p.round()
-                            ? NivaraColors.primary
-                            : Colors.white.withValues(alpha: 0.08),
+                            ? primary
+                            : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
                       ),
                     ),
                     child: Text(
                       '${p.round()} km',
                       style: TextStyle(
                         color: radiusKm.round() == p.round()
-                            ? NivaraColors.primary
-                            : Colors.white70,
+                            ? primary
+                            : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
                       ),
@@ -343,9 +355,24 @@ class _AreaStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
-      borderRadius: 22,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Row(
@@ -354,16 +381,19 @@ class _AreaStatsCard extends StatelessWidget {
                 value: loading ? null : open,
                 label: 'Active',
                 color: NivaraColors.accent,
+                isDark: isDark,
               ),
               _Stat(
                 value: loading ? null : inProgress,
                 label: 'In Progress',
                 color: NivaraColors.primaryBlue,
+                isDark: isDark,
               ),
               _Stat(
                 value: loading ? null : resolved,
                 label: 'Resolved',
                 color: NivaraColors.success,
+                isDark: isDark,
               ),
             ],
           ),
@@ -373,7 +403,10 @@ class _AreaStatsCard extends StatelessWidget {
               total == 0
                   ? 'No reports in this area'
                   : '$total total issue${total == 1 ? '' : 's'} recorded',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11.5),
+              style: TextStyle(
+                color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF6B7280),
+                fontSize: 11.5,
+              ),
             ),
           ],
         ],
@@ -383,11 +416,17 @@ class _AreaStatsCard extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label, required this.color});
+  const _Stat({
+    required this.value,
+    required this.label,
+    required this.color,
+    required this.isDark,
+  });
 
   final int? value;
   final String label;
   final Color color;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -407,7 +446,7 @@ class _Stat extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF6B7280),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -431,6 +470,7 @@ class _AreaReportTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sev = severityColor(report.severity);
     final status = statusColor(report.status);
     final title = report.title?.trim().isNotEmpty == true
@@ -442,16 +482,25 @@ class _AreaReportTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: sev.withValues(alpha: 0.16),
+                color: sev.withValues(alpha: isDark ? 0.16 : 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -469,8 +518,8 @@ class _AreaReportTile extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF111827),
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -481,7 +530,7 @@ class _AreaReportTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
+                      color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),
                       fontSize: 12,
                     ),
                   ),
@@ -492,7 +541,7 @@ class _AreaReportTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
               decoration: BoxDecoration(
-                color: status.withValues(alpha: 0.15),
+                color: status.withValues(alpha: isDark ? 0.15 : 0.1),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: status.withValues(alpha: 0.5)),
               ),
@@ -518,23 +567,31 @@ class _EmptyArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         children: [
-          const Icon(Icons.location_off_rounded, size: 36, color: Colors.white38),
+          Icon(
+            Icons.location_off_rounded,
+            size: 36,
+            color: isDark ? Colors.white38 : Colors.black26,
+          ),
           const SizedBox(height: 10),
           Text(
             'No issues reported within ${radiusKm.round()} km',
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: isDark ? Colors.white : const Color(0xFF111827),
               fontSize: 14.5,
             ),
           ),
@@ -542,7 +599,10 @@ class _EmptyArea extends StatelessWidget {
           Text(
             'Widen the radius or be the first to report an issue in your area.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5),
+            style: TextStyle(
+              color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),
+              fontSize: 12.5,
+            ),
           ),
         ],
       ),
@@ -557,8 +617,8 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     title,
-    style: const TextStyle(
-      color: Colors.white,
+    style: TextStyle(
+      color: Theme.of(context).colorScheme.onSurface,
       fontWeight: FontWeight.w800,
       fontSize: 16,
       letterSpacing: -0.2,

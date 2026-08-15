@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +11,6 @@ import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/civic_level_view.dart';
-import '../../core/widgets/glass_card.dart';
 import '../../models/enums.dart';
 import '../../models/user_profile.dart';
 import '../../router.dart';
@@ -86,7 +87,6 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF10161E),
       showDragHandle: true,
       builder: (_) => _EditProfileSheet(profile: profile),
     );
@@ -100,13 +100,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     }
   }
 
-  void _workWithNivara() {
+  void _workWithNivara(UserProfile? profile) {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF10161E),
-      builder: (_) => const _WorkWithNivaraSheet(),
+      builder: (_) => _WorkWithNivaraSheet(profile: profile),
     );
   }
 
@@ -132,10 +131,10 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   }
 
   Future<void> _resign() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF131A24),
         title: const Text('Resign from Field Team?'),
         content: const Text(
           'You will be removed from the field workforce and your account will '
@@ -171,7 +170,6 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF131A24),
         title: const Text('Sign out?'),
         content: const Text('You will need to sign in again to file and manage reports.'),
         actions: [
@@ -197,10 +195,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     final profile = ref.watch(authControllerProvider).asData?.value;
     final isCitizen = profile?.role == UserRole.citizen;
     final isWorker = profile?.isWorker ?? false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
 
     return RefreshIndicator(
-      color: NivaraColors.primary,
-      backgroundColor: const Color(0xFF10161E),
+      color: primary,
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -235,7 +235,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               color: NivaraColors.accent,
               title: 'Work with Nivara',
               subtitle: 'Become a verified field worker in your ward',
-              onTap: _workWithNivara,
+              onTap: () => _workWithNivara(profile),
             ),
             const SizedBox(height: 12),
           ],
@@ -312,6 +312,8 @@ class _WorkStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
     final dept = profile?.department?.label ?? 'Field Team';
     final workerNum = profile?.workerNumber;
     final statusColor = onLeave ? NivaraColors.accent : NivaraColors.success;
@@ -321,12 +323,12 @@ class _WorkStatusCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
             'FIELD SHIFT STATUS',
             style: TextStyle(
-              color: Colors.white60,
+              color: isDark ? Colors.white60 : const Color(0xFF6B7280),
               letterSpacing: 1.2,
               fontWeight: FontWeight.w800,
               fontSize: 11,
@@ -335,9 +337,18 @@ class _WorkStatusCard extends StatelessWidget {
         ),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF10161E),
+            color: isDark ? const Color(0xFF10161E) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+            border: Border.all(
+              color: statusColor.withValues(alpha: isDark ? 0.35 : 0.4),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
             children: [
@@ -348,7 +359,7 @@ class _WorkStatusCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.16),
+                        color: statusColor.withValues(alpha: isDark ? 0.16 : 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(statusIcon, color: statusColor, size: 22),
@@ -372,7 +383,7 @@ class _WorkStatusCard extends StatelessWidget {
                                 ? 'No new tasks will be dispatched to you'
                                 : 'Active & ready for task dispatch',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.55),
+                              color: isDark ? Colors.white54 : const Color(0xFF6B7280),
                               fontSize: 11.5,
                             ),
                           ),
@@ -393,17 +404,26 @@ class _WorkStatusCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+              Divider(
+                height: 1,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : const Color(0xFFE2E8F0),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    const Icon(Icons.badge_outlined, size: 18, color: Colors.white60),
+                    Icon(
+                      Icons.badge_outlined,
+                      size: 18,
+                      color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       dept,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : const Color(0xFF374151),
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
@@ -413,16 +433,16 @@ class _WorkStatusCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: NivaraColors.primary.withValues(alpha: 0.15),
+                          color: primary.withValues(alpha: isDark ? 0.15 : 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: NivaraColors.primary.withValues(alpha: 0.4),
+                            color: primary.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Text(
                           'Worker #$workerNum',
-                          style: const TextStyle(
-                            color: NivaraColors.primary,
+                          style: TextStyle(
+                            color: primary,
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                           ),
@@ -458,6 +478,8 @@ class _IdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
     final name = profile?.displayName ?? 'Citizen';
     final area = [
       if (profile?.ward != null && profile!.ward!.trim().isNotEmpty)
@@ -469,21 +491,25 @@ class _IdentityCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF122336), Color(0xFF0C141F)],
+          colors: isDark
+              ? const [Color(0xFF122336), Color(0xFF0C141F)]
+              : const [Colors.white, Color(0xFFF6F9FD)],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: NivaraColors.primary.withValues(alpha: 0.35),
+          color: primary.withValues(alpha: isDark ? 0.35 : 0.4),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.4)
+                : Colors.black.withValues(alpha: 0.06),
+            blurRadius: isDark ? 20 : 16,
+            offset: isDark ? const Offset(0, 6) : const Offset(0, 4),
           ),
         ],
       ),
@@ -493,13 +519,13 @@ class _IdentityCard extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+              gradient: LinearGradient(
+                colors: [primary, NivaraColors.primaryBlue],
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                  color: primary.withValues(alpha: 0.35),
                   blurRadius: 18,
                 ),
               ],
@@ -507,8 +533,10 @@ class _IdentityCard extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-              style: const TextStyle(
-                color: Colors.black,
+              style: TextStyle(
+                color: ThemeData.estimateBrightnessForColor(primary) == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
                 fontSize: 26,
                 fontWeight: FontWeight.w900,
               ),
@@ -521,8 +549,8 @@ class _IdentityCard extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF111827),
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.2,
@@ -535,16 +563,16 @@ class _IdentityCard extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: NivaraColors.primary.withValues(alpha: 0.16),
+                    color: primary.withValues(alpha: isDark ? 0.16 : 0.12),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: NivaraColors.primary.withValues(alpha: 0.5),
+                      color: primary.withValues(alpha: 0.5),
                     ),
                   ),
                   child: Text(
                     (profile?.role ?? UserRole.citizen).label,
-                    style: const TextStyle(
-                      color: NivaraColors.primary,
+                    style: TextStyle(
+                      color: primary,
                       fontWeight: FontWeight.w700,
                       fontSize: 11.5,
                     ),
@@ -554,9 +582,9 @@ class _IdentityCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.place_outlined,
-                        color: Colors.white60,
+                        color: isDark ? Colors.white60 : const Color(0xFF6B7280),
                         size: 14,
                       ),
                       const SizedBox(width: 4),
@@ -565,7 +593,10 @@ class _IdentityCard extends StatelessWidget {
                           area,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white60, fontSize: 11.5),
+                          style: TextStyle(
+                            color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                            fontSize: 11.5,
+                          ),
                         ),
                       ),
                     ],
@@ -597,24 +628,40 @@ class _ImpactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
       padding: const EdgeInsets.all(18),
-      borderRadius: 22,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.workspace_premium_rounded,
-                color: NivaraColors.primary,
+                color: primary,
                 size: 20,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Civic Standing',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : const Color(0xFF111827),
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
                 ),
@@ -622,8 +669,8 @@ class _ImpactCard extends StatelessWidget {
               const Spacer(),
               Text(
                 loading ? '—' : '$score XP',
-                style: const TextStyle(
-                  color: NivaraColors.primary,
+                style: TextStyle(
+                  color: primary,
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
                 ),
@@ -638,25 +685,31 @@ class _ImpactCard extends StatelessWidget {
                 value: reports,
                 label: 'Reports',
                 loading: loading,
+                isDark: isDark,
+                color: NivaraColors.accent,
               ),
-              _Divider(),
+              _Divider(isDark: isDark),
               _Stat(
                 icon: Icons.thumb_up_alt_rounded,
                 value: confirms,
                 label: 'Confirms',
                 loading: loading,
+                isDark: isDark,
+                color: primary,
               ),
-              _Divider(),
+              _Divider(isDark: isDark),
               _Stat(
                 icon: Icons.volunteer_activism_rounded,
                 value: finds,
                 label: 'Finds',
                 loading: loading,
+                isDark: isDark,
+                color: NivaraColors.primaryBlue,
               ),
             ],
           ),
           const SizedBox(height: 16),
-          CivicLevelBar(standing: civicStandingFor(score)),
+          CivicLevelBar(standing: civicStandingFor(score), onDark: isDark),
         ],
       ),
     );
@@ -669,24 +722,28 @@ class _Stat extends StatelessWidget {
     required this.value,
     required this.label,
     required this.loading,
+    required this.isDark,
+    required this.color,
   });
 
   final IconData icon;
   final int value;
   final String label;
   final bool loading;
+  final bool isDark;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: NivaraColors.primary, size: 20),
+          Icon(icon, color: color, size: 20),
           const SizedBox(height: 6),
           Text(
             loading ? '—' : '$value',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF111827),
               fontSize: 19,
               fontWeight: FontWeight.w800,
             ),
@@ -695,7 +752,7 @@ class _Stat extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.65),
+              color: isDark ? Colors.white60 : const Color(0xFF6B7280),
               fontSize: 11.5,
             ),
           ),
@@ -706,11 +763,16 @@ class _Stat extends StatelessWidget {
 }
 
 class _Divider extends StatelessWidget {
+  const _Divider({required this.isDark});
+  final bool isDark;
+
   @override
   Widget build(BuildContext context) => Container(
     width: 1,
     height: 36,
-    color: Colors.white.withValues(alpha: 0.1),
+    color: isDark
+        ? Colors.white.withValues(alpha: 0.1)
+        : const Color(0xFFE2E8F0),
   );
 }
 
@@ -733,21 +795,32 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          border: Border.all(
+            color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
+                color: color.withValues(alpha: isDark ? 0.15 : 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(icon, color: color, size: 22),
@@ -759,8 +832,8 @@ class _ActionTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF111827),
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -769,7 +842,7 @@ class _ActionTile extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
+                      color: isDark ? Colors.white54 : const Color(0xFF6B7280),
                       fontSize: 12,
                     ),
                   ),
@@ -795,7 +868,10 @@ class _ActionTile extends StatelessWidget {
               ),
               const SizedBox(width: 6),
             ],
-            const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
           ],
         ),
       ),
@@ -861,16 +937,19 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final email = supabase.auth.currentUser?.email ?? '';
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Edit Profile',
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.w800,
             ),
@@ -880,9 +959,10 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
             TextField(
               enabled: false,
               controller: TextEditingController(text: email),
-              decoration: const InputDecoration(
+              style: TextStyle(color: scheme.onSurfaceVariant),
+              decoration: InputDecoration(
                 labelText: 'Account Email',
-                prefixIcon: Icon(Icons.mail_outline, color: Colors.white60),
+                prefixIcon: Icon(Icons.mail_outline, color: scheme.onSurfaceVariant),
               ),
             ),
             const SizedBox(height: 12),
@@ -890,20 +970,20 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
           TextField(
             controller: _nameCtrl,
             textCapitalization: TextCapitalization.words,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
+            style: TextStyle(color: scheme.onSurface),
+            decoration: InputDecoration(
               labelText: 'Display Name',
-              prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.white60),
+              prefixIcon: Icon(Icons.person_outline_rounded, color: scheme.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _phoneCtrl,
             keyboardType: TextInputType.phone,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
+            style: TextStyle(color: scheme.onSurface),
+            decoration: InputDecoration(
               labelText: 'Phone Number',
-              prefixIcon: Icon(Icons.call_outlined, color: Colors.white60),
+              prefixIcon: Icon(Icons.call_outlined, color: scheme.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 12),
@@ -913,10 +993,10 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 child: TextField(
                   controller: _cityCtrl,
                   textCapitalization: TextCapitalization.words,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: scheme.onSurface),
+                  decoration: InputDecoration(
                     labelText: 'City',
-                    prefixIcon: Icon(Icons.location_city_rounded, color: Colors.white60),
+                    prefixIcon: Icon(Icons.location_city_rounded, color: scheme.onSurfaceVariant),
                   ),
                 ),
               ),
@@ -925,7 +1005,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 child: TextField(
                   controller: _wardCtrl,
                   textCapitalization: TextCapitalization.words,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: scheme.onSurface),
                   decoration: const InputDecoration(labelText: 'Ward / Locality'),
                 ),
               ),
@@ -937,15 +1017,30 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
             child: FilledButton.icon(
               onPressed: _saving ? null : _save,
               icon: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
+                      ),
                     )
-                  : const Icon(Icons.save_rounded, color: Colors.black),
+                  : Icon(
+                      Icons.save_rounded,
+                      color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
+                          ? Colors.white
+                          : Colors.black,
+                    ),
               label: Text(
                 _saving ? 'Saving…' : 'Save Changes',
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
+                      ? Colors.white
+                      : Colors.black,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
@@ -956,31 +1051,106 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
 }
 
 class _WorkWithNivaraSheet extends StatefulWidget {
-  const _WorkWithNivaraSheet();
+  const _WorkWithNivaraSheet({this.profile});
+  final UserProfile? profile;
 
   @override
   State<_WorkWithNivaraSheet> createState() => _WorkWithNivaraSheetState();
 }
 
 class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
-  final _message = TextEditingController();
+  late final _nameCtrl = TextEditingController(text: widget.profile?.displayName ?? '');
+  late final _phoneCtrl = TextEditingController(text: widget.profile?.phone ?? '');
+  late final _wardCtrl = TextEditingController(text: widget.profile?.ward ?? '');
+  final _motivationCtrl = TextEditingController();
+
+  final Set<String> _selectedCategories = {'roads_potholes'};
+  String _availability = 'Full-Time (Daily Shifts)';
+  bool _hasVehicle = false;
+  bool _hasTools = false;
+  bool _hasSmartphone = true;
+
   bool _submitting = false;
   bool _submitted = false;
   String? _error;
 
+  static const _kCategories = [
+    ('roads_potholes', 'Roads & Potholes', Icons.edit_road_rounded, NivaraColors.accent),
+    ('garbage_waste', 'Sanitation & Waste', Icons.delete_outline_rounded, NivaraColors.primary),
+    ('street_lighting', 'Streetlights & Electrical', Icons.lightbulb_outline_rounded, NivaraColors.accent),
+    ('water_drainage', 'Water & Drainage', Icons.water_drop_outlined, NivaraColors.primaryBlue),
+    ('parks_trees', 'Parks & Environment', Icons.park_outlined, Color(0xFF00E676)),
+    ('animal_control', 'Animal Control', Icons.pets_outlined, Color(0xFFFF9100)),
+    ('general', 'General Maintenance', Icons.build_outlined, Color(0xFF7C4DFF)),
+  ];
+
+  static const _kAvailabilities = [
+    'Full-Time (Daily Shifts)',
+    'Part-Time (Flexible)',
+    'Emergency Quick Responder',
+  ];
+
   @override
   void dispose() {
-    _message.dispose();
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _wardCtrl.dispose();
+    _motivationCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    final name = _nameCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
+    final ward = _wardCtrl.text.trim();
+
+    if (name.isEmpty) {
+      setState(() => _error = 'Please provide your full applicant name.');
+      return;
+    }
+    if (phone.isEmpty) {
+      setState(() => _error = 'Please provide a contact phone number.');
+      return;
+    }
+    if (_selectedCategories.isEmpty) {
+      setState(() => _error = 'Please select at least one field of interest.');
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _error = null;
     });
+
     try {
-      await WorkerRepo.submitApplication(message: _message.text.trim());
+      final payload = jsonEncode({
+        'applicant_name': name,
+        'phone': phone,
+        'ward': ward,
+        'categories': _selectedCategories.toList(),
+        'availability': _availability,
+        'has_vehicle': _hasVehicle,
+        'has_tools': _hasTools,
+        'has_smartphone': _hasSmartphone,
+        'motivation': _motivationCtrl.text.trim(),
+      });
+
+      await WorkerRepo.submitApplication(message: payload);
+
+      // If user provided name/phone/ward that differ, update profile in background
+      if (widget.profile != null) {
+        try {
+          final p = widget.profile!;
+          if (p.displayName != name || p.phone != phone || (ward.isNotEmpty && p.ward != ward)) {
+            await supabase.from(kTableProfiles).update({
+              'display_name': name,
+              'phone': phone,
+              if (ward.isNotEmpty) 'ward': ward,
+            }).eq('id', p.id);
+          }
+        } catch (_) {}
+      }
+
       if (mounted) setState(() => _submitted = true);
     } catch (e) {
       if (mounted) {
@@ -995,11 +1165,16 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + bottom),
         children: [
           Row(
             children: [
@@ -1012,87 +1187,353 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                 child: const Icon(Icons.handshake_rounded, color: NivaraColors.accent),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Work with Nivara',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Work with Nivara',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Municipal Field Workforce Application',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           if (_submitted) ...[
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: NivaraColors.success.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(16),
+                color: NivaraColors.success.withValues(alpha: isDark ? 0.14 : 0.1),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: NivaraColors.success.withValues(alpha: 0.4)),
               ),
-              child: const Row(
+              child: Column(
                 children: [
-                  Icon(Icons.check_circle_rounded, color: NivaraColors.success),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Application submitted! Municipal officials will review your request.',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: NivaraColors.success,
-                      ),
+                  const Icon(Icons.check_circle_rounded, color: NivaraColors.success, size: 48),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Application Submitted Successfully!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: NivaraColors.success,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Your application has been dispatched to municipal administrators for review and ward allocation.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12.5,
+                      height: 1.3,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Done', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800)),
+                child: const Text('Done'),
               ),
             ),
           ] else ...[
-            const Text(
-              'Verified field workers resolve assigned civic reports in their area '
-              'and log verified resolution proof.',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+            Text(
+              'Join verified civic field teams to resolve municipal infrastructure issues, log photo resolution proof, and receive worker stipends.',
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 12.5,
+                height: 1.3,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+
+            // 1. Personal & Contact Details
+            Text(
+              '1. APPLICANT DETAILS',
+              style: TextStyle(
+                color: scheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
             TextField(
-              controller: _message,
+              controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              style: TextStyle(color: scheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Full Legal Name *',
+                prefixIcon: Icon(Icons.person_outline, color: scheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    style: TextStyle(color: scheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: 'Phone Number *',
+                      prefixIcon: Icon(Icons.phone_outlined, color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _wardCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    style: TextStyle(color: scheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: 'Ward / Area',
+                      prefixIcon: Icon(Icons.location_city_outlined, color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // 2. Interested Categories
+            Text(
+              '2. INTERESTED DEPARTMENTS & SKILLS *',
+              style: TextStyle(
+                color: scheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _kCategories.map((cat) {
+                final isSelected = _selectedCategories.contains(cat.$1);
+                return FilterChip(
+                  avatar: Icon(cat.$3, size: 16, color: isSelected ? Colors.black : cat.$4),
+                  label: Text(cat.$2),
+                  selected: isSelected,
+                  selectedColor: scheme.primary,
+                  checkmarkColor: Colors.black,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.black : scheme.onSurface,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                    fontSize: 12,
+                  ),
+                  backgroundColor: isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9),
+                  side: BorderSide(
+                    color: isSelected
+                        ? scheme.primary
+                        : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                  ),
+                  onSelected: (val) {
+                    setState(() {
+                      if (val) {
+                        _selectedCategories.add(cat.$1);
+                      } else {
+                        _selectedCategories.remove(cat.$1);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+
+            // 3. Shift Availability
+            Text(
+              '3. SHIFT & AVAILABILITY',
+              style: TextStyle(
+                color: scheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Column(
+                children: _kAvailabilities.map((avail) {
+                  final isSelected = _availability == avail;
+                  return InkWell(
+                    onTap: () => setState(() => _availability = avail),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                            color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              avail,
+                              style: TextStyle(
+                                color: scheme.onSurface,
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 4. Equipment & Readiness
+            Text(
+              '4. EQUIPMENT & READINESS',
+              style: TextStyle(
+                color: scheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Column(
+                children: [
+                  CheckboxListTile(
+                    value: _hasVehicle,
+                    activeColor: scheme.primary,
+                    checkColor: Colors.black,
+                    title: const Text('Two-Wheeler / Vehicle Transport Available', style: TextStyle(fontSize: 12.5)),
+                    secondary: const Icon(Icons.two_wheeler_rounded, size: 20),
+                    onChanged: (v) => setState(() => _hasVehicle = v ?? false),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    dense: true,
+                  ),
+                  Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                  CheckboxListTile(
+                    value: _hasTools,
+                    activeColor: scheme.primary,
+                    checkColor: Colors.black,
+                    title: const Text('Own Basic Hand Tools / Repair Equipment', style: TextStyle(fontSize: 12.5)),
+                    secondary: const Icon(Icons.handyman_rounded, size: 20),
+                    onChanged: (v) => setState(() => _hasTools = v ?? false),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    dense: true,
+                  ),
+                  Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                  CheckboxListTile(
+                    value: _hasSmartphone,
+                    activeColor: scheme.primary,
+                    checkColor: Colors.black,
+                    title: const Text('Smartphone with GPS & Camera (for Proof Photos)', style: TextStyle(fontSize: 12.5)),
+                    secondary: const Icon(Icons.smartphone_rounded, size: 20),
+                    onChanged: (v) => setState(() => _hasSmartphone = v ?? false),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    dense: true,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 5. Note / Motivation
+            Text(
+              '5. MOTIVATION & PAST EXPERIENCE',
+              style: TextStyle(
+                color: scheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _motivationCtrl,
               maxLines: 3,
               maxLength: 400,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: scheme.onSurface),
               decoration: const InputDecoration(
-                labelText: 'Motivation & Skills (optional)',
-                hintText: 'Share your background, skills, or available equipment…',
+                labelText: 'Brief Experience / Background (optional)',
+                hintText: 'Share trade background, past civic work, or certifications…',
                 alignLabelWithHint: true,
               ),
             ),
+
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: NivaraColors.danger)),
+              Text(
+                _error!,
+                style: const TextStyle(color: NivaraColors.danger, fontWeight: FontWeight.w600),
+              ),
             ],
-            const SizedBox(height: 14),
+
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: _submitting ? null : _submit,
-                style: FilledButton.styleFrom(backgroundColor: NivaraColors.accent),
                 icon: _submitting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
+                              ? Colors.white
+                              : Colors.black,
+                        ),
                       )
-                    : const Icon(Icons.send_rounded, color: Colors.black),
+                    : Icon(
+                        Icons.send_rounded,
+                        color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
+                      ),
                 label: Text(
-                  _submitting ? 'Submitting…' : 'Submit Application',
-                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
+                  _submitting ? 'Submitting Application…' : 'Submit Application',
+                  style: TextStyle(
+                    color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),

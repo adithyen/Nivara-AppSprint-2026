@@ -307,18 +307,29 @@ class _TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sev = severityColor(report.severity);
     final title = report.title?.trim().isNotEmpty == true
         ? report.title!.trim()
         : report.category.label;
+
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,7 +339,7 @@ class _TaskCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: sev.withValues(alpha: 0.16),
+                    color: sev.withValues(alpha: isDark ? 0.16 : 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(categoryIcon(report.category), color: sev, size: 20),
@@ -342,8 +353,8 @@ class _TaskCard extends StatelessWidget {
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF111827),
                           fontWeight: FontWeight.w700,
                           fontSize: 14.5,
                         ),
@@ -352,7 +363,7 @@ class _TaskCard extends StatelessWidget {
                       Text(
                         '${report.category.label} · ${report.severity.label}',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),
                           fontSize: 12,
                         ),
                       ),
@@ -365,7 +376,11 @@ class _TaskCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.place_outlined, size: 14, color: Colors.white60),
+                Icon(
+                  Icons.place_outlined,
+                  size: 14,
+                  color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
@@ -375,7 +390,7 @@ class _TaskCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF6B7280),
                       fontSize: 12,
                     ),
                   ),
@@ -384,7 +399,7 @@ class _TaskCard extends StatelessWidget {
                 Text(
                   timeAgo(report.createdAt),
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: isDark ? Colors.white.withValues(alpha: 0.4) : const Color(0xFF9CA3AF),
                     fontSize: 11,
                   ),
                 ),

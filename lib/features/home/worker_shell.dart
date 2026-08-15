@@ -66,7 +66,7 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      backgroundColor: NivaraColors.canvasDark,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: WithConnectivityBanner(
         child: SafeArea(
           bottom: false,
@@ -81,6 +81,9 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
   }
 
   Widget _buildGlassNavBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
     return SafeArea(
       child: Container(
         margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
@@ -89,9 +92,11 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
           borderRadius: BorderRadius.circular(26),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.55),
-              blurRadius: 28,
-              offset: const Offset(0, 10),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.55)
+                  : Colors.black.withValues(alpha: 0.08),
+              blurRadius: isDark ? 28 : 20,
+              offset: isDark ? const Offset(0, 10) : const Offset(0, 4),
             ),
           ],
         ),
@@ -102,10 +107,14 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF10161E).withValues(alpha: 0.88),
+                color: isDark
+                    ? const Color(0xFF10161E).withValues(alpha: 0.88)
+                    : Colors.white.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.black.withValues(alpha: 0.08),
                   width: 1.2,
                 ),
               ),
@@ -131,12 +140,12 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? NivaraColors.primaryBlue.withValues(alpha: 0.18)
+                            ? primary.withValues(alpha: isDark ? 0.18 : 0.12)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(18),
                         border: isSelected
                             ? Border.all(
-                                color: NivaraColors.primaryBlue.withValues(alpha: 0.6),
+                                color: primary.withValues(alpha: isDark ? 0.6 : 0.4),
                                 width: 1.2,
                               )
                             : null,
@@ -146,15 +155,17 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
                         children: [
                           Icon(
                             isSelected ? t.selectedIcon : t.icon,
-                            color: isSelected ? NivaraColors.primaryBlue : Colors.white60,
+                            color: isSelected
+                                ? primary
+                                : (isDark ? Colors.white60 : Colors.black54),
                             size: 20,
                           ),
                           if (isSelected) ...[
                             const SizedBox(width: 6),
                             Text(
                               t.label,
-                              style: const TextStyle(
-                                color: NivaraColors.primaryBlue,
+                              style: TextStyle(
+                                color: primary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.2,

@@ -37,25 +37,27 @@ class LFItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
     final isLost = item.isLost;
-    final accent = isLost ? NivaraColors.danger : NivaraColors.primary;
+    final accent = isLost ? NivaraColors.danger : primary;
 
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: accent.withValues(alpha: 0.3),
+            color: accent.withValues(alpha: isDark ? 0.3 : 0.35),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -65,7 +67,7 @@ class LFItemCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.16),
+                color: accent.withValues(alpha: isDark ? 0.16 : 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(lfCategoryIcon(item.category), color: accent, size: 22),
@@ -82,8 +84,8 @@ class LFItemCard extends StatelessWidget {
                           item.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : const Color(0xFF111827),
                             fontWeight: FontWeight.w700,
                             fontSize: 14.5,
                           ),
@@ -98,7 +100,7 @@ class LFItemCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF6B7280),
                       fontSize: 12.5,
                       height: 1.3,
                     ),
@@ -111,28 +113,33 @@ class LFItemCard extends StatelessWidget {
                       _MetaLine(
                         icon: Icons.category_outlined,
                         text: item.category.label,
+                        isDark: isDark,
                       ),
                       _MetaLine(
                         icon: Icons.event_outlined,
                         text: formatDate(item.eventDate),
+                        isDark: isDark,
                       ),
                       if (item.locationLabel != null &&
                           item.locationLabel!.isNotEmpty)
                         _MetaLine(
                           icon: Icons.place_outlined,
                           text: item.locationLabel!,
+                          isDark: isDark,
                         ),
                       if (distanceMeters != null)
                         _MetaLine(
                           icon: Icons.near_me_rounded,
                           text: formatDistance(distanceMeters!),
-                          color: NivaraColors.primary,
+                          color: primary,
+                          isDark: isDark,
                         ),
                       if (item.rewardAmount != null && item.rewardAmount! > 0)
                         _MetaLine(
                           icon: Icons.card_giftcard_rounded,
                           text: '₹${item.rewardAmount}',
                           color: NivaraColors.accent,
+                          isDark: isDark,
                         ),
                     ],
                   ),
@@ -141,7 +148,7 @@ class LFItemCard extends StatelessWidget {
             ),
             if (item.photoUrls != null && item.photoUrls!.isNotEmpty) ...[
               const SizedBox(width: 10),
-              _Thumb(url: item.photoUrls!.first),
+              _Thumb(url: item.photoUrls!.first, isDark: isDark),
             ],
           ],
         ),
@@ -151,8 +158,9 @@ class LFItemCard extends StatelessWidget {
 }
 
 class _Thumb extends StatelessWidget {
-  const _Thumb({required this.url});
+  const _Thumb({required this.url, required this.isDark});
   final String url;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -166,8 +174,12 @@ class _Thumb extends StatelessWidget {
         errorBuilder: (context, error, stackTrace) => Container(
           width: 54,
           height: 54,
-          color: const Color(0xFF131A24),
-          child: const Icon(Icons.image_outlined, size: 20, color: Colors.white38),
+          color: isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9),
+          child: Icon(
+            Icons.image_outlined,
+            size: 20,
+            color: isDark ? Colors.white38 : Colors.black26,
+          ),
         ),
       ),
     );
@@ -202,14 +214,21 @@ class _TypeBadge extends StatelessWidget {
 }
 
 class _MetaLine extends StatelessWidget {
-  const _MetaLine({required this.icon, required this.text, this.color});
+  const _MetaLine({
+    required this.icon,
+    required this.text,
+    this.color,
+    required this.isDark,
+  });
+
   final IconData icon;
   final String text;
   final Color? color;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? Colors.white.withValues(alpha: 0.5);
+    final c = color ?? (isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF6B7280));
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

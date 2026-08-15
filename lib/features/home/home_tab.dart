@@ -129,10 +129,12 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(authControllerProvider).asData?.value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return RefreshIndicator(
-      color: NivaraColors.primary,
-      backgroundColor: const Color(0xFF10161E),
+      color: scheme.primary,
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -149,8 +151,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   children: [
                     Text(
                       'Welcome, ${profile?.displayName ?? 'Citizen'}',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: scheme.onSurface,
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.3,
@@ -160,7 +162,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                     Text(
                       kAppTagline,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.55),
+                        color: scheme.onSurfaceVariant,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
                       ),
@@ -170,13 +172,19 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF131A24),
+                    color: isDark
+                        ? const Color(0xFF131A24)
+                        : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : const Color(0xFFE2E8F0),
+                    ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.shield_outlined,
-                    color: NivaraColors.primary,
+                    color: scheme.primary,
                     size: 22,
                   ),
                 ),
@@ -287,24 +295,31 @@ class _ImpactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF101B2B), Color(0xFF0D141E)],
+          colors: isDark
+              ? const [Color(0xFF101B2B), Color(0xFF0D141E)]
+              : const [Colors.white, Color(0xFFF6F9FD)],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: NivaraColors.primary.withValues(alpha: 0.35),
+          color: primary.withValues(alpha: isDark ? 0.35 : 0.4),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: NivaraColors.primary.withValues(alpha: 0.12),
-            blurRadius: 28,
-            offset: const Offset(0, 8),
+            color: isDark
+                ? primary.withValues(alpha: 0.12)
+                : Colors.black.withValues(alpha: 0.06),
+            blurRadius: isDark ? 28 : 16,
+            offset: isDark ? const Offset(0, 8) : const Offset(0, 4),
           ),
         ],
       ),
@@ -316,20 +331,20 @@ class _ImpactCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: NivaraColors.primary.withValues(alpha: 0.16),
+                  color: primary.withValues(alpha: isDark ? 0.16 : 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.workspace_premium_rounded,
-                  color: NivaraColors.primary,
+                  color: primary,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'Civic Standing & Impact',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : const Color(0xFF111827),
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
                 ),
@@ -342,21 +357,21 @@ class _ImpactCard extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               loading
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 6),
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
                       child: SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: NivaraColors.primary,
+                          color: primary,
                         ),
                       ),
                     )
                   : Text(
                       '$score',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF111827),
                         fontSize: 42,
                         fontWeight: FontWeight.w900,
                         height: 1,
@@ -367,7 +382,7 @@ class _ImpactCard extends StatelessWidget {
               Text(
                 'XP Points',
                 style: TextStyle(
-                  color: NivaraColors.primary.withValues(alpha: 0.9),
+                  color: primary,
                   fontWeight: FontWeight.w800,
                   fontSize: 14,
                 ),
@@ -375,7 +390,7 @@ class _ImpactCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          CivicLevelBar(standing: civicStandingFor(score), onDark: true),
+          CivicLevelBar(standing: civicStandingFor(score), onDark: isDark),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -385,22 +400,25 @@ class _ImpactCard extends StatelessWidget {
                 label: 'Reports',
                 loading: loading,
                 color: NivaraColors.accent,
+                isDark: isDark,
               ),
-              _ImpactDivider(),
+              _ImpactDivider(isDark: isDark),
               _ImpactStat(
                 icon: Icons.thumb_up_alt_rounded,
                 value: confirms,
                 label: 'Confirms',
                 loading: loading,
-                color: NivaraColors.primary,
+                color: primary,
+                isDark: isDark,
               ),
-              _ImpactDivider(),
+              _ImpactDivider(isDark: isDark),
               _ImpactStat(
                 icon: Icons.volunteer_activism_rounded,
                 value: finds,
                 label: 'Finds',
                 loading: loading,
                 color: NivaraColors.primaryBlue,
+                isDark: isDark,
               ),
             ],
           ),
@@ -417,6 +435,7 @@ class _ImpactStat extends StatelessWidget {
     required this.label,
     required this.loading,
     required this.color,
+    required this.isDark,
   });
 
   final IconData icon;
@@ -424,6 +443,7 @@ class _ImpactStat extends StatelessWidget {
   final String label;
   final bool loading;
   final Color color;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -434,8 +454,8 @@ class _ImpactStat extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             loading ? '—' : '$value',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF111827),
               fontSize: 19,
               fontWeight: FontWeight.w800,
             ),
@@ -444,7 +464,9 @@ class _ImpactStat extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.65),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.65)
+                  : const Color(0xFF6B7280),
               fontSize: 11.5,
               fontWeight: FontWeight.w500,
             ),
@@ -456,11 +478,16 @@ class _ImpactStat extends StatelessWidget {
 }
 
 class _ImpactDivider extends StatelessWidget {
+  const _ImpactDivider({required this.isDark});
+  final bool isDark;
+
   @override
   Widget build(BuildContext context) => Container(
     width: 1,
     height: 36,
-    color: Colors.white.withValues(alpha: 0.12),
+    color: isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : const Color(0xFFE2E8F0),
   );
 }
 
@@ -481,9 +508,24 @@ class _PulseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      borderRadius: 22,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Row(
@@ -492,16 +534,19 @@ class _PulseCard extends StatelessWidget {
                 value: loading ? null : open,
                 label: 'Active',
                 color: NivaraColors.accent,
+                isDark: isDark,
               ),
               _PulseStat(
                 value: loading ? null : inProgress,
                 label: 'In Action',
                 color: NivaraColors.primaryBlue,
+                isDark: isDark,
               ),
               _PulseStat(
                 value: loading ? null : resolved,
                 label: 'Resolved',
                 color: NivaraColors.success,
+                isDark: isDark,
               ),
             ],
           ),
@@ -510,7 +555,9 @@ class _PulseCard extends StatelessWidget {
             Text(
               'Live telemetry over $sample city reports',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.5)
+                    : const Color(0xFF6B7280),
                 fontSize: 11.5,
                 fontWeight: FontWeight.w500,
               ),
@@ -527,11 +574,13 @@ class _PulseStat extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
+    required this.isDark,
   });
 
   final int? value;
   final String label;
   final Color color;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -551,7 +600,9 @@ class _PulseStat extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.65),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.65)
+                  : const Color(0xFF6B7280),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -570,8 +621,8 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: const TextStyle(
-        color: Colors.white,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: 17,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.2,
@@ -597,22 +648,26 @@ class _FeatureModuleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: color.withValues(alpha: 0.35),
+            color: color.withValues(alpha: isDark ? 0.35 : 0.4),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: isDark
+                  ? color.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: isDark ? 16 : 10,
+              offset: isDark ? const Offset(0, 4) : const Offset(0, 3),
             ),
           ],
         ),
@@ -634,7 +689,9 @@ class _FeatureModuleTile extends StatelessWidget {
                 ),
                 Icon(
                   Icons.arrow_outward_rounded,
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.3)
+                      : Colors.black.withValues(alpha: 0.25),
                   size: 16,
                 ),
               ],
@@ -646,8 +703,8 @@ class _FeatureModuleTile extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF111827),
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.2,
@@ -659,7 +716,9 @@ class _FeatureModuleTile extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.6)
+                        : const Color(0xFF6B7280),
                     fontSize: 11.5,
                     height: 1.2,
                   ),

@@ -102,8 +102,10 @@ class _LostFoundHubState extends State<LostFoundHub> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final primary = scheme.primary;
+
     return Scaffold(
-      backgroundColor: NivaraColors.canvasDark,
       appBar: AppBar(
         title: const Text('Lost & Found Radar'),
         actions: [
@@ -133,7 +135,7 @@ class _LostFoundHubState extends State<LostFoundHub> {
                   child: _ActionButton(
                     icon: Icons.inventory_2_rounded,
                     label: 'I Found\nSomething',
-                    color: NivaraColors.primary,
+                    color: primary,
                     onTap: () => context.push(Routes.reportFound),
                   ),
                 ),
@@ -144,10 +146,10 @@ class _LostFoundHubState extends State<LostFoundHub> {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Active Listings',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: scheme.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
@@ -168,8 +170,10 @@ class _LostFoundHubState extends State<LostFoundHub> {
   }
 
   Widget _buildFeed() {
+    final primary = Theme.of(context).colorScheme.primary;
+
     if (!_loaded) {
-      return const Center(child: CircularProgressIndicator(color: NivaraColors.primary));
+      return Center(child: CircularProgressIndicator(color: primary));
     }
     if (_error != null) {
       return _EmptyState(
@@ -216,20 +220,22 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: color.withValues(alpha: 0.35),
+            color: color.withValues(alpha: isDark ? 0.35 : 0.3),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: 0.12),
+              color: color.withValues(alpha: isDark ? 0.12 : 0.08),
               blurRadius: 18,
               offset: const Offset(0, 4),
             ),
@@ -240,7 +246,7 @@ class _ActionButton extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.16),
+                color: color.withValues(alpha: isDark ? 0.16 : 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 26),
@@ -282,6 +288,9 @@ class _FilterChips extends StatelessWidget {
 
   Widget _chip(BuildContext context, String label, LFItemType? type) {
     final selected = value == type;
+    final primary = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BouncyTap(
       onTap: () => onChanged(type),
       child: AnimatedContainer(
@@ -289,19 +298,21 @@ class _FilterChips extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: selected
-              ? NivaraColors.primary.withValues(alpha: 0.2)
-              : const Color(0xFF131A24),
+              ? primary.withValues(alpha: isDark ? 0.2 : 0.15)
+              : (isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected
-                ? NivaraColors.primary
-                : Colors.white.withValues(alpha: 0.08),
+                ? primary
+                : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? NivaraColors.primary : Colors.white70,
+            color: selected
+                ? primary
+                : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
             fontSize: 12,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
           ),
@@ -323,6 +334,8 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -333,15 +346,19 @@ class _EmptyState extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
+                color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04),
               ),
-              child: Icon(icon, size: 48, color: Colors.white38),
+              child: Icon(
+                icon,
+                size: 48,
+                color: isDark ? Colors.white38 : Colors.black26,
+              ),
             ),
             const SizedBox(height: 14),
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF111827),
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
               ),
@@ -351,7 +368,7 @@ class _EmptyState extends StatelessWidget {
               subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
+                color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),
                 fontSize: 12.5,
               ),
             ),

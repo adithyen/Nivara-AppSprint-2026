@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -863,6 +865,15 @@ class _EmployeeSheetState extends ConsumerState<_EmployeeSheet> {
 // Application tile + sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
+Map<String, dynamic>? _parseAppPayload(String? message) {
+  if (message == null || !message.trim().startsWith('{')) return null;
+  try {
+    return jsonDecode(message) as Map<String, dynamic>;
+  } catch (_) {
+    return null;
+  }
+}
+
 class _AppTile extends StatelessWidget {
   const _AppTile({required this.app, required this.onTap});
   final WorkerApplication app;
@@ -878,67 +889,120 @@ class _AppTile extends StatelessWidget {
             ? NivaraColors.success
             : NivaraColors.danger;
 
+    final payload = _parseAppPayload(app.message);
+    final applicantName = payload?['applicant_name'] as String? ?? 'Applicant';
+    final applicantPhone = payload?['phone'] as String?;
+    final applicantWard = payload?['ward'] as String?;
+    final categories = (payload?['categories'] as List?)?.cast<String>() ?? [];
+    final motivation = payload != null ? payload['motivation'] as String? : app.message;
+
     return Material(
       color: scheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: isPending ? onTap : null,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: statusColor.withValues(alpha: 0.12),
-                child: Icon(
-                  Icons.handshake_outlined,
-                  color: statusColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      app.userId,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: statusColor.withValues(alpha: 0.12),
+                    child: Icon(
+                      Icons.handshake_outlined,
+                      color: statusColor,
+                      size: 20,
                     ),
-                    if (app.message != null && app.message!.isNotEmpty)
-                      Text(
-                        app.message!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          payload != null ? applicantName : app.userId,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        if (applicantPhone != null && applicantPhone.isNotEmpty)
+                          Text(
+                            [
+                              applicantPhone,
+                              if (applicantWard != null && applicantWard.isNotEmpty) applicantWard,
+                            ].join(' • '),
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      app.status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (isPending) ...[
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right, color: scheme.outline, size: 18),
+                  ],
+                ],
+              ),
+              if (categories.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: categories.map((cat) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        cat.replaceAll('_', ' ').toUpperCase(),
                         style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 13,
+                          color: scheme.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  app.status,
+              ],
+              if (motivation != null && motivation.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  motivation,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: statusColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
-              ),
-              if (isPending) ...[
-                const SizedBox(width: 4),
-                Icon(Icons.chevron_right, color: scheme.outline, size: 18),
               ],
             ],
           ),
@@ -985,43 +1049,196 @@ class _ApplicationSheetState extends ConsumerState<_ApplicationSheet> {
   @override
   Widget build(BuildContext context) {
     final app = widget.app;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        24 + MediaQuery.of(context).viewInsets.bottom,
+    final scheme = Theme.of(context).colorScheme;
+    final payload = _parseAppPayload(app.message);
+
+    final applicantName = payload?['applicant_name'] as String? ?? 'Applicant';
+    final applicantPhone = payload?['phone'] as String? ?? 'Not specified';
+    final applicantWard = payload?['ward'] as String? ?? 'Not specified';
+    final categories = (payload?['categories'] as List?)?.cast<String>() ?? [];
+    final availability = payload?['availability'] as String? ?? 'Full-Time';
+    final hasVehicle = payload?['has_vehicle'] as bool? ?? false;
+    final hasTools = payload?['has_tools'] as bool? ?? false;
+    final hasSmartphone = payload?['has_smartphone'] as bool? ?? true;
+    final motivation = payload != null ? payload['motivation'] as String? : app.message;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: ListView(
+        shrinkWrap: true,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          24 + MediaQuery.of(context).viewInsets.bottom,
+        ),
         children: [
-          Text(
-            'Worker Application',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: scheme.primary.withValues(alpha: 0.15),
+                child: Text(
+                  applicantName.isNotEmpty ? applicantName.characters.first.toUpperCase() : '?',
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      applicantName,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Applicant Contact: $applicantPhone',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Ward & Availability dossier card
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Target Ward / Area:',
+                      style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+                    ),
+                    Text(
+                      applicantWard,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Shift Availability:',
+                      style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+                    ),
+                    Text(
+                      availability,
+                      style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 16),
+
+          // Interested Categories
+          if (categories.isNotEmpty) ...[
+            Text(
+              'Interested Departments & Skills',
+              style: TextStyle(
+                color: scheme.primary,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: categories.map((cat) {
+                return Chip(
+                  label: Text(
+                    cat.replaceAll('_', ' ').toUpperCase(),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                  ),
+                  backgroundColor: scheme.surfaceContainerHigh,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Equipment Checklist
           Text(
-            'User ID: ${app.userId}',
+            'Field Equipment Readiness',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 13,
+              color: scheme.primary,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              letterSpacing: 0.5,
             ),
           ),
-          if (app.message != null && app.message!.isNotEmpty) ...[
-            const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                _DossierCheck(label: 'Two-Wheeler / Transport Available', checked: hasVehicle),
+                const SizedBox(height: 6),
+                _DossierCheck(label: 'Basic Hand Repair Tools', checked: hasTools),
+                const SizedBox(height: 6),
+                _DossierCheck(label: 'Smartphone with GPS & Camera', checked: hasSmartphone),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Motivation note
+          if (motivation != null && motivation.isNotEmpty) ...[
+            Text(
+              'Motivation & Qualifications',
+              style: TextStyle(
+                color: scheme.primary,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Text(app.message!),
+              child: Text(
+                motivation,
+                style: const TextStyle(fontSize: 13, height: 1.3),
+              ),
             ),
+            const SizedBox(height: 20),
           ],
-          const SizedBox(height: 20),
+
           Row(
             children: [
               Expanded(
@@ -1040,9 +1257,10 @@ class _ApplicationSheetState extends ConsumerState<_ApplicationSheet> {
               Expanded(
                 child: FilledButton.icon(
                   icon: const Icon(Icons.check, size: 18),
-                  label: const Text('Approve'),
+                  label: const Text('Approve Worker'),
                   style: FilledButton.styleFrom(
                     backgroundColor: NivaraColors.success,
+                    foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: _busy ? null : () => _review('APPROVED'),
@@ -1052,6 +1270,38 @@ class _ApplicationSheetState extends ConsumerState<_ApplicationSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DossierCheck extends StatelessWidget {
+  const _DossierCheck({required this.label, required this.checked});
+  final String label;
+  final bool checked;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          checked ? Icons.check_circle : Icons.cancel_outlined,
+          color: checked ? NivaraColors.success : Colors.grey,
+          size: 18,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: checked
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: checked ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

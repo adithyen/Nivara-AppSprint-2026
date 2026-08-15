@@ -317,20 +317,31 @@ class _ComposerPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Share with your community',
             style: TextStyle(
-              color: Colors.white,
+              color: isDark ? Colors.white : const Color(0xFF111827),
               fontWeight: FontWeight.w800,
               fontSize: 15,
             ),
@@ -339,7 +350,7 @@ class _ComposerPrompt extends StatelessWidget {
           Text(
             'Post questions, start polls, offer jobs, or broadcast alerts.',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
+              color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),
               fontSize: 12,
             ),
           ),
@@ -385,15 +396,17 @@ class _TemplateButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = communityTypeColor(type);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Expanded(
       child: BouncyTap(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
+            color: color.withValues(alpha: isDark ? 0.12 : 0.08),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
+            border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -446,6 +459,8 @@ class _PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
     final color = communityTypeColor(post.type);
     final photo = (post.photoUrls?.isNotEmpty ?? false)
         ? post.photoUrls!.first
@@ -453,12 +468,19 @@ class _PostCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: color.withValues(alpha: 0.25),
+          color: color.withValues(alpha: isDark ? 0.25 : 0.3),
           width: 1.2,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,14 +503,17 @@ class _PostCard extends StatelessWidget {
                 Text(
                   timeAgo(post.createdAt),
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.45),
+                    color: isDark ? Colors.white.withValues(alpha: 0.45) : const Color(0xFF9CA3AF),
                     fontSize: 11.5,
                   ),
                 ),
                 if (isMine)
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert_rounded, size: 18, color: Colors.white60),
-                    color: const Color(0xFF131A24),
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      size: 18,
+                      color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                    ),
                     onSelected: (v) {
                       switch (v) {
                         case 'edit':
@@ -503,12 +528,12 @@ class _PostCard extends StatelessWidget {
                       if (_editable)
                         const PopupMenuItem(
                           value: 'edit',
-                          child: Text('Edit Post', style: TextStyle(color: Colors.white)),
+                          child: Text('Edit Post'),
                         ),
                       if (post.type == CommunityPostType.job)
                         const PopupMenuItem(
                           value: 'close',
-                          child: Text('Mark Closed', style: TextStyle(color: Colors.white)),
+                          child: Text('Mark Closed'),
                         ),
                       const PopupMenuItem(
                         value: 'delete',
@@ -530,7 +555,7 @@ class _PostCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 12,
-                      backgroundColor: color.withValues(alpha: 0.18),
+                      backgroundColor: color.withValues(alpha: isDark ? 0.18 : 0.12),
                       child: Text(
                         post.authorName.isNotEmpty
                             ? post.authorName.characters.first.toUpperCase()
@@ -545,8 +570,8 @@ class _PostCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       post.authorName,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF111827),
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
@@ -556,8 +581,8 @@ class _PostCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   post.title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF111827),
                     fontWeight: FontWeight.w800,
                     fontSize: 15.5,
                   ),
@@ -567,7 +592,7 @@ class _PostCard extends StatelessWidget {
                   Text(
                     post.body!.trim(),
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: isDark ? Colors.white.withValues(alpha: 0.7) : const Color(0xFF4B5563),
                       fontSize: 13.5,
                       height: 1.35,
                     ),
@@ -598,12 +623,12 @@ class _PostCard extends StatelessWidget {
                 Row(
                   children: [
                     if (distanceMeters != null) ...[
-                      const Icon(Icons.near_me_rounded, size: 13, color: NivaraColors.primary),
+                      Icon(Icons.near_me_rounded, size: 13, color: primary),
                       const SizedBox(width: 4),
                       Text(
                         formatDistance(distanceMeters!),
-                        style: const TextStyle(
-                          color: NivaraColors.primary,
+                        style: TextStyle(
+                          color: primary,
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                         ),
@@ -643,6 +668,8 @@ class _PollWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = options.fold<int>(0, (sum, o) => sum + o.voteCount);
     final hasVoted = myVote != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
 
     return Column(
       children: options.map((opt) {
@@ -656,12 +683,12 @@ class _PollWidget extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF131A24),
+                color: isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isChosen
-                      ? NivaraColors.primary
-                      : Colors.white.withValues(alpha: 0.08),
+                      ? primary
+                      : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
                 ),
               ),
               child: Column(
@@ -673,7 +700,7 @@ class _PollWidget extends StatelessWidget {
                       Text(
                         opt.label,
                         style: TextStyle(
-                          color: isChosen ? NivaraColors.primary : Colors.white,
+                          color: isChosen ? primary : (isDark ? Colors.white : const Color(0xFF111827)),
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
@@ -682,7 +709,7 @@ class _PollWidget extends StatelessWidget {
                         Text(
                           '${(pct * 100).round()}%',
                           style: TextStyle(
-                            color: isChosen ? NivaraColors.primary : Colors.white60,
+                            color: isChosen ? primary : (isDark ? Colors.white60 : const Color(0xFF6B7280)),
                             fontWeight: FontWeight.w800,
                             fontSize: 12,
                           ),
@@ -696,8 +723,10 @@ class _PollWidget extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: pct,
                         minHeight: 6,
-                        backgroundColor: Colors.white.withValues(alpha: 0.06),
-                        color: isChosen ? NivaraColors.primary : Colors.white38,
+                        backgroundColor: isDark
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : const Color(0xFFE2E8F0),
+                        color: isChosen ? primary : (isDark ? Colors.white38 : Colors.black26),
                       ),
                     ),
                   ],
@@ -718,24 +747,27 @@ class _ContactPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BouncyTap(
       onTap: () => launchLFContact(method, value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: NivaraColors.primary.withValues(alpha: 0.15),
+          color: primary.withValues(alpha: isDark ? 0.15 : 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.5)),
+          border: Border.all(color: primary.withValues(alpha: 0.5)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.chat_bubble_outline_rounded, size: 12, color: NivaraColors.primary),
-            SizedBox(width: 4),
+            Icon(Icons.chat_bubble_outline_rounded, size: 12, color: primary),
+            const SizedBox(width: 4),
             Text(
               'Contact',
               style: TextStyle(
-                color: NivaraColors.primary,
+                color: primary,
                 fontWeight: FontWeight.w800,
                 fontSize: 11,
               ),
@@ -752,6 +784,8 @@ class _EmptyFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -762,15 +796,19 @@ class _EmptyFeed extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
+                color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04),
               ),
-              child: const Icon(Icons.forum_rounded, size: 48, color: Colors.white38),
+              child: Icon(
+                Icons.forum_rounded,
+                size: 48,
+                color: isDark ? Colors.white38 : Colors.black26,
+              ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'No Community Posts Yet',
               style: TextStyle(
-                color: Colors.white,
+                color: isDark ? Colors.white : const Color(0xFF111827),
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
               ),
@@ -780,7 +818,7 @@ class _EmptyFeed extends StatelessWidget {
               'Be the first to post a question, start a poll, or announce a civic update.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
+                color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),
                 fontSize: 12.5,
               ),
             ),
