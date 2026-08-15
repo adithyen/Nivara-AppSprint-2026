@@ -130,13 +130,27 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (extra is ReportCategory) {
             return ReportFormScreen(initialCategory: extra);
           }
+          if (extra is ({double lat, double lng, String address})) {
+            return ReportFormScreen(
+              initialLat: extra.lat,
+              initialLng: extra.lng,
+              initialAddress: extra.address,
+            );
+          }
           return const ReportFormScreen();
         },
       ),
       GoRoute(
         path: Routes.reportDetail,
-        builder: (context, state) =>
-            ReportDetailScreen(report: state.extra as Report),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Report) {
+            return ReportDetailScreen(report: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Report details unavailable')),
+          );
+        },
       ),
       GoRoute(
         path: Routes.map,
@@ -160,34 +174,78 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.lostFoundMatch,
-        builder: (context, state) => MatchScreen(item: state.extra as LFItem),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is LFItem) {
+            return MatchScreen(item: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Item not found')),
+          );
+        },
       ),
       GoRoute(
         path: Routes.lostFoundDetail,
         builder: (context, state) {
-          // extra is a record: (item, distanceMeters, isMatch). Hub taps pass a
-          // bare LFItem; normalise both.
           final extra = state.extra;
           if (extra is LFItem) {
             return LFItemDetailScreen(item: extra);
           }
-          final args = extra as ({LFItem item, double? distance, bool isMatch});
-          return LFItemDetailScreen(
-            item: args.item,
-            distanceMeters: args.distance,
-            isMatch: args.isMatch,
+          if (extra is ({LFItem item, double? distance, bool isMatch})) {
+            return LFItemDetailScreen(
+              item: extra.item,
+              distanceMeters: extra.distance,
+              isMatch: extra.isMatch,
+            );
+          }
+          if (extra is ({LFItem item, double? distanceMeters, bool isMatch})) {
+            return LFItemDetailScreen(
+              item: extra.item,
+              distanceMeters: extra.distanceMeters,
+              isMatch: extra.isMatch,
+            );
+          }
+          return const Scaffold(
+            body: Center(child: Text('Item details unavailable')),
           );
         },
       ),
       GoRoute(
         path: Routes.communityCompose,
         builder: (context, state) {
-          final args =
-              state.extra
-                  as ({CommunityPostType type, CommunityPost? existing});
+          final extra = state.extra;
+          CommunityPostType type = CommunityPostType.general;
+          CommunityPost? existing;
+
+          if (extra is CommunityPostType) {
+            type = extra;
+          } else if (extra is CommunityPost) {
+            type = extra.type;
+            existing = extra;
+          } else if (extra is ({CommunityPostType template, double? lat, double? lng})) {
+            type = extra.template;
+          } else if (extra is ({CommunityPost post, double? lat, double? lng})) {
+            type = extra.post.type;
+            existing = extra.post;
+          } else if (extra is ({CommunityPostType type, CommunityPost? existing})) {
+            type = extra.type;
+            existing = extra.existing;
+          } else if (extra is Map) {
+            if (extra['type'] is CommunityPostType) {
+              type = extra['type'] as CommunityPostType;
+            } else if (extra['template'] is CommunityPostType) {
+              type = extra['template'] as CommunityPostType;
+            }
+            if (extra['existing'] is CommunityPost) {
+              existing = extra['existing'] as CommunityPost;
+            } else if (extra['post'] is CommunityPost) {
+              existing = extra['post'] as CommunityPost;
+            }
+          }
+
           return CommunityComposeScreen(
-            type: args.type,
-            existing: args.existing,
+            type: type,
+            existing: existing,
           );
         },
       ),

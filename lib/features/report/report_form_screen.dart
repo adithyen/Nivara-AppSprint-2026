@@ -24,10 +24,19 @@ import 'category_grid.dart';
 /// 2. Details Form: Immediately opens details form with preselected category banner,
 ///    Ola Map location picker, photo evidence, and submit.
 class ReportFormScreen extends StatefulWidget {
-  const ReportFormScreen({super.key, this.initialCategory});
+  const ReportFormScreen({
+    super.key,
+    this.initialCategory,
+    this.initialLat,
+    this.initialLng,
+    this.initialAddress,
+  });
 
   /// Preselect a category (e.g. when opened from the category grid on home).
   final ReportCategory? initialCategory;
+  final double? initialLat;
+  final double? initialLng;
+  final String? initialAddress;
 
   @override
   State<ReportFormScreen> createState() => _ReportFormScreenState();
@@ -59,6 +68,13 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   void initState() {
     super.initState();
     _category = widget.initialCategory;
+    if (widget.initialLat != null && widget.initialLng != null) {
+      _customLat = widget.initialLat;
+      _customLng = widget.initialLng;
+    }
+    if (widget.initialAddress != null && widget.initialAddress!.isNotEmpty) {
+      _addressCtrl.text = widget.initialAddress!;
+    }
     _fetchLocation();
   }
 
