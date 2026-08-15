@@ -117,14 +117,24 @@ class OlaMapsService {
 
   bool get isConfigured => apiKey != null;
 
+  static const String kDefaultDarkStyleUrl =
+      'https://api.olamaps.io/styleEditor/v1/styleEdit/styles/1a5115aa-26c8-4e8b-8433-0e2858238ca7/Style1-Dark';
+
+  String get darkStyleUrl {
+    final configured = dotenv.env['OLA_MAPS_DARK_STYLE_URL']?.trim();
+    if (configured != null && configured.isNotEmpty) return configured;
+    return kDefaultDarkStyleUrl;
+  }
+
   // ── 1. Vector Style Resolver ──────────────────────────────────────────────
 
-  /// Fetches the Ola `Style1-Dark` style json and dynamically signs all sub-urls
-  /// (tiles, sprites, glyphs) with the API key so `maplibre_gl` can render it
+  /// Fetches the Ola custom or standard dark style json and dynamically signs all sub-urls
+  /// (tiles, sprites, glyphs) with the API key so `maplibre_gl` / `OlaMapView` can render it
   /// without unauthenticated 403 / blank map issues.
   ///
   /// Returns a JSON string ready for `MapLibreMap(styleString: ...)` or null on failure.
   Future<String?> getAuthenticatedVectorStyleJson({
+    String? customStyleUrl,
     String styleName = 'Style1-Dark',
   }) async {
     final key = apiKey;
@@ -134,10 +144,14 @@ class OlaMapsService {
     }
 
     try {
-      final styleUrl = Uri.parse(
-        '$_baseUrl/tiles/vector/v1/styles/$styleName/style.json?api_key=$key',
+      final targetUrl = customStyleUrl ?? darkStyleUrl;
+      final uri = Uri.parse(
+        targetUrl.startsWith('http')
+            ? _appendKey(targetUrl, key)
+            : '$_baseUrl/tiles/vector/v1/styles/$styleName/style.json?api_key=$key',
       );
-      final resp = await http.get(styleUrl).timeout(const Duration(seconds: 8));
+
+      final resp = await http.get(uri).timeout(const Duration(seconds: 10));
       if (resp.statusCode != 200) {
         _log.error('OLA', 'Failed to fetch style: HTTP ${resp.statusCode}');
         return null;
@@ -178,7 +192,7 @@ class OlaMapsService {
       }
 
       final injectedJson = jsonEncode(styleMap);
-      _log.log('OLA', 'Successfully constructed authenticated Ola $styleName vector style');
+      _log.log('OLA', 'Successfully constructed authenticated Ola Dark vector style (${styleMap["name"]})');
       return injectedJson;
     } catch (e, st) {
       _log.error('OLA', 'Error building authenticated style: $e', st);

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../constants.dart';
+import '../services/ola_maps_service.dart';
 
 /// Callback when the native Ola Map is fully ready and loaded.
 typedef OnOlaMapReadyCallback = void Function(OlaNativeMapController controller);
@@ -87,6 +88,7 @@ class OlaNativeMapWidget extends StatefulWidget {
     this.initialLat = kDefaultLat,
     this.initialLng = kDefaultLng,
     this.initialZoom = 15.0,
+    this.styleUrl = OlaMapsService.kDefaultDarkStyleUrl,
     this.onMapReady,
     this.onMarkerClicked,
     this.onMapClicked,
@@ -97,6 +99,7 @@ class OlaNativeMapWidget extends StatefulWidget {
   final double initialLat;
   final double initialLng;
   final double initialZoom;
+  final String styleUrl;
   final OnOlaMapReadyCallback? onMapReady;
   final OnOlaMarkerClickedCallback? onMarkerClicked;
   final OnOlaMapClickedCallback? onMapClicked;
@@ -162,11 +165,16 @@ class _OlaNativeMapWidgetState extends State<OlaNativeMapWidget> {
       );
     }
 
+    final effectiveStyleUrl = widget.styleUrl.isNotEmpty
+        ? widget.styleUrl
+        : (dotenv.env['OLA_MAPS_DARK_STYLE_URL']?.trim() ?? OlaMapsService.kDefaultDarkStyleUrl);
+
     final creationParams = <String, dynamic>{
       'apiKey': _apiKey,
       'initialLat': widget.initialLat,
       'initialLng': widget.initialLng,
       'initialZoom': widget.initialZoom,
+      'styleUrl': effectiveStyleUrl,
     };
 
     return PlatformViewLink(

@@ -53,6 +53,8 @@ class OlaNativeView(
         val initialLat = (creationParams?.get("initialLat") as? Number)?.toDouble() ?: 8.5241
         val initialLng = (creationParams?.get("initialLng") as? Number)?.toDouble() ?: 76.9366
         val initialZoom = (creationParams?.get("initialZoom") as? Number)?.toDouble() ?: 15.0
+        val styleUrl = creationParams?.get("styleUrl") as? String
+            ?: "https://api.olamaps.io/styleEditor/v1/styleEdit/styles/1a5115aa-26c8-4e8b-8433-0e2858238ca7/Style1-Dark"
 
         val settings = MapControlSettings.Builder()
             .setRotateGesturesEnabled(true)
