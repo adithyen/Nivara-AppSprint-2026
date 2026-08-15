@@ -68,6 +68,14 @@ class OlaPlaceDetails {
     required this.lat,
     required this.lng,
     this.types = const [],
+    this.rating,
+    this.userRatingsTotal,
+    this.phoneNumber,
+    this.website,
+    this.openNow,
+    this.weekdayText = const [],
+    this.photoReference,
+    this.iconMaskUri,
   });
 
   final String placeId;
@@ -76,6 +84,14 @@ class OlaPlaceDetails {
   final double lat;
   final double lng;
   final List<String> types;
+  final double? rating;
+  final int? userRatingsTotal;
+  final String? phoneNumber;
+  final String? website;
+  final bool? openNow;
+  final List<String> weekdayText;
+  final String? photoReference;
+  final String? iconMaskUri;
 
   factory OlaPlaceDetails.fromJson(Map<String, dynamic> json) {
     final result = (json['result'] as Map<String, dynamic>?) ?? json;
@@ -89,6 +105,38 @@ class OlaPlaceDetails {
       }
     }
 
+    final openingHours = result['opening_hours'] as Map<String, dynamic>?;
+    final weekdayList = <String>[];
+    if (openingHours?['weekday_text'] is List) {
+      for (final w in openingHours!['weekday_text'] as List) {
+        if (w != null) weekdayList.add(w.toString());
+      }
+    }
+
+    String? photoRef;
+    if (result['photos'] is List && (result['photos'] as List).isNotEmpty) {
+      final firstPhoto = (result['photos'] as List).first;
+      if (firstPhoto is Map<String, dynamic>) {
+        photoRef = firstPhoto['photo_reference'] as String?;
+      }
+    }
+
+    final phone = (result['formatted_phone_number'] as String?)?.trim();
+    final intlPhone = (result['international_phone_number'] as String?)?.trim();
+    final effectivePhone = (phone != null && phone.isNotEmpty && phone != 'NA')
+        ? phone
+        : (intlPhone != null && intlPhone.isNotEmpty && intlPhone != 'NA' ? intlPhone : null);
+
+    final site = (result['website'] as String?)?.trim();
+    final effectiveSite = (site != null && site.isNotEmpty && site != 'NA') ? site : null;
+
+    final rateNum = result['rating'] as num?;
+    final rate = (rateNum != null && rateNum > 0) ? rateNum.toDouble() : null;
+
+    final totalReviews = (result['user_ratings_total'] as num?)?.toInt();
+
+    final iconUri = (result['icon_mask_base_uri'] as String?)?.trim();
+
     return OlaPlaceDetails(
       placeId: (result['place_id'] as String?) ?? '',
       name: (result['name'] as String?) ?? '',
@@ -96,6 +144,14 @@ class OlaPlaceDetails {
       lat: (loc?['lat'] as num?)?.toDouble() ?? kDefaultLat,
       lng: (loc?['lng'] as num?)?.toDouble() ?? kDefaultLng,
       types: typesList,
+      rating: rate,
+      userRatingsTotal: totalReviews,
+      phoneNumber: effectivePhone,
+      website: effectiveSite,
+      openNow: openingHours?['open_now'] as bool?,
+      weekdayText: weekdayList,
+      photoReference: photoRef,
+      iconMaskUri: (iconUri != null && iconUri.isNotEmpty && iconUri != 'NA') ? iconUri : null,
     );
   }
 }
@@ -242,45 +298,74 @@ class OlaMapsService {
     }
   }
 
-  // ── 3. Place Details API ──────────────────────────────────────────────────
+  // ── 3. Place Details & Advanced Place Details API ─────────────────────────
 
-  /// Fetches exact coordinates and full address for a given Ola [placeId].
-  Future<OlaPlaceDetails?> getPlaceDetails(String placeId) async {
+  /// Fetches structured metadata, geometry and operational fields for an Ola [placeId].
+  /// If [advanced] is true, queries `/places/v1/details/advanced` for deeper POI attributes.
+  Future<OlaPlaceDetails?> getPlaceDetails(
+    String placeId, {
+    bool advanced = true,
+  }) async {
     final key = apiKey;
     if (key == null || placeId.trim().isEmpty) return null;
 
     try {
-      final uri = Uri.parse('$_baseUrl/places/v1/details').replace(
+      final endpoint = advanced
+          ? '$_baseUrl/places/v1/details/advanced'
+          : '$_baseUrl/places/v1/details';
+
+      final uri = Uri.parse(endpoint).replace(
         queryParameters: {
           'place_id': placeId.trim(),
           'api_key': key,
         },
       );
-      final resp = await http.get(uri).timeout(const Duration(seconds: 6));
-      if (resp.statusCode != 200) return null;
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (resp.statusCode != 200) {
+        if (advanced) {
+          // Fallback to standard details
+          return getPlaceDetails(placeId, advanced: false);
+        }
+        return null;
+      }
 
       final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
       return OlaPlaceDetails.fromJson(data);
     } catch (e) {
       _log.error('OLA', 'Place details exception: $e');
+      if (advanced) return getPlaceDetails(placeId, advanced: false);
       return null;
     }
   }
 
+  /// Builds the authenticated image URL for an Ola Places [photoReference].
+  String? getPhotoUrl(String? photoReference) {
+    final key = apiKey;
+    if (key == null || photoReference == null || photoReference.trim().isEmpty) {
+      return null;
+    }
+    return '$_baseUrl/places/v1/photo?photo_reference=${Uri.encodeComponent(photoReference.trim())}&api_key=$key';
+  }
+
   // ── 4. Nearby Search API ──────────────────────────────────────────────────
 
-  /// Searches for nearby venues, transit, hospitals, civic offices around [lat], [lng].
+  /// Searches for nearby venues, emergency facilities, transit, hospitals, civic offices around [lat], [lng].
   Future<List<OlaPlacePrediction>> nearbySearch({
     required double lat,
     required double lng,
     String? types,
-    double radius = 3000,
-    String layers = 'venue,address',
+    double radius = 4000,
+    String layers = 'venue',
+    bool advanced = false,
   }) async {
     final key = apiKey;
     if (key == null) return [];
 
     try {
+      final endpoint = advanced
+          ? '$_baseUrl/places/v1/nearbysearch/advanced'
+          : '$_baseUrl/places/v1/nearbysearch';
+
       final params = <String, String>{
         'location': '$lat,$lng',
         'radius': radius.toInt().toString(),
@@ -291,9 +376,8 @@ class OlaMapsService {
         params['types'] = types;
       }
 
-      final uri = Uri.parse('$_baseUrl/places/v1/nearbysearch')
-          .replace(queryParameters: params);
-      final resp = await http.get(uri).timeout(const Duration(seconds: 6));
+      final uri = Uri.parse(endpoint).replace(queryParameters: params);
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
       if (resp.statusCode != 200) {
         _log.error('OLA', 'Nearby search HTTP ${resp.statusCode}: ${resp.body}');
         return [];

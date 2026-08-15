@@ -59,11 +59,12 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   // Nearby discovery filters
   final List<({String label, String icon, String? type})> _nearbyFilters = [
-    (label: 'All Landmarks', icon: '📍', type: null),
+    (label: 'Nearby Landmarks', icon: '📍', type: null),
     (label: 'Hospitals', icon: '🏥', type: 'hospital'),
     (label: 'Police', icon: '👮', type: 'police'),
     (label: 'Transit', icon: '🚌', type: 'transit_station'),
     (label: 'Civic Offices', icon: '🏛️', type: 'local_government_office'),
+    (label: 'Pharmacies', icon: '💊', type: 'pharmacy'),
   ];
   int _selectedFilterIdx = 0;
   List<OlaPlacePrediction> _nearbyPlaces = [];

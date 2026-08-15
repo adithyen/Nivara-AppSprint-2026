@@ -8,7 +8,6 @@ import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/civic_level_view.dart';
-import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/staggered_entrance.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';

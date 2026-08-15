@@ -131,7 +131,6 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   }
 
   Future<void> _resign() async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -938,7 +937,6 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final email = supabase.auth.currentUser?.email ?? '';
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + bottom),
