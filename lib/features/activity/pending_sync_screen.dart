@@ -221,11 +221,11 @@ class _QueueTile extends StatelessWidget {
     'worker_note' => Icons.note_rounded,
     _ => Icons.cloud_off_rounded,
   };
-
   bool get _isPhotoError => entry.hasPhotoError;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = _isPhotoError ? NivaraColors.danger : NivaraColors.accent;
     final fmt = DateFormat('d MMM · HH:mm');
 
@@ -244,13 +244,22 @@ class _QueueTile extends StatelessWidget {
       onDismissed: (_) => onDismiss(),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: _isPhotoError
                 ? NivaraColors.danger.withValues(alpha: 0.45)
-                : Colors.white.withValues(alpha: 0.08),
+                : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
           ),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,8 +276,8 @@ class _QueueTile extends StatelessWidget {
               ),
               title: Text(
                 _typeLabel,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
@@ -276,7 +285,7 @@ class _QueueTile extends StatelessWidget {
               subtitle: Text(
                 'Queued ${fmt.format(entry.queuedAt)}',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.55),
+                  color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
                   fontSize: 12,
                 ),
               ),
@@ -285,13 +294,13 @@ class _QueueTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: (entry.localPhotoPaths.isNotEmpty
                           ? NivaraColors.primary
-                          : Colors.white60)
+                          : (isDark ? Colors.white60 : const Color(0xFF94A3B8)))
                       .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: (entry.localPhotoPaths.isNotEmpty
                             ? NivaraColors.primary
-                            : Colors.white60)
+                            : (isDark ? Colors.white60 : const Color(0xFF94A3B8)))
                         .withValues(alpha: 0.4),
                   ),
                 ),
@@ -300,7 +309,7 @@ class _QueueTile extends StatelessWidget {
                   style: TextStyle(
                     color: entry.localPhotoPaths.isNotEmpty
                         ? NivaraColors.primary
-                        : Colors.white70,
+                        : (isDark ? Colors.white70 : const Color(0xFF475569)),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),

@@ -400,16 +400,26 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = entry.color(context);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
         ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -423,8 +433,8 @@ class _ActivityTile extends StatelessWidget {
         ),
         title: Text(
           entry.title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
             fontWeight: FontWeight.w700,
             fontSize: 14,
           ),
@@ -438,7 +448,7 @@ class _ActivityTile extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B),
                 fontSize: 12.5,
               ),
             ),
@@ -446,7 +456,7 @@ class _ActivityTile extends StatelessWidget {
             Text(
               timeAgo(entry.at),
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: isDark ? Colors.white.withValues(alpha: 0.4) : const Color(0xFF94A3B8),
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),

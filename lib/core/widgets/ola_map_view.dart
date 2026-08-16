@@ -48,6 +48,8 @@ class OlaNativeMapController {
     required double lng,
     String? snippet,
     Color color = const Color(0xFF2ECC71),
+    String type = 'default',
+    String? label,
   }) async {
     try {
       final hex = '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
@@ -57,6 +59,8 @@ class OlaNativeMapController {
         'lng': lng,
         'snippet': snippet ?? '',
         'color': hex,
+        'type': type,
+        'label': label ?? '',
       });
     } catch (_) {}
   }

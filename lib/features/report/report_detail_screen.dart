@@ -112,19 +112,20 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final r = _report;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sev = severityColor(r.severity);
     final title = r.title?.trim().isNotEmpty == true
         ? r.title!.trim()
         : r.category.label;
 
     return Scaffold(
-      backgroundColor: NivaraColors.canvasDark,
+      backgroundColor: isDark ? NivaraColors.canvasDark : const Color(0xFFF6F8FA),
       appBar: AppBar(
         title: const Text('Civic Report Detail'),
       ),
       body: RefreshIndicator(
         color: NivaraColors.primary,
-        backgroundColor: const Color(0xFF10161E),
+        backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
         onRefresh: () async {
           await _refresh();
           await _checkConfirmed();
@@ -136,12 +137,21 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFF10161E),
+                color: isDark ? const Color(0xFF10161E) : Colors.white,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: sev.withValues(alpha: 0.35),
+                  color: sev.withValues(alpha: isDark ? 0.35 : 0.45),
                   width: 1.2,
                 ),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Row(
                 children: [
@@ -160,8 +170,8 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.2,
@@ -350,15 +360,25 @@ class _CommunityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = verified ? NivaraColors.success : NivaraColors.primary;
     final remaining = (5 - count).clamp(0, 5);
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accent.withValues(alpha: 0.35), width: 1.2),
+        border: Border.all(color: accent.withValues(alpha: isDark ? 0.35 : 0.45), width: 1.2),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,7 +433,10 @@ class _CommunityCard extends StatelessWidget {
                     : remaining > 0
                         ? '$remaining more confirmation${remaining == 1 ? '' : 's'} needed for community-verified badge.'
                         : 'Awaiting municipal verification.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12.5),
+            style: TextStyle(
+              color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B),
+              fontSize: 12.5,
+            ),
           ),
           const SizedBox(height: 14),
           _ConfirmButton(
@@ -442,39 +465,57 @@ class _ConfirmButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (isOwn) {
       return Container(
         height: 46,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE2E8F0),
           borderRadius: BorderRadius.circular(14),
         ),
-        alignment: Alignment.center,
-        child: const Text('Your Report', style: TextStyle(color: Colors.white60, fontWeight: FontWeight.w700)),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_outline_rounded, size: 18, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
+              const SizedBox(width: 8),
+              Text(
+                'You filed this report',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
     if (alreadyConfirmed) {
       return Container(
         height: 46,
         decoration: BoxDecoration(
-          color: NivaraColors.success.withValues(alpha: 0.15),
+          color: NivaraColors.success.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: NivaraColors.success.withValues(alpha: 0.4)),
+          border: Border.all(color: NivaraColors.success.withValues(alpha: 0.45)),
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle_rounded, color: NivaraColors.success, size: 18),
-            SizedBox(width: 8),
-            Text('You Confirmed This', style: TextStyle(color: NivaraColors.success, fontWeight: FontWeight.w800)),
-          ],
+        child: const Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_rounded, color: NivaraColors.success, size: 18),
+              SizedBox(width: 8),
+              Text('You Confirmed This Issue', style: TextStyle(color: NivaraColors.success, fontWeight: FontWeight.w800, fontSize: 13)),
+            ],
+          ),
         ),
       );
     }
     return BouncyTap(
       onTap: confirming ? null : onConfirm,
       child: Container(
-        height: 48,
+        height: 46,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
@@ -482,7 +523,7 @@ class _ConfirmButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00E676).withValues(alpha: 0.3),
+              color: const Color(0xFF00E676).withValues(alpha: 0.35),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -491,8 +532,8 @@ class _ConfirmButton extends StatelessWidget {
         child: Center(
           child: confirming
               ? const SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                 )
               : const Row(
@@ -519,27 +560,37 @@ class _EvidenceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: NivaraColors.primary.withValues(alpha: 0.35),
+            color: NivaraColors.primary.withValues(alpha: isDark ? 0.35 : 0.5),
             width: 1.2,
           ),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.verified_user_rounded, color: NivaraColors.primary),
-            SizedBox(width: 12),
+            const Icon(Icons.verified_user_rounded, color: NivaraColors.primary),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Tamper-Proof Evidence Record',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
@@ -547,15 +598,18 @@ class _EvidenceTile extends StatelessWidget {
                       fontSize: 14,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'SHA-256 sensor snapshot · tap to verify integrity',
-                    style: TextStyle(color: Colors.white60, fontSize: 12),
+                    style: TextStyle(
+                      color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: NivaraColors.primary),
+            const Icon(Icons.chevron_right_rounded, color: NivaraColors.primary),
           ],
         ),
       ),
@@ -569,15 +623,16 @@ class _EvidenceHashOnly extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final short = hash.length > 20
         ? '${hash.substring(0, 10)}…${hash.substring(hash.length - 8)}'
         : hash;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFCBD5E1)),
       ),
       child: Row(
         children: [
@@ -598,9 +653,9 @@ class _EvidenceHashOnly extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   'SHA-256 · $short',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'monospace',
-                    color: Colors.white60,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
                     fontSize: 12,
                   ),
                 ),
@@ -619,6 +674,7 @@ class _PhotoStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       height: 120,
       child: ListView.separated(
@@ -635,8 +691,8 @@ class _PhotoStrip extends StatelessWidget {
             errorBuilder: (context, error, stackTrace) => Container(
               width: 120,
               height: 120,
-              color: const Color(0xFF10161E),
-              child: const Icon(Icons.broken_image_rounded, color: Colors.white38),
+              color: isDark ? const Color(0xFF10161E) : const Color(0xFFE2E8F0),
+              child: Icon(Icons.broken_image_rounded, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
             ),
           ),
         ),
@@ -678,13 +734,23 @@ class _GlassSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -693,7 +759,7 @@ class _GlassSection extends StatelessWidget {
             title,
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.6),
+              color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B),
               fontSize: 12,
               letterSpacing: 0.4,
             ),
@@ -713,6 +779,7 @@ class _MetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -722,13 +789,20 @@ class _MetaRow extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+              style: TextStyle(
+                color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
+                fontSize: 13,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                fontSize: 13,
+              ),
             ),
           ),
         ],

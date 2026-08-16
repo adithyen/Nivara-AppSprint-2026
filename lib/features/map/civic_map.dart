@@ -180,7 +180,12 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
         .listen((rows) {
           for (final r in rows) {
             try {
-              _lfItems[r['id'] as String] = LFItem.fromMap(r);
+              final item = LFItem.fromMap(r);
+              if (item.status != 'ACTIVE') {
+                _lfItems.remove(item.id);
+              } else {
+                _lfItems[item.id] = item;
+              }
             } catch (_) {}
           }
           if (_mapReady) _syncMarkersToOlaMap();
@@ -193,7 +198,7 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
 
     await c.clearMarkers();
 
-    // 1. Citizen Reports (if enabled)
+    // 1. Citizen Reports (if enabled) — Only active, with status-driven colors
     if (_showReportsLayer) {
       for (final r in _reports.values) {
         if (r.status == ReportStatus.resolved ||
@@ -201,10 +206,18 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
             r.status == ReportStatus.duplicate) {
           continue;
         }
+        // User specification:
+        // Red: Not Acknowledged (submitted)
+        // Orange: Acknowledged (acknowledged, no worker yet)
+        // Yellow: Workers Assigned (acknowledged + assignedTo)
+        // Green: Work in Progress (inProgress)
         final color = switch (r.status) {
-          ReportStatus.submitted => const Color(0xFFFFB300),
-          ReportStatus.inProgress => const Color(0xFF29B6F6),
-          _ => const Color(0xFF90A4AE),
+          ReportStatus.submitted => const Color(0xFFFF3B30),
+          ReportStatus.acknowledged => (r.assignedTo != null && r.assignedTo!.isNotEmpty)
+              ? const Color(0xFFFFD600)
+              : const Color(0xFFFF9500),
+          ReportStatus.inProgress => const Color(0xFF00E676),
+          _ => const Color(0xFFFF3B30),
         };
         await c.addMarker(
           id: 'report_${r.id}',
@@ -212,20 +225,25 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
           lng: r.lng,
           snippet: r.title ?? r.category.label,
           color: color,
+          type: 'report',
+          label: r.category.label,
         );
       }
     }
 
-    // 2. Lost & Found Items (if enabled)
+    // 2. Lost & Found Items (if enabled) — ONLY active items with distinct badges
     if (_showLfLayer) {
       for (final l in _lfItems.values) {
-        final color = l.isLost ? const Color(0xFFFF5252) : const Color(0xFF00E676);
+        if (l.status != 'ACTIVE') continue;
+        final color = l.isLost ? const Color(0xFFFF6D00) : const Color(0xFF00B0FF);
         await c.addMarker(
           id: 'lf_${l.id}',
           lat: l.lat,
           lng: l.lng,
           snippet: '${l.isLost ? 'Lost' : 'Found'}: ${l.title}',
           color: color,
+          type: l.isLost ? 'lost' : 'found',
+          label: l.isLost ? 'LOST' : 'FOUND',
         );
       }
     }
@@ -244,6 +262,7 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
             lng: p.lng!,
             snippet: p.mainText ?? p.description,
             color: activeColor,
+            type: 'poi',
           );
         }
       }
@@ -335,6 +354,7 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
       lng: lng,
       snippet: 'Selected Location',
       color: const Color(0xFF00E676),
+      type: 'dropped_pin',
     );
 
     final addr = await _ola.reverseGeocode(lat: lat, lng: lng);

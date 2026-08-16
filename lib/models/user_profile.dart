@@ -81,6 +81,28 @@ class UserProfile {
     updatedAt: toDateTimeOrNull(map['updated_at']),
   );
 
+  /// Full serializable map for local caching.
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'display_name': displayName,
+    'avatar_url': avatarUrl,
+    'phone': phone,
+    'city': city,
+    'ward': ward,
+    'role': role.wire,
+    'department': department?.wire,
+    'jurisdiction_city': jurisdictionCity,
+    'jurisdiction_ward': jurisdictionWard,
+    'civic_score': civicScore,
+    'reports_count': reportsCount,
+    'finds_count': findsCount,
+    'is_on_leave': isOnLeave,
+    'worker_number': workerNumber,
+    'resigned_at': resignedAt?.toIso8601String(),
+    'created_at': createdAt?.toIso8601String(),
+    'updated_at': updatedAt?.toIso8601String(),
+  };
+
   /// Only the columns a user may write to their own profile. Role/department
   /// changes go through the `set_user_role` RPC, never a direct update.
   Map<String, dynamic> toUpdateMap() => {

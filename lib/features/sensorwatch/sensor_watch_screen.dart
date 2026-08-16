@@ -81,8 +81,10 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
   @override
   Widget build(BuildContext context) {
     final svc = ref.watch(sensorWatchServiceProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: NivaraColors.canvasDark,
+      backgroundColor: isDark ? NivaraColors.canvasDark : const Color(0xFFF6F8FA),
       appBar: AppBar(
         title: const Text('SensorWatch HUD'),
       ),
@@ -98,7 +100,7 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
                 onSimulate: _simulate,
               ),
             ),
-            const Divider(height: 1, color: Colors.white12),
+            Divider(height: 1, color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
             Expanded(
               child: _detections.isEmpty
                   ? const _EmptyState()
@@ -119,10 +121,11 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
   }
 
   void _openEvidence(SensorDetection d) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF10161E),
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
       showDragHandle: true,
       builder: (_) => _EvidenceSheet(detection: d),
     );
@@ -144,6 +147,7 @@ class _StatusPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final over = snap.impactG >= kDetectionThresholdG;
     final meterColor = over ? NivaraColors.danger : NivaraColors.primary;
     final meter = (snap.impactG / (kDetectionThresholdG * 1.5)).clamp(0.0, 1.0);
@@ -152,17 +156,17 @@ class _StatusPanel extends StatelessWidget {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: (snap.monitoring ? NivaraColors.primary : Colors.white)
-              .withValues(alpha: snap.monitoring ? 0.4 : 0.1),
+          color: (snap.monitoring ? NivaraColors.primary : (isDark ? Colors.white : const Color(0xFFCBD5E1)))
+              .withValues(alpha: snap.monitoring ? 0.4 : (isDark ? 0.1 : 0.6)),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: (snap.monitoring ? NivaraColors.primary : Colors.black)
-                .withValues(alpha: snap.monitoring ? 0.15 : 0.3),
+            color: (snap.monitoring ? NivaraColors.primary : (isDark ? Colors.black : const Color(0xFF94A3B8)))
+                .withValues(alpha: isDark ? (snap.monitoring ? 0.15 : 0.3) : 0.12),
             blurRadius: 24,
             offset: const Offset(0, 6),
           ),
@@ -179,13 +183,13 @@ class _StatusPanel extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
+                  child: Text(
                     'IDLE',
                     style: TextStyle(
-                      color: Colors.white60,
+                      color: isDark ? Colors.white60 : const Color(0xFF64748B),
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                     ),
@@ -194,8 +198,8 @@ class _StatusPanel extends StatelessWidget {
               const Spacer(),
               Text(
                 '${snap.detectionCount} Captured',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
                 ),
@@ -218,10 +222,10 @@ class _StatusPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'g Impact Force',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: isDark ? Colors.white70 : const Color(0xFF64748B),
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -249,7 +253,7 @@ class _StatusPanel extends StatelessWidget {
               _Stat(
                 label: 'GPS Fix',
                 value: snap.hasFix ? 'Active' : 'No Fix',
-                valueColor: snap.hasFix ? NivaraColors.success : Colors.white60,
+                valueColor: snap.hasFix ? NivaraColors.success : (isDark ? Colors.white60 : const Color(0xFF64748B)),
               ),
               _Stat(
                 label: 'Threshold',
@@ -314,7 +318,7 @@ class _StatusPanel extends StatelessWidget {
                   child: Container(
                     height: 48,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131A24),
+                      color: isDark ? const Color(0xFF131A24) : const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: NivaraColors.accent.withValues(alpha: 0.5),
@@ -362,13 +366,14 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Column(
         children: [
           Text(
             value,
             style: TextStyle(
-              color: valueColor ?? Colors.white,
+              color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
               fontWeight: FontWeight.w800,
               fontSize: 14,
               fontFamily: 'monospace',
@@ -378,7 +383,7 @@ class _Stat extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF64748B),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -394,6 +399,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -404,19 +410,19 @@ class _EmptyState extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
+                color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE2E8F0),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.sensors_rounded,
                 size: 48,
-                color: Colors.white38,
+                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No Road Detections Yet',
               style: TextStyle(
-                color: Colors.white,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
               ),
@@ -426,7 +432,7 @@ class _EmptyState extends StatelessWidget {
               'Start monitoring and drive over a road jolt or tap Simulate Impact.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
+                color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
                 fontSize: 13,
               ),
             ),
@@ -459,6 +465,7 @@ class _DetectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = detectionColor(detection.type);
     final hash = detection.evidence.evidenceHash ?? '';
     return BouncyTap(
@@ -466,12 +473,21 @@ class _DetectionTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: color.withValues(alpha: 0.35),
+            color: color.withValues(alpha: isDark ? 0.35 : 0.45),
             width: 1.2,
           ),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Row(
           children: [
@@ -490,8 +506,8 @@ class _DetectionTile extends StatelessWidget {
                 children: [
                   Text(
                     '${detection.type.label} • ${detection.gAboveBaseline.toStringAsFixed(1)} g Impact',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -502,7 +518,7 @@ class _DetectionTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
+                      color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
                       fontSize: 11.5,
                       fontFamily: 'monospace',
                     ),
@@ -510,7 +526,7 @@ class _DetectionTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
           ],
         ),
       ),
@@ -600,6 +616,7 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final verified = EvidenceEngine.verify(_pkg);
     final color = detectionColor(_pkg.eventType);
     final hash = _pkg.evidenceHash ?? '—';
@@ -633,8 +650,8 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
                       children: [
                         Text(
                           _pkg.eventType.label,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                           ),
@@ -642,7 +659,7 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
                         Text(
                           'Tamper-Proof Evidence Record',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.55),
+                            color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
                             fontSize: 12,
                           ),
                         ),
@@ -688,12 +705,12 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
               const SizedBox(height: 16),
               _HashRow(hash: hash),
               const SizedBox(height: 8),
-              _kv('Impact Force', '${_pkg.accelZPeak.toStringAsFixed(2)} g'),
-              _kv('Noise Baseline', '${_pkg.accelZBaseline.toStringAsFixed(2)} g'),
-              _kv('Coordinates', '${_pkg.lat.toStringAsFixed(5)}, ${_pkg.lng.toStringAsFixed(5)}'),
-              _kv('GPS Accuracy', '±${_pkg.gpsAccuracy.toStringAsFixed(0)} m'),
-              _kv('Speed', '${_pkg.speedKmph.toStringAsFixed(0)} km/h'),
-              _kv('App Version', _pkg.appVersion),
+              _kv('Impact Force', '${_pkg.accelZPeak.toStringAsFixed(2)} g', isDark),
+              _kv('Noise Baseline', '${_pkg.accelZBaseline.toStringAsFixed(2)} g', isDark),
+              _kv('Coordinates', '${_pkg.lat.toStringAsFixed(5)}, ${_pkg.lng.toStringAsFixed(5)}', isDark),
+              _kv('GPS Accuracy', '±${_pkg.gpsAccuracy.toStringAsFixed(0)} m', isDark),
+              _kv('Speed', '${_pkg.speedKmph.toStringAsFixed(0)} km/h', isDark),
+              _kv('App Version', _pkg.appVersion, isDark),
               const SizedBox(height: 18),
               if (_submittedId != null)
                 Container(
@@ -744,7 +761,7 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
     );
   }
 
-  Widget _kv(String k, String v) => Padding(
+  Widget _kv(String k, String v, bool isDark) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
       children: [
@@ -753,7 +770,7 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
           child: Text(
             k,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
+              color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
               fontSize: 12.5,
             ),
           ),
@@ -761,8 +778,8 @@ class _EvidenceSheetState extends ConsumerState<_EvidenceSheet> {
         Expanded(
           child: Text(
             v,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
               fontWeight: FontWeight.w600,
               fontSize: 13,
               fontFamily: 'monospace',
@@ -780,6 +797,7 @@ class _HashRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return BouncyTap(
       onTap: () {
         Clipboard.setData(ClipboardData(text: hash));
@@ -790,9 +808,11 @@ class _HashRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF131A24),
+          color: isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFCBD5E1),
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -803,10 +823,10 @@ class _HashRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'SHA-256 Hash',
                     style: TextStyle(
-                      color: Colors.white60,
+                      color: isDark ? Colors.white60 : const Color(0xFF64748B),
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -814,8 +834,8 @@ class _HashRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     hash,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                       fontFamily: 'monospace',
                       fontSize: 11.5,
                       height: 1.3,
@@ -824,7 +844,7 @@ class _HashRow extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.copy_rounded, size: 16, color: Colors.white60),
+            Icon(Icons.copy_rounded, size: 16, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
           ],
         ),
       ),
