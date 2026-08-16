@@ -154,8 +154,6 @@ class OlaNativeView(
                         mapField?.isAccessible = true
                         val iMap = (if (olaMap != null) mapField?.get(olaMap) else mapField?.get(mapView)) as? com.ola.mapsdk.interfaces.IMap
                         iMap?.setStyle(newStyleUrl)
-                        val nativeMap = iMap?.getNativeMap()?.getMap() as? org.maplibre.android.maps.MapLibreMap
-                        nativeMap?.setStyle(org.maplibre.android.maps.Style.Builder().fromUri(newStyleUrl))
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("STYLE_ERROR", e.message, null)
