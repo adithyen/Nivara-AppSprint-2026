@@ -61,6 +61,18 @@ class OlaNativeMapController {
     } catch (_) {}
   }
 
+  Future<void> removeMarker(String id) async {
+    try {
+      await _channel.invokeMethod('removeMarker', {'id': id});
+    } catch (_) {}
+  }
+
+  Future<void> setStyleUrl(String styleUrl) async {
+    try {
+      await _channel.invokeMethod('setStyleUrl', {'styleUrl': styleUrl});
+    } catch (_) {}
+  }
+
   Future<void> clearMarkers() async {
     try {
       await _channel.invokeMethod('clearMarkers');
@@ -88,7 +100,7 @@ class OlaNativeMapWidget extends StatefulWidget {
     this.initialLat = kDefaultLat,
     this.initialLng = kDefaultLng,
     this.initialZoom = 15.0,
-    this.styleUrl = OlaMapsService.kDefaultDarkStyleUrl,
+    this.styleUrl,
     this.onMapReady,
     this.onMarkerClicked,
     this.onMapClicked,
@@ -99,7 +111,7 @@ class OlaNativeMapWidget extends StatefulWidget {
   final double initialLat;
   final double initialLng;
   final double initialZoom;
-  final String styleUrl;
+  final String? styleUrl;
   final OnOlaMapReadyCallback? onMapReady;
   final OnOlaMarkerClickedCallback? onMarkerClicked;
   final OnOlaMapClickedCallback? onMapClicked;
@@ -111,12 +123,34 @@ class OlaNativeMapWidget extends StatefulWidget {
 }
 
 class _OlaNativeMapWidgetState extends State<OlaNativeMapWidget> {
+  OlaNativeMapController? _controller;
+  String? _lastAppliedStyle;
+
   String get _apiKey =>
       dotenv.env['OLA_MAPS_API_KEY']?.trim() ?? '';
+
+  String _resolveEffectiveStyle(BuildContext context) {
+    if (widget.styleUrl != null && widget.styleUrl!.isNotEmpty) {
+      return widget.styleUrl!;
+    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return OlaMapsService.instance.getStyleUrl(isDark: isDark);
+  }
+
+  @override
+  void didUpdateWidget(covariant OlaNativeMapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final newStyle = _resolveEffectiveStyle(context);
+    if (_lastAppliedStyle != null && _lastAppliedStyle != newStyle) {
+      _lastAppliedStyle = newStyle;
+      _controller?.setStyleUrl(newStyle);
+    }
+  }
 
   void _onPlatformViewCreated(int id) {
     final channel = MethodChannel('com.nivara.ola_map_$id');
     final controller = OlaNativeMapController._(channel, id);
+    _controller = controller;
 
     channel.setMethodCallHandler((call) async {
       switch (call.method) {
@@ -144,7 +178,7 @@ class _OlaNativeMapWidgetState extends State<OlaNativeMapWidget> {
           widget.onCameraIdle?.call(lat, lng);
           break;
         case 'onMapError':
-          final error = call.arguments as String? ?? 'Unknown Ola Map Error';
+          final error = call.arguments as String? ?? 'Map service error';
           widget.onMapError?.call(error);
           break;
       }
@@ -153,21 +187,23 @@ class _OlaNativeMapWidgetState extends State<OlaNativeMapWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (defaultTargetPlatform != TargetPlatform.android) {
       return Container(
-        color: const Color(0xFF0B0F14),
-        child: const Center(
+        color: isDark ? const Color(0xFF0B0F14) : const Color(0xFFF1F5F9),
+        child: Center(
           child: Text(
-            'Ola Maps SDK is optimized for Android',
-            style: TextStyle(color: Colors.white70),
+            'Map view is optimized for Android',
+            style: TextStyle(
+              color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+            ),
           ),
         ),
       );
     }
 
-    final effectiveStyleUrl = widget.styleUrl.isNotEmpty
-        ? widget.styleUrl
-        : (dotenv.env['OLA_MAPS_DARK_STYLE_URL']?.trim() ?? OlaMapsService.kDefaultDarkStyleUrl);
+    final effectiveStyleUrl = _resolveEffectiveStyle(context);
+    _lastAppliedStyle = effectiveStyleUrl;
 
     final creationParams = <String, dynamic>{
       'apiKey': _apiKey,

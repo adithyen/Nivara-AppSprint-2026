@@ -54,7 +54,19 @@ class OlaNativeView(
         val initialLng = (creationParams?.get("initialLng") as? Number)?.toDouble() ?: 76.9366
         val initialZoom = (creationParams?.get("initialZoom") as? Number)?.toDouble() ?: 15.0
         val styleUrl = creationParams?.get("styleUrl") as? String
-            ?: "https://api.olamaps.io/styleEditor/v1/styleEdit/styles/1a5115aa-26c8-4e8b-8433-0e2858238ca7/Style1-Dark"
+            ?: "https://api.olamaps.io/tiles/vector/v1/styles/default-dark-standard/style.json"
+
+        // Pre-set style on internal IMap before getMap() triggers loadMap()
+        try {
+            val mapField = mapView.javaClass.getDeclaredField("map")
+            mapField.isAccessible = true
+            val iMap = mapField.get(mapView) as? com.ola.mapsdk.interfaces.IMap
+            if (!styleUrl.isNullOrEmpty()) {
+                iMap?.setStyle(styleUrl)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("OlaNativeView", "Could not set initial style: ${e.message}")
+        }
 
         val settings = MapControlSettings.Builder()
             .setRotateGesturesEnabled(true)
@@ -130,6 +142,28 @@ class OlaNativeView(
                 olaMap?.zoomToLocation(OlaLatLng(lat, lng), zoom)
                 result.success(true)
             }
+            "setStyleUrl" -> {
+                val newStyleUrl = call.argument<String>("styleUrl") ?: ""
+                if (newStyleUrl.isNotEmpty()) {
+                    try {
+                        val mapField = try {
+                            olaMap?.javaClass?.getDeclaredField("map")
+                        } catch (_: Exception) {
+                            mapView.javaClass.getDeclaredField("map")
+                        }
+                        mapField?.isAccessible = true
+                        val iMap = (if (olaMap != null) mapField?.get(olaMap) else mapField?.get(mapView)) as? com.ola.mapsdk.interfaces.IMap
+                        iMap?.setStyle(newStyleUrl)
+                        val nativeMap = iMap?.getNativeMap()?.getMap() as? org.maplibre.android.maps.MapLibreMap
+                        nativeMap?.setStyle(org.maplibre.android.maps.Style.Builder().fromUri(newStyleUrl))
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("STYLE_ERROR", e.message, null)
+                    }
+                } else {
+                    result.success(false)
+                }
+            }
             "addMarker" -> {
                 val id = call.argument<String>("id") ?: ""
                 val lat = (call.argument<Number>("lat"))?.toDouble() ?: 0.0
@@ -158,6 +192,20 @@ class OlaNativeView(
                     result.success(true)
                 } catch (e: Exception) {
                     result.error("MARKER_ERROR", e.message, null)
+                }
+            }
+            "removeMarker" -> {
+                val id = call.argument<String>("id") ?: ""
+                if (id.isNotEmpty()) {
+                    try {
+                        markersMap[id]?.removeMarker()
+                        markersMap.remove(id)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("REMOVE_MARKER_ERROR", e.message, null)
+                    }
+                } else {
+                    result.success(false)
                 }
             }
             "clearMarkers" -> {

@@ -242,10 +242,11 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
   @override
   Widget build(BuildContext context) {
     final myUid = currentUserId;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return RefreshIndicator(
       color: NivaraColors.primary,
-      backgroundColor: const Color(0xFF10161E),
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -255,10 +256,10 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
           const SizedBox(height: 20),
           Row(
             children: [
-              const Text(
+              Text(
                 'Neighborhood Feed',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : const Color(0xFF111827),
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
@@ -268,7 +269,9 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
                 Text(
                   '${_posts.length} posts',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.5)
+                        : const Color(0xFF6B7280),
                     fontSize: 12,
                   ),
                 ),

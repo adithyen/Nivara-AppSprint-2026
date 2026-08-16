@@ -244,12 +244,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF090D12),
+      backgroundColor: isDark ? const Color(0xFF090D12) : const Color(0xFFF6F8FB),
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // 1. Native Ola Map View
+          // 1. Native Map View
           OlaNativeMapWidget(
             initialLat: _currentLat,
             initialLng: _currentLng,
@@ -271,7 +273,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             ),
           ),
 
-          // 2. Futuristic Animated Center Pin
+          // 2. Animated Center Pin
           Center(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 38),
@@ -328,7 +330,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             ),
           ),
 
-          // 3. Ultra-Modern Glassmorphic Search Bar
+          // 3. Glassmorphic Search Bar
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -341,41 +343,55 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFF131A22).withValues(alpha: 0.88),
+                          color: isDark
+                              ? const Color(0xFF131A22).withValues(alpha: 0.90)
+                              : Colors.white.withValues(alpha: 0.94),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : const Color(0xFFE2E8F0),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
+                              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+                              blurRadius: 18,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
                         child: Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.arrow_back, color: Colors.white),
+                              icon: Icon(
+                                Icons.arrow_back,
+                                color: isDark ? Colors.white : const Color(0xFF111827),
+                              ),
                               onPressed: () => Navigator.of(context).pop(),
                             ),
                             Expanded(
                               child: TextField(
                                 controller: _searchCtrl,
                                 onChanged: _onSearchChanged,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
                                 decoration: InputDecoration(
+                                  fillColor: Colors.transparent,
+                                  filled: false,
                                   hintText: 'Search city, landmark or road…',
                                   hintStyle: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.45),
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.45)
+                                        : const Color(0xFF9CA3AF),
                                     fontSize: 14,
                                   ),
                                   border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                                 ),
@@ -395,7 +411,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                               )
                             else if (_searchCtrl.text.isNotEmpty)
                               IconButton(
-                                icon: const Icon(Icons.close, size: 18, color: Colors.white70),
+                                icon: Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: isDark ? Colors.white70 : const Color(0xFF6B7280),
+                                ),
                                 onPressed: () {
                                   _searchCtrl.clear();
                                   _onSearchChanged('');
@@ -413,14 +433,18 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       margin: const EdgeInsets.only(top: 8),
                       constraints: const BoxConstraints(maxHeight: 250),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF131A22).withValues(alpha: 0.94),
+                        color: isDark
+                            ? const Color(0xFF131A22).withValues(alpha: 0.96)
+                            : Colors.white.withValues(alpha: 0.98),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.1),
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : const Color(0xFFE2E8F0),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.6),
+                            color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.12),
                             blurRadius: 18,
                           ),
                         ],
@@ -434,7 +458,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           separatorBuilder: (_, _) => Divider(
                             height: 1,
                             indent: 52,
-                            color: Colors.white.withValues(alpha: 0.08),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : const Color(0xFFE5E7EB),
                           ),
                           itemBuilder: (context, i) {
                             final p = _predictions[i];
@@ -454,8 +480,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                               ),
                               title: Text(
                                 p.mainText ?? p.description,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
                                 ),
@@ -465,7 +491,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                       p.secondaryText!,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.white.withValues(alpha: 0.5),
+                                        color: isDark
+                                            ? Colors.white.withValues(alpha: 0.5)
+                                            : const Color(0xFF6B7280),
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -488,17 +516,23 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             bottom: 240,
             child: FloatingActionButton.small(
               heroTag: 'picker_recenter_2026',
-              backgroundColor: const Color(0xFF151D28).withValues(alpha: 0.9),
+              backgroundColor: isDark
+                  ? const Color(0xFF151D28).withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.95),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : const Color(0xFFE2E8F0),
+                ),
               ),
               onPressed: _goToMyLocation,
               child: const Icon(Icons.my_location, color: Color(0xFF00E676), size: 20),
             ),
           ),
 
-          // 5. 2026-Level Futuristic Glassmorphic Bottom Panel
+          // 5. Glassmorphic Bottom Panel
           Positioned(
             left: 0,
             right: 0,
@@ -510,14 +544,20 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10161E).withValues(alpha: 0.92),
+                    color: isDark
+                        ? const Color(0xFF10161E).withValues(alpha: 0.94)
+                        : Colors.white.withValues(alpha: 0.96),
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
                     border: Border(
-                      top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                      top: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.15)
+                            : const Color(0xFFE2E8F0),
+                      ),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.6),
+                        color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.12),
                         blurRadius: 24,
                         offset: const Offset(0, -6),
                       ),
@@ -550,18 +590,24 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                   decoration: BoxDecoration(
                                     color: selected
                                         ? const Color(0xFF00E676).withValues(alpha: 0.18)
-                                        : Colors.white.withValues(alpha: 0.06),
+                                        : (isDark
+                                            ? Colors.white.withValues(alpha: 0.06)
+                                            : const Color(0xFFF1F5F9)),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: selected
                                           ? const Color(0xFF00E676).withValues(alpha: 0.7)
-                                          : Colors.white.withValues(alpha: 0.1),
+                                          : (isDark
+                                              ? Colors.white.withValues(alpha: 0.1)
+                                              : const Color(0xFFE2E8F0)),
                                     ),
                                   ),
                                   child: Text(
                                     '${f.icon} ${f.label}',
                                     style: TextStyle(
-                                      color: selected ? const Color(0xFF00E676) : Colors.white70,
+                                      color: selected
+                                          ? const Color(0xFF00E676)
+                                          : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
                                       fontSize: 12,
                                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                                     ),
@@ -575,11 +621,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         // Nearby landmark suggestions
                         if (_loadingNearby) ...[
                           const SizedBox(height: 10),
-                          const SizedBox(
+                          SizedBox(
                             height: 20,
                             child: Row(
                               children: [
-                                SizedBox(
+                                const SizedBox(
                                   width: 13,
                                   height: 13,
                                   child: CircularProgressIndicator(
@@ -587,10 +633,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                     color: Color(0xFF00E676),
                                   ),
                                 ),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Scanning nearby landmarks with Ola…',
-                                  style: TextStyle(color: Colors.white60, fontSize: 11),
+                                  'Scanning nearby landmarks…',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
@@ -606,11 +655,20 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                               itemBuilder: (context, i) {
                                 final place = _nearbyPlaces[i];
                                 return ActionChip(
-                                  backgroundColor: const Color(0xFF19222D),
-                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                                  backgroundColor: isDark
+                                      ? const Color(0xFF19222D)
+                                      : Colors.white,
+                                  side: BorderSide(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.1)
+                                        : const Color(0xFFE2E8F0),
+                                  ),
                                   label: Text(
                                     place.mainText ?? place.description,
-                                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                                    style: TextStyle(
+                                      color: isDark ? Colors.white : const Color(0xFF111827),
+                                      fontSize: 11,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -654,8 +712,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                         : _currentAddress,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: isDark ? Colors.white : const Color(0xFF111827),
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14,
                                     ),
@@ -664,7 +722,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                   Text(
                                     '${_currentLat.toStringAsFixed(5)}° N, ${_currentLng.toStringAsFixed(5)}° E',
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.45),
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.45)
+                                          : const Color(0xFF6B7280),
                                       fontSize: 11,
                                       fontFamily: 'monospace',
                                     ),
@@ -677,7 +737,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
                         const SizedBox(height: 16),
 
-                        // Futuristic Gradient Confirm Button
+                        // Gradient Confirm Button
                         SizedBox(
                           width: double.infinity,
                           height: 50,

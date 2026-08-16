@@ -9,8 +9,6 @@ import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/civic_level_view.dart';
 import '../../core/widgets/staggered_entrance.dart';
-import '../../models/enums.dart';
-import '../../models/report.dart';
 import '../../router.dart';
 import '../auth/auth_controller.dart';
 
@@ -27,21 +25,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   int _myReports = 0;
   int _myConfirms = 0;
   int _myFinds = 0;
-  List<Report> _recent = const [];
 
   int get _civicScore => _myReports * 10 + _myConfirms * 5 + _myFinds * 15;
-
-  int get _openCount => _recent
-      .where(
-        (r) =>
-            r.status == ReportStatus.submitted ||
-            r.status == ReportStatus.acknowledged,
-      )
-      .length;
-  int get _inProgressCount =>
-      _recent.where((r) => r.status == ReportStatus.inProgress).length;
-  int get _resolvedCount =>
-      _recent.where((r) => r.status == ReportStatus.resolved).length;
 
   @override
   void initState() {
@@ -55,19 +40,16 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     final reportsFut = _countMyRows(kTableReports, uid);
     final confirmsFut = _countMyConfirms(uid);
     final findsFut = _countMyFinds(uid);
-    final recentFut = _fetchRecent();
 
     final myReports = await reportsFut;
     final myConfirms = await confirmsFut;
     final myFinds = await findsFut;
-    final recent = await recentFut;
 
     if (!mounted) return;
     setState(() {
       _myReports = myReports;
       _myConfirms = myConfirms;
       _myFinds = myFinds;
-      _recent = recent;
       _loading = false;
     });
   }
@@ -107,21 +89,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       return (rows as List).length;
     } catch (_) {
       return 0;
-    }
-  }
-
-  Future<List<Report>> _fetchRecent() async {
-    try {
-      final rows = await supabase
-          .from(kTableReports)
-          .select()
-          .order('created_at', ascending: false)
-          .limit(50);
-      return (rows as List)
-          .map((e) => Report.fromMap(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return const [];
     }
   }
 
@@ -169,22 +136,27 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF131A24)
-                        : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(16),
+                    color: scheme.primary.withValues(alpha: isDark ? 0.15 : 0.1),
+                    shape: BoxShape.circle,
                     border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.1)
-                          : const Color(0xFFE2E8F0),
+                      color: scheme.primary.withValues(alpha: isDark ? 0.4 : 0.5),
+                      width: 1.5,
                     ),
                   ),
-                  child: Icon(
-                    Icons.shield_outlined,
-                    color: scheme.primary,
-                    size: 22,
+                  child: Center(
+                    child: Text(
+                      (profile != null && profile.displayName.trim().isNotEmpty)
+                          ? profile.displayName.trim().characters.first.toUpperCase()
+                          : 'C',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -205,25 +177,11 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             ),
           ),
 
-          const SizedBox(height: 22),
-
-          // Community Pulse Strip
-          StaggeredEntrance(
-            index: 2,
-            child: _PulseCard(
-              loading: _loading,
-              open: _openCount,
-              inProgress: _inProgressCount,
-              resolved: _resolvedCount,
-              sample: _recent.length,
-            ),
-          ),
-
-          const SizedBox(height: 26),
+          const SizedBox(height: 24),
 
           // Section Title
           const StaggeredEntrance(
-            index: 3,
+            index: 2,
             child: _SectionHeader('Civic Modules'),
           ),
 
@@ -231,7 +189,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
           // 2x2 Feature Modules Grid
           StaggeredEntrance(
-            index: 4,
+            index: 3,
             child: GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
@@ -244,7 +202,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   icon: Icons.sensors_rounded,
                   color: NivaraColors.primary,
                   title: 'SensorWatch',
-                  subtitle: 'Passive road jolt telemetry',
+                  subtitle: 'Passive road bump sensing',
                   onTap: () => context.push(Routes.sensorWatch),
                 ),
                 _FeatureModuleTile(
@@ -258,7 +216,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   icon: Icons.map_rounded,
                   color: NivaraColors.primaryBlue,
                   title: 'CivicMap',
-                  subtitle: 'Real-time Ola live map',
+                  subtitle: 'Real-time civic map & reports',
                   onTap: () => context.push(Routes.map),
                 ),
                 _FeatureModuleTile(
@@ -488,128 +446,6 @@ class _ImpactDivider extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.12)
         : const Color(0xFFE2E8F0),
   );
-}
-
-class _PulseCard extends StatelessWidget {
-  const _PulseCard({
-    required this.loading,
-    required this.open,
-    required this.inProgress,
-    required this.resolved,
-    required this.sample,
-  });
-
-  final bool loading;
-  final int open;
-  final int inProgress;
-  final int resolved;
-  final int sample;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF10161E) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _PulseStat(
-                value: loading ? null : open,
-                label: 'Active',
-                color: NivaraColors.accent,
-                isDark: isDark,
-              ),
-              _PulseStat(
-                value: loading ? null : inProgress,
-                label: 'In Action',
-                color: NivaraColors.primaryBlue,
-                isDark: isDark,
-              ),
-              _PulseStat(
-                value: loading ? null : resolved,
-                label: 'Resolved',
-                color: NivaraColors.success,
-                isDark: isDark,
-              ),
-            ],
-          ),
-          if (!loading && sample > 0) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Live telemetry over $sample city reports',
-              style: TextStyle(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.5)
-                    : const Color(0xFF6B7280),
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PulseStat extends StatelessWidget {
-  const _PulseStat({
-    required this.value,
-    required this.label,
-    required this.color,
-    required this.isDark,
-  });
-
-  final int? value;
-  final String label;
-  final Color color;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value == null ? '—' : '$value',
-            style: TextStyle(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.65)
-                  : const Color(0xFF6B7280),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _SectionHeader extends StatelessWidget {

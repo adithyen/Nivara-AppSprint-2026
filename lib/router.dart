@@ -137,6 +137,25 @@ final routerProvider = Provider<GoRouter>((ref) {
               initialAddress: extra.address,
             );
           }
+          if (extra is ({double lat, double lng, String? address})) {
+            return ReportFormScreen(
+              initialLat: extra.lat,
+              initialLng: extra.lng,
+              initialAddress: extra.address,
+            );
+          }
+          if (extra is Map) {
+            final lat = (extra['lat'] as num?)?.toDouble();
+            final lng = (extra['lng'] as num?)?.toDouble();
+            final address = extra['address'] as String?;
+            final cat = extra['category'] as ReportCategory?;
+            return ReportFormScreen(
+              initialCategory: cat,
+              initialLat: lat,
+              initialLng: lng,
+              initialAddress: address,
+            );
+          }
           return const ReportFormScreen();
         },
       ),

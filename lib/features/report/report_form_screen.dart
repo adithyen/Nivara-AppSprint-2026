@@ -88,6 +88,26 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   }
 
   Future<void> _fetchLocation() async {
+    // If user already pre-selected coordinates on map, prioritize them and reverse geocode if needed!
+    if (_customLat != null && _customLng != null) {
+      if (_addressCtrl.text.trim().isEmpty) {
+        setState(() => _locating = true);
+        final addr = await _ola.reverseGeocode(
+          lat: _customLat!,
+          lng: _customLng!,
+        );
+        if (mounted) {
+          setState(() {
+            _locating = false;
+            if (addr != null && _addressCtrl.text.trim().isEmpty) {
+              _addressCtrl.text = addr;
+            }
+          });
+        }
+      }
+      return;
+    }
+
     setState(() => _locating = true);
     final perm = await _location.ensurePermission();
     Position? pos;
@@ -98,12 +118,12 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       _locating = false;
     });
 
-    if (pos != null && _addressCtrl.text.trim().isEmpty) {
+    if (pos != null && _addressCtrl.text.trim().isEmpty && _customLat == null) {
       final addr = await _ola.reverseGeocode(
         lat: pos.latitude,
         lng: pos.longitude,
       );
-      if (addr != null && mounted && _addressCtrl.text.trim().isEmpty) {
+      if (addr != null && mounted && _addressCtrl.text.trim().isEmpty && _customLat == null) {
         setState(() => _addressCtrl.text = addr);
       }
     }
@@ -271,6 +291,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
   // ── Step 1: Dedicated Category Selection Screen ───────────────────────────
   Widget _buildCategorySelectionScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final query = _categoryFilterCtrl.text.trim().toLowerCase();
     final filteredCategories = ReportCategory.values.where((c) {
       if (query.isEmpty) return true;
@@ -319,7 +340,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                   ? Center(
                       child: Text(
                         'No category found matching "$query"',
-                        style: const TextStyle(color: Colors.white60),
+                        style: TextStyle(
+                          color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                        ),
                       ),
                     )
                   : GridView.builder(
@@ -341,11 +364,24 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                           borderRadius: BorderRadius.circular(16),
                           child: Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF141C26),
+                              color: isDark
+                                  ? const Color(0xFF141C26)
+                                  : Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.1),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.1)
+                                    : const Color(0xFFE2E8F0),
                               ),
+                              boxShadow: isDark
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.04),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                             ),
                             padding: const EdgeInsets.all(10),
                             child: Column(
@@ -369,10 +405,10 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                                    color: isDark ? Colors.white : const Color(0xFF111827),
                                   ),
                                 ),
                               ],
@@ -439,16 +475,23 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Issue Category',
-                            style: TextStyle(fontSize: 11, color: Colors.white60),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white60
+                                  : const Color(0xFF6B7280),
+                            ),
                           ),
                           Text(
                             _category!.label,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white
+                                  : const Color(0xFF111827),
                             ),
                           ),
                         ],
@@ -625,10 +668,10 @@ class _LocationCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: locating
-                      ? const Text('Acquiring GPS location…')
+                      ? const Text('Acquiring location…')
                       : lat == null
                           ? const Text(
-                              'Location unavailable — pick on Ola Map or enable GPS.',
+                              'Location unavailable — pick on map or enable GPS.',
                               style: TextStyle(fontSize: 13),
                             )
                           : Column(
@@ -636,7 +679,7 @@ class _LocationCard extends StatelessWidget {
                               children: [
                                 Text(
                                   _hasCustom
-                                      ? 'Selected on Ola Map'
+                                      ? 'Selected on map'
                                       : 'GPS location captured',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
@@ -674,7 +717,7 @@ class _LocationCard extends StatelessWidget {
                 onPressed: onPickOnMap,
                 icon: const Icon(Icons.map, size: 18),
                 label: Text(
-                  _hasCustom ? 'Change on Ola Map' : 'Select on Ola Map',
+                  _hasCustom ? 'Change on map' : 'Select on map',
                 ),
               ),
             ),

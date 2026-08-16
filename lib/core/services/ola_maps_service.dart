@@ -174,13 +174,21 @@ class OlaMapsService {
   bool get isConfigured => apiKey != null;
 
   static const String kDefaultDarkStyleUrl =
-      'https://api.olamaps.io/styleEditor/v1/styleEdit/styles/1a5115aa-26c8-4e8b-8433-0e2858238ca7/Style1-Dark';
+      'https://api.olamaps.io/tiles/vector/v1/styles/default-dark-standard/style.json';
+
+  static const String kDefaultLightStyleUrl =
+      'https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json';
 
   String get darkStyleUrl {
     final configured = dotenv.env['OLA_MAPS_DARK_STYLE_URL']?.trim();
     if (configured != null && configured.isNotEmpty) return configured;
     return kDefaultDarkStyleUrl;
   }
+
+  String get lightStyleUrl => kDefaultLightStyleUrl;
+
+  String getStyleUrl({required bool isDark}) =>
+      isDark ? darkStyleUrl : lightStyleUrl;
 
   // ── 1. Vector Style Resolver ──────────────────────────────────────────────
 

@@ -705,10 +705,10 @@ class _LocationCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: locating
-                      ? const Text('Acquiring GPS location…')
+                      ? const Text('Acquiring location…')
                       : lat == null
                           ? const Text(
-                              'Location unavailable — pick on Ola Map or enable GPS.',
+                              'Location unavailable — pick on map or enable GPS.',
                               style: TextStyle(fontSize: 13),
                             )
                           : Column(
@@ -716,7 +716,7 @@ class _LocationCard extends StatelessWidget {
                               children: [
                                 Text(
                                   _hasCustom
-                                      ? 'Selected on Ola Map'
+                                      ? 'Selected on map'
                                       : 'GPS location captured',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
@@ -754,7 +754,7 @@ class _LocationCard extends StatelessWidget {
                 onPressed: onPickOnMap,
                 icon: const Icon(Icons.map, size: 18),
                 label: Text(
-                  _hasCustom ? 'Change on Ola Map' : 'Select on Ola Map',
+                  _hasCustom ? 'Change on map' : 'Select on map',
                 ),
               ),
             ),
