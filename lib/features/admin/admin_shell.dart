@@ -215,7 +215,6 @@ class _AdminProfileTab extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF131A24),
         title: const Text('Sign out of Command Center?'),
         content: const Text('You will need to sign in again to dispatch reports.'),
         actions: [
@@ -296,6 +295,7 @@ class _OfficerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final name = profile?.displayName ?? 'Municipal Officer';
     final role = (profile?.role ?? UserRole.admin).label;
     final dept = profile?.department?.label;
@@ -309,19 +309,22 @@ class _OfficerCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E2A38), Color(0xFF10161E)],
-        ),
+        color: isDark ? null : Colors.white,
+        gradient: isDark
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1E2A38), Color(0xFF10161E)],
+              )
+            : null,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: NivaraColors.accent.withValues(alpha: 0.35),
+          color: NivaraColors.accent.withValues(alpha: isDark ? 0.35 : 0.4),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.05),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -352,8 +355,8 @@ class _OfficerCard extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -365,7 +368,7 @@ class _OfficerCard extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: NivaraColors.accent.withValues(alpha: 0.18),
+                    color: NivaraColors.accent.withValues(alpha: isDark ? 0.18 : 0.12),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: NivaraColors.accent.withValues(alpha: 0.5),
@@ -373,8 +376,8 @@ class _OfficerCard extends StatelessWidget {
                   ),
                   child: Text(
                     dept == null ? role : '$role · $dept',
-                    style: const TextStyle(
-                      color: NivaraColors.accent,
+                    style: TextStyle(
+                      color: isDark ? NivaraColors.accent : const Color(0xFFB45309),
                       fontWeight: FontWeight.w700,
                       fontSize: 11.5,
                     ),
@@ -384,9 +387,9 @@ class _OfficerCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.place_outlined,
-                        color: Colors.white60,
+                        color: isDark ? Colors.white60 : const Color(0xFF64748B),
                         size: 14,
                       ),
                       const SizedBox(width: 4),
@@ -395,7 +398,10 @@ class _OfficerCard extends StatelessWidget {
                           area,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white60, fontSize: 11.5),
+                          style: TextStyle(
+                            color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                            fontSize: 11.5,
+                          ),
                         ),
                       ),
                     ],
@@ -429,21 +435,32 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF131A24),
+          color: isDark ? const Color(0xFF131A24) : Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
+                color: color.withValues(alpha: isDark ? 0.15 : 0.10),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(icon, color: color, size: 22),
@@ -455,8 +472,8 @@ class _ActionTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -465,7 +482,7 @@ class _ActionTile extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
+                      color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
                       fontSize: 12,
                     ),
                   ),
@@ -494,7 +511,10 @@ class _ActionTile extends StatelessWidget {
               ),
               const SizedBox(width: 6),
             ],
-            const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+            ),
           ],
         ),
       ),

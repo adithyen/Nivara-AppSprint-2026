@@ -290,6 +290,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
 
   // ── Step 1: Category Selection Screen ─────────────────────────────────────
   Widget _buildCategorySelectionScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = _isLost ? NivaraColors.danger : NivaraColors.primary;
     final query = _categoryFilterCtrl.text.trim().toLowerCase();
     final filteredCategories = LFCategory.values.where((c) {
@@ -339,7 +340,9 @@ class _LFFormScreenState extends State<LFFormScreen> {
                   ? Center(
                       child: Text(
                         'No category found matching "$query"',
-                        style: const TextStyle(color: Colors.white60),
+                        style: TextStyle(
+                          color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                        ),
                       ),
                     )
                   : GridView.builder(
@@ -361,11 +364,20 @@ class _LFFormScreenState extends State<LFFormScreen> {
                           borderRadius: BorderRadius.circular(16),
                           child: Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF141C26),
+                              color: isDark ? const Color(0xFF10161E) : Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.1),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.1)
+                                    : const Color(0xFFE2E8F0),
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             padding: const EdgeInsets.all(10),
                             child: Column(
@@ -374,7 +386,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: accent.withValues(alpha: 0.14),
+                                    color: accent.withValues(alpha: isDark ? 0.14 : 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -389,10 +401,10 @@ class _LFFormScreenState extends State<LFFormScreen> {
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                                   ),
                                 ),
                               ],
@@ -410,6 +422,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
 
   // ── Step 2: Details Form Screen ───────────────────────────────────────────
   Widget _buildDetailsFormScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = _isLost ? NivaraColors.danger : NivaraColors.primary;
 
     return Scaffold(
@@ -436,10 +449,10 @@ class _LFFormScreenState extends State<LFFormScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
+                  color: accent.withValues(alpha: isDark ? 0.12 : 0.08),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: accent.withValues(alpha: 0.35),
+                    color: accent.withValues(alpha: isDark ? 0.35 : 0.3),
                   ),
                 ),
                 child: Row(
@@ -447,7 +460,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.2),
+                        color: accent.withValues(alpha: isDark ? 0.2 : 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -461,16 +474,19 @@ class _LFFormScreenState extends State<LFFormScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Item Category',
-                            style: TextStyle(fontSize: 11, color: Colors.white60),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                            ),
                           ),
                           Text(
                             _category!.label,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
                         ],

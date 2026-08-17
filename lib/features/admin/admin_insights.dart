@@ -291,12 +291,23 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +318,7 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: data.color.withValues(alpha: 0.16),
+                  color: data.color.withValues(alpha: isDark ? 0.16 : 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(data.icon, color: data.color, size: 20),
@@ -330,7 +341,7 @@ class _StatCard extends StatelessWidget {
               Text(
                 data.label,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -620,12 +631,23 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF10161E),
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -636,9 +658,11 @@ class _Panel extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14.5,
+                ),
               ),
             ],
           ),

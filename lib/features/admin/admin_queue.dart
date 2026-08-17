@@ -557,18 +557,33 @@ class _QueueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sev = severityColor(report.severity);
     final title = report.title?.trim().isNotEmpty == true
         ? report.title!.trim()
         : report.category.label;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B);
+    final iconMuted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final timeColor = isDark ? Colors.white.withValues(alpha: 0.4) : const Color(0xFF94A3B8);
+
     return BouncyTap(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF10161E),
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -578,7 +593,7 @@ class _QueueCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: sev.withValues(alpha: 0.16),
+                    color: sev.withValues(alpha: isDark ? 0.16 : 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(categoryIcon(report.category), color: sev, size: 20),
@@ -592,8 +607,8 @@ class _QueueCard extends StatelessWidget {
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: primaryText,
                           fontWeight: FontWeight.w700,
                           fontSize: 14.5,
                         ),
@@ -602,7 +617,7 @@ class _QueueCard extends StatelessWidget {
                       Text(
                         '${report.category.label} · ${report.severity.label}',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: secondaryText,
                           fontSize: 12,
                         ),
                       ),
@@ -618,13 +633,13 @@ class _QueueCard extends StatelessWidget {
                 Icon(
                   report.isFromSensor ? Icons.radar_rounded : Icons.edit_note_rounded,
                   size: 15,
-                  color: Colors.white60,
+                  color: iconMuted,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   report.isFromSensor ? 'SensorWatch' : 'Manual',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: secondaryText,
                     fontSize: 12,
                   ),
                 ),
@@ -647,12 +662,12 @@ class _QueueCard extends StatelessWidget {
                 ],
                 if (report.confirmationCount > 0) ...[
                   const SizedBox(width: 8),
-                  const Icon(Icons.group_rounded, size: 15, color: Colors.white60),
+                  Icon(Icons.group_rounded, size: 15, color: iconMuted),
                   const SizedBox(width: 3),
                   Text(
                     '${report.confirmationCount}',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: secondaryText,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -662,7 +677,7 @@ class _QueueCard extends StatelessWidget {
                 Text(
                   timeAgo(report.createdAt),
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: timeColor,
                     fontSize: 11,
                   ),
                 ),

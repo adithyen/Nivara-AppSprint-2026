@@ -133,24 +133,8 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   Future<void> _resign() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Resign from Field Team?'),
-        content: const Text(
-          'You will be removed from the field workforce and your account will '
-          'revert to citizen status.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: NivaraColors.danger),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Resign', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (_) => const _ResignConfirmationDialog(),
     );
     if (ok != true || !mounted) return;
     try {
@@ -1537,6 +1521,298 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Two-step Resignation Confirmation: Requires typing 'CONFIRM' then sliding to execute.
+class _ResignConfirmationDialog extends StatefulWidget {
+  const _ResignConfirmationDialog();
+
+  @override
+  State<_ResignConfirmationDialog> createState() => _ResignConfirmationDialogState();
+}
+
+class _ResignConfirmationDialogState extends State<_ResignConfirmationDialog>
+    with SingleTickerProviderStateMixin {
+  final _confirmCtrl = TextEditingController();
+  bool _unlocked = false;
+  double _dragPosition = 0.0;
+  bool _confirmed = false;
+
+  late final AnimationController _resetAnim;
+  Animation<double>? _resetProgress;
+
+  @override
+  void initState() {
+    super.initState();
+    _resetAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _confirmCtrl.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    final matches = _confirmCtrl.text.trim() == 'CONFIRM';
+    if (matches != _unlocked) {
+      setState(() {
+        _unlocked = matches;
+        if (!_unlocked) _dragPosition = 0.0;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _confirmCtrl.removeListener(_onTextChanged);
+    _confirmCtrl.dispose();
+    _resetAnim.dispose();
+    super.dispose();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details, double trackWidth, double thumbSize) {
+    if (!_unlocked || _confirmed) return;
+    final maxDrag = trackWidth - thumbSize;
+    if (maxDrag <= 0) return;
+
+    setState(() {
+      _dragPosition = (_dragPosition + details.delta.dx).clamp(0.0, maxDrag);
+    });
+
+    if (_dragPosition >= maxDrag * 0.90 && !_confirmed) {
+      _confirmed = true;
+      Navigator.pop(context, true);
+    }
+  }
+
+  void _onDragEnd(DragEndDetails details, double trackWidth, double thumbSize) {
+    if (!_unlocked || _confirmed) return;
+    final maxDrag = trackWidth - thumbSize;
+    if (_dragPosition < maxDrag * 0.90) {
+      _resetProgress = Tween<double>(begin: _dragPosition, end: 0.0).animate(
+        CurvedAnimation(parent: _resetAnim, curve: Curves.easeOutCubic),
+      )..addListener(() {
+          setState(() {
+            _dragPosition = _resetProgress!.value;
+          });
+        });
+      _resetAnim.forward(from: 0.0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
+
+    return Dialog(
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Danger Icon Header
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: NivaraColors.danger.withValues(alpha: isDark ? 0.16 : 0.12),
+                  border: Border.all(
+                    color: NivaraColors.danger.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: NivaraColors.danger,
+                  size: 32,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Resign from Field Team?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: primaryText,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You will be removed from the field workforce and your account will revert to citizen status.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: secondaryText,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Step 1: Input text box
+            Text(
+              "Type 'CONFIRM' to unlock slider:",
+              style: TextStyle(
+                color: secondaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _confirmCtrl,
+              textCapitalization: TextCapitalization.characters,
+              style: TextStyle(
+                color: primaryText,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+              ),
+              decoration: InputDecoration(
+                hintText: 'CONFIRM',
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white30 : const Color(0xFF94A3B8),
+                  letterSpacing: 1.5,
+                ),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF161F2B) : const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: _unlocked
+                        ? NivaraColors.danger
+                        : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: _unlocked
+                        ? NivaraColors.danger
+                        : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                    width: _unlocked ? 1.8 : 1.0,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: NivaraColors.danger,
+                    width: 2.0,
+                  ),
+                ),
+                prefixIcon: Icon(
+                  _unlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                  color: _unlocked ? NivaraColors.danger : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Step 2: Slide to Confirm Slider
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const trackHeight = 54.0;
+                const thumbSize = 46.0;
+                final trackWidth = constraints.maxWidth;
+                final maxDrag = trackWidth - thumbSize - 8.0;
+
+                return Container(
+                  height: trackHeight,
+                  decoration: BoxDecoration(
+                    color: _unlocked
+                        ? NivaraColors.danger.withValues(alpha: isDark ? 0.15 : 0.12)
+                        : (isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9)),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: _unlocked
+                          ? NivaraColors.danger.withValues(alpha: 0.5)
+                          : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      // Slider Prompt / Instruction
+                      Center(
+                        child: Text(
+                          _unlocked
+                              ? 'Slide to confirm resignation ➔'
+                              : 'Type CONFIRM above to unlock',
+                          style: TextStyle(
+                            color: _unlocked
+                                ? NivaraColors.danger
+                                : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      // Slide Thumb
+                      Positioned(
+                        left: 4.0 + (_unlocked ? _dragPosition : 0.0),
+                        child: GestureDetector(
+                          onHorizontalDragUpdate: (d) => _onDragUpdate(d, trackWidth, thumbSize + 8.0),
+                          onHorizontalDragEnd: (d) => _onDragEnd(d, trackWidth, thumbSize + 8.0),
+                          child: Container(
+                            width: thumbSize,
+                            height: thumbSize,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _unlocked ? NivaraColors.danger : (isDark ? const Color(0xFF1E2836) : const Color(0xFFCBD5E1)),
+                              boxShadow: _unlocked
+                                  ? [
+                                      BoxShadow(
+                                        color: NivaraColors.danger.withValues(alpha: 0.4),
+                                        blurRadius: 10,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Icon(
+                              _unlocked
+                                  ? Icons.double_arrow_rounded
+                                  : Icons.lock_rounded,
+                              color: _unlocked ? Colors.white : (isDark ? Colors.white38 : const Color(0xFF64748B)),
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Cancel Button
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: secondaryText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -69,8 +69,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
+    final iconColor = isDark ? Colors.white60 : const Color(0xFF64748B);
+
     return Scaffold(
-      backgroundColor: NivaraColors.canvasDark,
+      backgroundColor: isDark ? NivaraColors.canvasDark : NivaraColors.surfaceLight,
       appBar: AppBar(
         title: const Text('Create Citizen Account'),
         leading: IconButton(
@@ -105,8 +110,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Join $kAppName',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: primaryText,
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
                     ),
@@ -116,7 +121,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     'Empower your neighborhood with verified civic proof.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: secondaryText,
                       fontSize: 13,
                     ),
                   ),
@@ -126,10 +131,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     controller: _name,
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.next,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: primaryText, fontSize: 14),
+                    decoration: InputDecoration(
                       labelText: 'Full Name',
-                      prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.white60),
+                      prefixIcon: Icon(Icons.person_outline_rounded, color: iconColor),
                     ),
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Enter your name' : null,
@@ -141,10 +146,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
                     textInputAction: TextInputAction.next,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: primaryText, fontSize: 14),
+                    decoration: InputDecoration(
                       labelText: 'Email Address',
-                      prefixIcon: Icon(Icons.email_outlined, color: Colors.white60),
+                      prefixIcon: Icon(Icons.email_outlined, color: iconColor),
                     ),
                     validator: (v) {
                       final t = v?.trim() ?? '';
@@ -163,16 +168,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     autofillHints: const [AutofillHints.newPassword],
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _submit(),
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: primaryText, fontSize: 14),
                     decoration: InputDecoration(
                       labelText: 'Password (min 6 chars)',
-                      prefixIcon: const Icon(Icons.lock_outline_rounded, color: Colors.white60),
+                      prefixIcon: Icon(Icons.lock_outline_rounded, color: iconColor),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscure
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
-                          color: Colors.white60,
+                          color: iconColor,
                         ),
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
@@ -275,16 +280,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       Text(
                         'Already have an account? ',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: secondaryText,
                           fontSize: 13.5,
                         ),
                       ),
                       TextButton(
                         onPressed: _loading ? null : () => context.go(Routes.login),
-                        child: const Text(
+                        child: Text(
                           'Sign In',
                           style: TextStyle(
-                            color: NivaraColors.primary,
+                            color: isDark ? NivaraColors.primary : const Color(0xFF007A3D),
                             fontWeight: FontWeight.w800,
                             fontSize: 13.5,
                           ),

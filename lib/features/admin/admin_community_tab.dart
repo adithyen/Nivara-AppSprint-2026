@@ -8,18 +8,16 @@ import '../../core/services/location_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../models/community_poll.dart';
 import '../../models/community_post.dart';
 import '../../models/enums.dart';
 import '../../router.dart';
+import '../community/community_tab.dart' show communityTypeColor, communityTypeIcon;
 import '../worker/worker_repo.dart';
 
-/// The **Admin Community** tab — same neighbourhood board as the citizen side,
-/// but officials additionally see a **Delete** button on every post so they
-/// can remove inappropriate content. They can also compose posts just like
-/// citizens.
-///
-/// Body-only (the [Scaffold]/[AppBar] belong to the admin shell).
+/// **Admin Community** tab — state-of-the-art municipal civic feed matching the citizen UI,
+/// equipped with official moderation tools (remove inappropriate content, broadcast announcements).
 class AdminCommunityTab extends ConsumerStatefulWidget {
   const AdminCommunityTab({super.key});
 
@@ -119,12 +117,12 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
     };
   }
 
-  Future<void> _compose(CommunityPostType type) async {
-    final created = await context.push<bool>(
+  Future<void> _compose(CommunityPostType template) async {
+    final changed = await context.push<bool>(
       Routes.communityCompose,
-      extra: (type: type, existing: null),
+      extra: (template: template, lat: _lat, lng: _lng),
     );
-    if (created == true) await _load();
+    if (changed == true) await _load();
   }
 
   Future<void> _adminDelete(CommunityPost post) async {
@@ -133,7 +131,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
       builder: (_) => AlertDialog(
         title: const Text('Delete post?'),
         content: Text(
-          'Remove "${post.title.length > 60 ? '${post.title.substring(0, 60)}\u2026' : post.title}" from the community board? This cannot be undone.',
+          'Remove "${post.title.length > 60 ? '${post.title.substring(0, 60)}…' : post.title}" from the civic feed? This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -145,7 +143,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
               backgroundColor: NivaraColors.danger,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -157,7 +155,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
         setState(() => _posts.removeWhere((p) => p.id == post.id));
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Post removed.')));
+          ..showSnackBar(const SnackBar(content: Text('Post removed from feed.')));
       }
     } catch (e) {
       if (mounted) {
@@ -170,218 +168,506 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      children: [
-        // Compose prompt — same as user community
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Post to community',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return RefreshIndicator(
+      color: NivaraColors.primary,
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 110),
+        children: [
+          _AdminComposerPrompt(onPick: _compose),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Text(
+                'Civic Community Feed',
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              if (!_loading && _posts.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: NivaraColors.primary.withValues(alpha: isDark ? 0.15 : 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_posts.length} posts',
+                    style: const TextStyle(
+                      color: NivaraColors.primary,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      for (final t in CommunityPostType.values)
-                        ActionChip(
-                          label: Text(t.label),
-                          onPressed: () => _compose(t),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Posts list
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _posts.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.groups_outlined, size: 56, color: scheme.outline),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No community posts',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Be the first to post something to the neighbourhood board.',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
-                    itemCount: _posts.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) {
-                      final post = _posts[i];
-                      return _AdminPostCard(
-                        post: post,
-                        options: _pollOptions[post.id],
-                        myVoteOptionId: _myVotes[post.id],
-                        onDelete: () => _adminDelete(post),
-                      );
-                    },
-                  ),
                 ),
-        ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 36),
+              child: Center(
+                child: CircularProgressIndicator(color: NivaraColors.primary),
+              ),
+            )
+          else if (_posts.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.groups_outlined,
+                      size: 56,
+                      color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No community posts yet',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Citizen discussions, polls, and announcements will appear here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._posts.map((p) {
+              final dist = (p.lat != null && p.lng != null)
+                  ? haversineMeters(_lat, _lng, p.lat!, p.lng!)
+                  : null;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _AdminPostCard(
+                  post: p,
+                  distanceMeters: dist,
+                  options: _pollOptions[p.id] ?? const [],
+                  myVoteOptionId: _myVotes[p.id],
+                  onDelete: () => _adminDelete(p),
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 }
 
-/// A community post card with an admin Delete button overlaid.
+class _AdminComposerPrompt extends StatelessWidget {
+  const _AdminComposerPrompt({required this.onPick});
+  final ValueChanged<CommunityPostType> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: NivaraColors.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.campaign_rounded, color: NivaraColors.accent, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Official Broadcast & Post',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  Text(
+                    'Publish alerts, polls, or announcements to citizens.',
+                    style: TextStyle(
+                      color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _AdminTemplateButton(
+                type: CommunityPostType.announcement,
+                onTap: () => onPick(CommunityPostType.announcement),
+              ),
+              const SizedBox(width: 8),
+              _AdminTemplateButton(
+                type: CommunityPostType.poll,
+                onTap: () => onPick(CommunityPostType.poll),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _AdminTemplateButton(
+                type: CommunityPostType.general,
+                onTap: () => onPick(CommunityPostType.general),
+              ),
+              const SizedBox(width: 8),
+              _AdminTemplateButton(
+                type: CommunityPostType.job,
+                onTap: () => onPick(CommunityPostType.job),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminTemplateButton extends StatelessWidget {
+  const _AdminTemplateButton({required this.type, required this.onTap});
+  final CommunityPostType type;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = communityTypeColor(type);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Expanded(
+      child: BouncyTap(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.12 : 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(communityTypeIcon(type), color: color, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                type.label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A flagship community post card with an official admin moderation toolbar.
 class _AdminPostCard extends StatelessWidget {
   const _AdminPostCard({
     required this.post,
-    this.options,
+    this.distanceMeters,
+    required this.options,
     this.myVoteOptionId,
     required this.onDelete,
   });
 
   final CommunityPost post;
-  final List<CommunityPollOption>? options;
+  final double? distanceMeters;
+  final List<CommunityPollOption> options;
   final String? myVoteOptionId;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: NivaraColors.primary.withValues(alpha: 0.15),
-                  child: const Icon(
-                    Icons.person,
-                    color: NivaraColors.primary,
-                    size: 18,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = communityTypeColor(post.type);
+    final totalVotes = options.fold<int>(0, (sum, o) => sum + o.voteCount);
+
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Author Header + Type Badge + Moderation Action
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: color.withValues(alpha: isDark ? 0.2 : 0.12),
+                child: Text(
+                  post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.authorName,
+                      style: TextStyle(
+                        color: primaryText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          timeAgo(post.createdAt),
+                          style: TextStyle(color: secondaryText, fontSize: 11),
+                        ),
+                        if (distanceMeters != null) ...[
+                          Text(' · ', style: TextStyle(color: secondaryText, fontSize: 11)),
+                          Text(
+                            formatDistance(distanceMeters!),
+                            style: TextStyle(color: secondaryText, fontSize: 11),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Type Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: isDark ? 0.15 : 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withValues(alpha: isDark ? 0.4 : 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(communityTypeIcon(post.type), color: color, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      post.type.label,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Title
+          Text(
+            post.title,
+            style: TextStyle(
+              color: primaryText,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
+          // Body
+          if (post.body != null && post.body!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              post.body!.trim(),
+              style: TextStyle(
+                color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF334155),
+                fontSize: 13.5,
+                height: 1.4,
+              ),
+            ),
+          ],
+
+          // Poll Section (if poll)
+          if (post.isPoll && options.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...options.map((opt) {
+              final pct = totalVotes > 0 ? (opt.voteCount / totalVotes * 100).round() : 0;
+              final isMyVote = myVoteOptionId == opt.id;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isMyVote
+                          ? color
+                          : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+                    ),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        post.authorName,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              opt.label,
+                              style: TextStyle(
+                                color: primaryText,
+                                fontWeight: isMyVote ? FontWeight.w700 : FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${opt.voteCount} (${pct}%)',
+                            style: TextStyle(
+                              color: isMyVote ? color : secondaryText,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        timeAgo(post.createdAt),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: totalVotes > 0 ? opt.voteCount / totalVotes : 0,
+                          minHeight: 5,
+                          backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                          valueColor: AlwaysStoppedAnimation(color),
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Admin delete button
-                IconButton(
-                  tooltip: 'Delete post',
-                  icon: Icon(
-                    Icons.delete_outline,
-                    color: NivaraColors.danger,
+              );
+            }),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Admin Moderation Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.admin_panel_settings_outlined,
+                  size: 16,
+                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Official Moderation',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
                   ),
-                  onPressed: onDelete,
+                ),
+                const Spacer(),
+                BouncyTap(
+                  onTap: onDelete,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: NivaraColors.danger.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: NivaraColors.danger.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 14, color: NivaraColors.danger),
+                        SizedBox(width: 4),
+                        Text(
+                          'Delete Post',
+                          style: TextStyle(
+                            color: NivaraColors.danger,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            // Post type badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: NivaraColors.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                post.type.label,
-                style: TextStyle(
-                  color: NivaraColors.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Title + Body
-            Text(
-              post.title,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            if (post.body?.trim().isNotEmpty == true) ...[  
-              const SizedBox(height: 4),
-              Text(post.body!),
-            ],
-            // Poll options
-            if (post.isPoll && options != null && options!.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              for (final opt in options!)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Icon(
-                        myVoteOptionId == opt.id
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                        size: 16,
-                        color: myVoteOptionId == opt.id
-                            ? NivaraColors.primary
-                            : scheme.outline,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(opt.label)),
-                      Text(
-                        '${opt.voteCount}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

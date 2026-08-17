@@ -67,6 +67,7 @@ abstract final class Routes {
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
   ref.listen(authControllerProvider, (_, _) => refresh.value++);
+  ref.listen(splashAnimationDoneProvider, (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
@@ -74,12 +75,13 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
+      final splashDone = ref.read(splashAnimationDoneProvider);
       final loc = state.matchedLocation;
       final atAuth = loc == Routes.login || loc == Routes.signup;
       final atSplash = loc == Routes.splash;
 
-      // Initial profile still loading — hold on the splash screen.
-      if (auth.isLoading) return atSplash ? null : Routes.splash;
+      // Hold on the branded splash screen until its animation completes or while profile is loading
+      if (!splashDone || auth.isLoading) return atSplash ? null : Routes.splash;
 
       final profile = auth.asData?.value;
       final loggedIn = profile != null;

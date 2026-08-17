@@ -81,9 +81,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isStaff = _mode != _LoginMode.citizen;
+
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B);
+    final iconColor = isDark ? Colors.white60 : const Color(0xFF64748B);
+
     return Scaffold(
-      backgroundColor: NivaraColors.canvasDark,
+      backgroundColor: isDark ? NivaraColors.canvasDark : NivaraColors.surfaceLight,
       body: Stack(
         children: [
           // Background ambient gradient orbs
@@ -95,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 240,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: NivaraColors.primary.withValues(alpha: 0.12),
+                color: NivaraColors.primary.withValues(alpha: isDark ? 0.12 : 0.08),
               ),
             ),
           ),
@@ -107,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: NivaraColors.primaryBlue.withValues(alpha: 0.08),
+                color: NivaraColors.primaryBlue.withValues(alpha: isDark ? 0.08 : 0.06),
               ),
             ),
           ),
@@ -131,7 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                              color: const Color(0xFF00E676).withValues(alpha: isDark ? 0.4 : 0.25),
                               blurRadius: 28,
                               spreadRadius: 2,
                             ),
@@ -146,8 +152,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 16),
                       Text(
                         kAppName,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: primaryText,
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.5,
@@ -158,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         kAppTagline,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: secondaryText,
                           fontSize: 13.5,
                           fontWeight: FontWeight.w500,
                         ),
@@ -166,13 +172,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                       const SizedBox(height: 28),
 
-                      // Glassmorphic Role Switcher
+                      // Role Switcher
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10161E),
+                          color: isDark ? const Color(0xFF10161E) : Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                          border: Border.all(
+                            color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [
@@ -184,7 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   padding: const EdgeInsets.symmetric(vertical: 10),
                                   decoration: BoxDecoration(
                                     color: _mode == _LoginMode.citizen
-                                        ? NivaraColors.primary.withValues(alpha: 0.2)
+                                        ? NivaraColors.primary.withValues(alpha: isDark ? 0.2 : 0.14)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(16),
                                     border: _mode == _LoginMode.citizen
@@ -199,15 +214,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         size: 18,
                                         color: _mode == _LoginMode.citizen
                                             ? NivaraColors.primary
-                                            : Colors.white60,
+                                            : iconColor,
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
                                         'Citizen',
                                         style: TextStyle(
                                           color: _mode == _LoginMode.citizen
-                                              ? NivaraColors.primary
-                                              : Colors.white60,
+                                              ? (_mode == _LoginMode.citizen && !isDark ? const Color(0xFF007A3D) : NivaraColors.primary)
+                                              : iconColor,
                                           fontWeight: FontWeight.w700,
                                           fontSize: 13.5,
                                         ),
@@ -225,7 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   padding: const EdgeInsets.symmetric(vertical: 10),
                                   decoration: BoxDecoration(
                                     color: _mode == _LoginMode.official
-                                        ? NivaraColors.accent.withValues(alpha: 0.2)
+                                        ? NivaraColors.accent.withValues(alpha: isDark ? 0.2 : 0.14)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(16),
                                     border: _mode == _LoginMode.official
@@ -240,15 +255,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         size: 18,
                                         color: _mode == _LoginMode.official
                                             ? NivaraColors.accent
-                                            : Colors.white60,
+                                            : iconColor,
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
                                         'Officials',
                                         style: TextStyle(
                                           color: _mode == _LoginMode.official
-                                              ? NivaraColors.accent
-                                              : Colors.white60,
+                                              ? (_mode == _LoginMode.official && !isDark ? const Color(0xFFB45309) : NivaraColors.accent)
+                                              : iconColor,
                                           fontWeight: FontWeight.w700,
                                           fontSize: 13.5,
                                         ),
@@ -277,12 +292,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : TextInputType.emailAddress,
                         autofillHints: isStaff ? null : const [AutofillHints.email],
                         textInputAction: TextInputAction.next,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style: TextStyle(color: primaryText, fontSize: 14),
                         decoration: InputDecoration(
                           labelText: isStaff ? 'Email or username' : 'Email',
                           prefixIcon: Icon(
                             isStaff ? Icons.badge_outlined : Icons.email_outlined,
-                            color: Colors.white60,
+                            color: iconColor,
                           ),
                         ),
                         validator: (v) {
@@ -308,16 +323,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : const [AutofillHints.password],
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _submit(),
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style: TextStyle(color: primaryText, fontSize: 14),
                         decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white60),
+                          prefixIcon: Icon(Icons.lock_outline, color: iconColor),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscure
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
-                              color: Colors.white60,
+                              color: iconColor,
                             ),
                             onPressed: () => setState(() => _obscure = !_obscure),
                           ),
@@ -420,16 +435,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             Text(
                               "Don't have an account? ",
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
+                                color: secondaryText,
                                 fontSize: 13.5,
                               ),
                             ),
                             TextButton(
                               onPressed: _loading ? null : () => context.go(Routes.signup),
-                              child: const Text(
+                              child: Text(
                                 'Sign Up',
                                 style: TextStyle(
-                                  color: NivaraColors.primary,
+                                  color: isDark ? NivaraColors.primary : const Color(0xFF007A3D),
                                   fontWeight: FontWeight.w800,
                                   fontSize: 13.5,
                                 ),
