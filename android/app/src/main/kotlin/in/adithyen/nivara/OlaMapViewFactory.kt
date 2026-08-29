@@ -1,4 +1,4 @@
-package com.nivara.nivara
+package `in`.adithyen.nivara
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -264,14 +264,12 @@ class OlaNativeView(
 
             // Teardrop path
             val path = Path().apply {
-                // Arc around top head circle
                 arcTo(
                     RectF(headCenterX - headRadius, headCenterY - headRadius, headCenterX + headRadius, headCenterY + headRadius),
                     -205f,
                     230f,
                     false
                 )
-                // Line down to needle tip
                 lineTo(headCenterX, needleTipY)
                 close()
             }

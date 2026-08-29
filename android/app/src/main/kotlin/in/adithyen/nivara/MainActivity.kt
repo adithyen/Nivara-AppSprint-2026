@@ -1,5 +1,6 @@
-package com.nivara.nivara
+package `in`.adithyen.nivara
 
+import `in`.adithyen.nivara.R
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ShortcutInfo
@@ -11,7 +12,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val SHORTCUT_CHANNEL = "com.nivara.app/shortcuts"
+    private val SHORTCUT_CHANNEL = "in.adithyen.nivara/shortcuts"
     private var pendingRoute: String? = null
     private var channel: MethodChannel? = null
 

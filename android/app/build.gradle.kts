@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.nivara.nivara"
+    namespace = "in.adithyen.nivara"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -17,8 +17,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.nivara.nivara"
+        applicationId = "in.adithyen.nivara"
         // maplibre_gl + supabase realtime want a modern floor; keep >= 24.
         minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
