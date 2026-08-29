@@ -10,7 +10,7 @@ import '../../core/widgets/glass_card.dart';
 import '../../router.dart';
 import 'auth_controller.dart';
 
-enum _LoginMode { citizen, official }
+enum _LoginMode { citizen, worker, official }
 
 /// 2026-Level Cyber-Civic Portal Login Screen.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -40,17 +40,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _mode = mode;
       _error = null;
-      const demoUsers = [kDemoAdminUsername];
-      const demoPasswords = [kDemoAdminPassword];
-      if (demoUsers.contains(_email.text)) _email.clear();
-      if (demoPasswords.contains(_password.text)) _password.clear();
       switch (mode) {
         case _LoginMode.citizen:
+          _email.clear();
+          _password.clear();
+          break;
+        case _LoginMode.worker:
+          _email.text = 'pothole_worker1@nivara.app';
+          _password.text = 'worker123';
           break;
         case _LoginMode.official:
-          _email.text = kDemoAdminUsername;
+          _email.text = kDemoAdminEmail;
           _password.text = kDemoAdminPassword;
+          break;
       }
+    });
+  }
+
+  void _fillWorker({required String email, required String password}) {
+    setState(() {
+      _email.text = email;
+      _password.text = password;
+      _error = null;
     });
   }
 
@@ -64,12 +75,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final raw = _email.text.trim();
       final lower = raw.toLowerCase();
-      final email = lower == kDemoAdminUsername
-          ? kDemoAdminEmail
-          : raw;
+      String email = raw;
+      if (lower == kDemoAdminUsername || lower == 'admin') {
+        email = kDemoAdminEmail;
+      } else if (lower == kDemoWorkerUsername || lower == 'worker') {
+        email = kDemoWorkerEmail;
+      } else if (!raw.contains('@')) {
+        email = '$raw@nivara.app';
+      }
+
       await ref
           .read(authControllerProvider.notifier)
-          .signIn(email: email, password: _password.text);
+          .signIn(email: email, password: _password.text.trim());
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
@@ -170,9 +187,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
 
-                      // Role Switcher
+                      // 3-Way Role Switcher
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
@@ -191,95 +208,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: BouncyTap(
-                                onTap: _loading ? null : () => _setMode(_LoginMode.citizen),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _mode == _LoginMode.citizen
-                                        ? NivaraColors.primary.withValues(alpha: isDark ? 0.2 : 0.14)
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: _mode == _LoginMode.citizen
-                                        ? Border.all(color: NivaraColors.primary.withValues(alpha: 0.7))
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.person_rounded,
-                                        size: 18,
-                                        color: _mode == _LoginMode.citizen
-                                            ? NivaraColors.primary
-                                            : iconColor,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Citizen',
-                                        style: TextStyle(
-                                          color: _mode == _LoginMode.citizen
-                                              ? (_mode == _LoginMode.citizen && !isDark ? const Color(0xFF007A3D) : NivaraColors.primary)
-                                              : iconColor,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            _buildRoleTab(
+                              mode: _LoginMode.citizen,
+                              label: 'Citizen',
+                              icon: Icons.person_rounded,
+                              activeColor: NivaraColors.primary,
+                              isDark: isDark,
+                              iconColor: iconColor,
                             ),
-                            Expanded(
-                              child: BouncyTap(
-                                onTap: _loading ? null : () => _setMode(_LoginMode.official),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _mode == _LoginMode.official
-                                        ? NivaraColors.accent.withValues(alpha: isDark ? 0.2 : 0.14)
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: _mode == _LoginMode.official
-                                        ? Border.all(color: NivaraColors.accent.withValues(alpha: 0.7))
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.shield_rounded,
-                                        size: 18,
-                                        color: _mode == _LoginMode.official
-                                            ? NivaraColors.accent
-                                            : iconColor,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Officials',
-                                        style: TextStyle(
-                                          color: _mode == _LoginMode.official
-                                              ? (_mode == _LoginMode.official && !isDark ? const Color(0xFFB45309) : NivaraColors.accent)
-                                              : iconColor,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            _buildRoleTab(
+                              mode: _LoginMode.worker,
+                              label: 'Worker',
+                              icon: Icons.engineering_rounded,
+                              activeColor: const Color(0xFF00B0FF),
+                              isDark: isDark,
+                              iconColor: iconColor,
+                            ),
+                            _buildRoleTab(
+                              mode: _LoginMode.official,
+                              label: 'Officials',
+                              icon: Icons.shield_rounded,
+                              activeColor: NivaraColors.accent,
+                              isDark: isDark,
+                              iconColor: iconColor,
                             ),
                           ],
                         ),
                       ),
 
-                      if (isStaff) ...[
+                      if (_mode == _LoginMode.worker) ...[
                         const SizedBox(height: 16),
-                        _DemoStaffCard(mode: _mode),
+                        _WorkerDemoBox(
+                          currentEmail: _email.text.trim(),
+                          onSelect: _fillWorker,
+                        ),
+                      ] else if (_mode == _LoginMode.official) ...[
+                        const SizedBox(height: 16),
+                        const _OfficialDemoBox(),
                       ],
 
                       const SizedBox(height: 20),
@@ -294,7 +259,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         textInputAction: TextInputAction.next,
                         style: TextStyle(color: primaryText, fontSize: 14),
                         decoration: InputDecoration(
-                          labelText: isStaff ? 'Email or username' : 'Email',
+                          labelText: isStaff ? 'Email or worker username' : 'Email',
                           prefixIcon: Icon(
                             isStaff ? Icons.badge_outlined : Icons.email_outlined,
                             color: iconColor,
@@ -302,11 +267,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         validator: (v) {
                           final t = v?.trim() ?? '';
-                          if (t.isEmpty) return 'Enter your email';
+                          if (t.isEmpty) return 'Enter your email or username';
                           final lower = t.toLowerCase();
-                          if (lower == kDemoAdminUsername) return null;
-                          if (!t.contains('@') || !t.contains('.')) {
-                            return 'Enter a valid email';
+                          if (lower == kDemoAdminUsername ||
+                              lower == kDemoWorkerUsername ||
+                              lower.contains('_worker')) {
+                            return null;
+                          }
+                          if (!t.contains('@') && !t.contains('_')) {
+                            return 'Enter a valid email or worker alias';
                           }
                           return null;
                         },
@@ -349,7 +318,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             color: NivaraColors.danger.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: NivaraColors.danger.withValues(alpha: 0.5),
+                              color: NivaraColors.danger.withValues(alpha: 0.4),
                             ),
                           ),
                           child: Row(
@@ -365,7 +334,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   _error!,
                                   style: const TextStyle(
                                     color: NivaraColors.danger,
-                                    fontSize: 13,
+                                    fontSize: 12.5,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -414,7 +383,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                   )
                                 : Text(
-                                    isStaff ? 'Enter Command Portal' : 'Sign In as Citizen',
+                                    switch (_mode) {
+                                      _LoginMode.citizen => 'Sign In as Citizen',
+                                      _LoginMode.worker => 'Sign In as Field Worker',
+                                      _LoginMode.official => 'Enter Command Portal',
+                                    },
                                     style: const TextStyle(
                                       color: Colors.black,
                                       fontSize: 15,
@@ -462,30 +435,264 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+
+  Widget _buildRoleTab({
+    required _LoginMode mode,
+    required String label,
+    required IconData icon,
+    required Color activeColor,
+    required bool isDark,
+    required Color iconColor,
+  }) {
+    final active = _mode == mode;
+    return Expanded(
+      child: BouncyTap(
+        onTap: _loading ? null : () => _setMode(mode),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: active
+                ? activeColor.withValues(alpha: isDark ? 0.2 : 0.14)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: active
+                ? Border.all(color: activeColor.withValues(alpha: 0.7))
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 17,
+                color: active ? activeColor : iconColor,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? activeColor : iconColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _DemoStaffCard extends StatelessWidget {
-  const _DemoStaffCard({required this.mode});
-  final _LoginMode mode;
+/// Stylized labeled card detailing worker username/password logic and 3 quick-fill examples.
+class _WorkerDemoBox extends StatelessWidget {
+  const _WorkerDemoBox({
+    required this.currentEmail,
+    required this.onSelect,
+  });
+
+  final String currentEmail;
+  final void Function({required String email, required String password}) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final examples = [
+      (
+        title: 'Pothole Worker #1',
+        dept: 'Roads Dept',
+        email: 'pothole_worker1@nivara.app',
+        icon: Icons.edit_road_rounded,
+        color: const Color(0xFFFF9100),
+      ),
+      (
+        title: 'Street Light Worker #1',
+        dept: 'Electricity Dept',
+        email: 'street_light_worker1@nivara.app',
+        icon: Icons.lightbulb_rounded,
+        color: const Color(0xFFFFD600),
+      ),
+      (
+        title: 'Garbage Worker #1',
+        dept: 'Sanitation Dept',
+        email: 'garbage_worker1@nivara.app',
+        icon: Icons.delete_sweep_rounded,
+        color: const Color(0xFF00E676),
+      ),
+    ];
+
+    return GlassCard(
+      padding: const EdgeInsets.all(14),
+      borderRadius: 18,
+      borderColor: const Color(0xFF00B0FF).withValues(alpha: 0.35),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00B0FF).withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.engineering_rounded,
+                  color: Color(0xFF00B0FF),
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Worker Login Format & Demo Credentials',
+                  style: TextStyle(
+                    color: Color(0xFF00B0FF),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF080D14) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark ? Colors.white10 : const Color(0xFFCBD5E1),
+              ),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Format: <category_key>_worker<1-5>@nivara.app',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Default Password: worker123',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Tap any example below to 1-tap prefill and test:',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final ex in examples) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: BouncyTap(
+                onTap: () => onSelect(email: ex.email, password: 'worker123'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: currentEmail == ex.email
+                        ? ex.color.withValues(alpha: isDark ? 0.2 : 0.14)
+                        : (isDark ? const Color(0xFF141C26) : Colors.white),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: currentEmail == ex.email
+                          ? ex.color
+                          : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                      width: currentEmail == ex.email ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(ex.icon, color: ex.color, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ex.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11.5,
+                                color: currentEmail == ex.email ? ex.color : null,
+                              ),
+                            ),
+                            Text(
+                              '${ex.dept} • ${ex.email}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (currentEmail == ex.email)
+                        Icon(Icons.check_circle_rounded, color: ex.color, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _OfficialDemoBox extends StatelessWidget {
+  const _OfficialDemoBox();
 
   @override
   Widget build(BuildContext context) {
     return GlassCard(
       padding: const EdgeInsets.all(14),
       borderRadius: 16,
-      borderColor: NivaraColors.accent.withValues(alpha: 0.3),
+      borderColor: NivaraColors.accent.withValues(alpha: 0.35),
       child: const Row(
         children: [
-          Icon(Icons.info_outline_rounded, color: NivaraColors.accent, size: 20),
+          Icon(Icons.shield_rounded, color: NivaraColors.accent, size: 20),
           SizedBox(width: 10),
           Expanded(
-            child: Text(
-              'Demo Official credentials pre-filled for rapid inspection.',
-              style: TextStyle(
-                color: NivaraColors.accent,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Municipal Official Pre-filled (admin@nivara.app)',
+                  style: TextStyle(
+                    color: NivaraColors.accent,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Password: admin123 • Full command & dispatch authority',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
