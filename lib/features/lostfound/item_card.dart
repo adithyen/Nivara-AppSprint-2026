@@ -144,36 +144,68 @@ class LFItemCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
-                          .withValues(alpha: isDark ? 0.12 : 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
-                            .withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isLost ? Icons.volunteer_activism_rounded : Icons.verified_rounded,
-                          size: 12,
-                          color: isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isLost ? 'Direct Handover' : 'Direct Claim',
-                          style: TextStyle(
-                            color: isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10.5,
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
+                              .withValues(alpha: isDark ? 0.12 : 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
+                                .withValues(alpha: 0.3),
                           ),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isLost ? Icons.volunteer_activism_rounded : Icons.verified_rounded,
+                              size: 12,
+                              color: isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isLost ? 'Direct Handover' : 'Direct Claim',
+                              style: TextStyle(
+                                color: isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (item.isPrivate)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF9100).withValues(alpha: isDark ? 0.16 : 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFFFF9100).withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.shield_rounded, size: 11, color: Color(0xFFFF9100)),
+                              SizedBox(width: 3),
+                              Text(
+                                'Confidential',
+                                style: TextStyle(
+                                  color: Color(0xFFFF9100),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

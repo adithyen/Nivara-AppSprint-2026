@@ -106,6 +106,24 @@ void main() {
       expect(m['contact_value'], '12345');
       expect(m['reward_amount'], 500);
       expect(m['photo_urls'], const ['https://x/y.jpg']);
+      expect(m['is_private'], isFalse);
+    });
+
+    test('serializes is_private true when confidential mode is selected', () {
+      final item = LFItem(
+        id: '',
+        userId: 'u1',
+        itemType: LFItemType.lost,
+        category: LFCategory.jewellery,
+        title: 'Gold Ring',
+        description: '24k gold band with engraved initials',
+        lat: 8.5,
+        lng: 76.9,
+        eventDate: DateTime(2026, 8, 7),
+        isPrivate: true,
+      );
+      final m = item.toInsertMap();
+      expect(m['is_private'], isTrue);
     });
   });
 }

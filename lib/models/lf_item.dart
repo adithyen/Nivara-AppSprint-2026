@@ -31,6 +31,11 @@ class LFItem {
 
   /// 'ACTIVE' | 'MATCHED' | 'RESOLVED' | 'EXPIRED'.
   final String status;
+
+  /// Whether the listing is hidden from public browse feeds and only visible
+  /// via automated high-confidence radar matching (ideal for high-value items).
+  final bool isPrivate;
+
   final DateTime? expiresAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -51,6 +56,7 @@ class LFItem {
     this.contactValue,
     this.rewardAmount,
     this.status = 'ACTIVE',
+    this.isPrivate = false,
     this.expiresAt,
     this.createdAt,
     this.updatedAt,
@@ -87,6 +93,7 @@ class LFItem {
         ? null
         : toInt(map['reward_amount']),
     status: (map['status'] as String?) ?? 'ACTIVE',
+    isPrivate: (map['is_private'] as bool?) ?? false,
     expiresAt: toDateTimeOrNull(map['expires_at']),
     createdAt: toDateTimeOrNull(map['created_at']),
     updatedAt: toDateTimeOrNull(map['updated_at']),
@@ -108,5 +115,6 @@ class LFItem {
     'contact_method': contactMethod,
     if (contactValue != null) 'contact_value': contactValue,
     if (rewardAmount != null) 'reward_amount': rewardAmount,
+    'is_private': isPrivate,
   };
 }

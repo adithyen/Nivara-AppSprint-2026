@@ -58,6 +58,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
   bool _locating = false;
   final List<XFile> _photos = [];
   bool _submitting = false;
+  bool _isPrivate = false;
 
   bool get _isLost => widget.itemType == LFItemType.lost;
   double get _effectiveLat => _customLat ?? _pos?.latitude ?? kDefaultLat;
@@ -246,6 +247,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
       contactValue: _contactCtrl.text.trim(),
       rewardAmount: reward,
       photoUrls: photoUrls,
+      isPrivate: _isPrivate,
       createdAt: DateTime.now(),
     );
 
@@ -613,6 +615,13 @@ class _LFFormScreenState extends State<LFFormScreen> {
                 onRemove: (i) => setState(() => _photos.removeAt(i)),
               ),
 
+              const SizedBox(height: 20),
+              _ConfidentialModeCard(
+                isPrivate: _isPrivate,
+                onChanged: (val) => setState(() => _isPrivate = val),
+                onInfoTap: _showPrivateListingInfoSheet,
+              ),
+
               const SizedBox(height: 28),
               FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: accent),
@@ -632,6 +641,106 @@ class _LFFormScreenState extends State<LFFormScreen> {
               ),
               const SizedBox(height: 40),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPrivateListingInfoSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.65) : const Color(0xFF475569);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                          blurRadius: 18,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.shield_rounded, size: 36, color: Colors.black),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Confidential Radar-Only Mode',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: primaryText,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Protect High-Value Items from Public Feed Exposure',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: secondaryText,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _InfoTile(
+                  icon: Icons.diamond_rounded,
+                  iconColor: const Color(0xFF00E676),
+                  title: 'When to Use Confidential Mode',
+                  description:
+                      'Highly recommended for high-value items such as gold or diamond jewellery, luxury watches, large cash sums, confidential documents (passports, IDs), or expensive electronics.',
+                ),
+                const SizedBox(height: 10),
+                _InfoTile(
+                  icon: Icons.visibility_off_rounded,
+                  iconColor: const Color(0xFF00B0FF),
+                  title: 'Prevent Fraudulent & Opportunistic Claims',
+                  description:
+                      'Publicly listing exact photos and locations of high-value items can attract unauthorized or fraudulent claimants. Confidential mode completely hides this post from the public explore feed and map.',
+                ),
+                const SizedBox(height: 10),
+                _InfoTile(
+                  icon: Icons.radar_rounded,
+                  iconColor: const Color(0xFFFF9100),
+                  title: 'Automated Radar Matching Still Active',
+                  description:
+                      'Nivara’s background Radar Matching engine will continuously cross-reference time, GPS location, and category behind the scenes. You will be notified the instant a legitimate matching opposite report is filed.',
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Got It', style: TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -901,6 +1010,187 @@ class _PhotoStrip extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfidentialModeCard extends StatelessWidget {
+  const _ConfidentialModeCard({
+    required this.isPrivate,
+    required this.onChanged,
+    required this.onInfoTap,
+  });
+
+  final bool isPrivate;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onInfoTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131A24) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isPrivate
+              ? const Color(0xFF00E676).withValues(alpha: 0.5)
+              : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+          width: isPrivate ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (isPrivate ? const Color(0xFF00E676) : const Color(0xFF64748B))
+                      .withValues(alpha: isDark ? 0.18 : 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isPrivate ? Icons.shield_rounded : Icons.visibility_off_outlined,
+                  color: isPrivate ? const Color(0xFF00E676) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Text(
+                      'Confidential Mode',
+                      style: TextStyle(
+                        color: primaryText,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: onInfoTap,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                        ),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          size: 14,
+                          color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: isPrivate,
+                activeTrackColor: const Color(0xFF00E676),
+                activeThumbColor: Colors.black,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isPrivate
+                ? 'Hidden from public feed. Only matching opposite reports will discover this item via radar.'
+                : 'Visible in public explore feed and map. Turn ON to hide and match only via radar.',
+            style: TextStyle(
+              color: isPrivate ? const Color(0xFF00E676) : secondaryText,
+              fontSize: 11.5,
+              fontWeight: isPrivate ? FontWeight.w600 : FontWeight.normal,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.7) : const Color(0xFF475569);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: isDark ? 0.18 : 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: primaryText,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: secondaryText,
+                    fontSize: 11.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

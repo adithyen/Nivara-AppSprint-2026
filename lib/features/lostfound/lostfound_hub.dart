@@ -88,15 +88,20 @@ class _LostFoundHubState extends State<LostFoundHub> {
   }
 
   List<LFItem> get _visible {
-    final list =
-        _items.values
-            .where((i) => _filter == null || i.itemType == _filter)
-            .toList()
-          ..sort(
-            (a, b) => (b.createdAt ?? b.eventDate).compareTo(
-              a.createdAt ?? a.eventDate,
-            ),
-          );
+    final uid = currentUserId;
+    final list = _items.values
+        .where((i) {
+          if (_filter != null && i.itemType != _filter) return false;
+          // Hide private items from public explore feed unless owned by current user
+          if (i.isPrivate && (uid == null || i.userId != uid)) return false;
+          return true;
+        })
+        .toList()
+      ..sort(
+        (a, b) => (b.createdAt ?? b.eventDate).compareTo(
+          a.createdAt ?? a.eventDate,
+        ),
+      );
     return list;
   }
 

@@ -586,7 +586,7 @@ class _AdminPostCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${opt.voteCount} (${pct}%)',
+                            '${opt.voteCount} ($pct%)',
                             style: TextStyle(
                               color: isMyVote ? color : secondaryText,
                               fontWeight: FontWeight.w700,

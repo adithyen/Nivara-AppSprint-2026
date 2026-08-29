@@ -1727,7 +1727,6 @@ class _ResignConfirmationDialogState extends State<_ResignConfirmationDialog>
                 const trackHeight = 54.0;
                 const thumbSize = 46.0;
                 final trackWidth = constraints.maxWidth;
-                final maxDrag = trackWidth - thumbSize - 8.0;
 
                 return Container(
                   height: trackHeight,

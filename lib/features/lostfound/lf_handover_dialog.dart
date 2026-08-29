@@ -149,33 +149,6 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
     }
   }
 
-  Future<void> _verifyToken(String token) async {
-    if (_verifying) return;
-    setState(() {
-      _verifying = true;
-      _error = null;
-    });
-    HapticFeedback.mediumImpact();
-    try {
-      await LFClaimsRepo.verifyHandover(
-        claimId: widget.claim.id,
-        token: token,
-      );
-      if (!mounted) return;
-      HapticFeedback.heavyImpact();
-      setState(() {
-        _completed = true;
-        _verifying = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-        _verifying = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

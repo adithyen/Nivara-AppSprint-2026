@@ -624,6 +624,13 @@ class _MyItemCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             _StatusPill(status: item.status),
+                            if (item.isPrivate) ...[
+                              const SizedBox(width: 6),
+                              const _Pill(
+                                text: 'CONFIDENTIAL',
+                                color: Color(0xFFFF9100),
+                              ),
+                            ],
                           ],
                         ),
                       ],
