@@ -266,6 +266,15 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           const SizedBox(height: 12),
 
           _ActionTile(
+            icon: Icons.feedback_outlined,
+            color: const Color(0xFF00B0FF),
+            title: 'Report Issue / Contact Developer',
+            subtitle: 'Bug reports, feature suggestions, and developer email',
+            onTap: () => context.push(Routes.feedback),
+          ),
+          const SizedBox(height: 12),
+
+          _ActionTile(
             icon: Icons.logout_rounded,
             color: NivaraColors.danger,
             title: 'Sign Out',

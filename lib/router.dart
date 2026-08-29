@@ -26,6 +26,7 @@ import 'features/sensorwatch/sensor_watch_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/home/worker_shell.dart';
 import 'features/worker/worker_task_detail.dart';
+import 'features/profile/feedback_contact_screen.dart';
 import 'models/community_post.dart';
 import 'models/enums.dart';
 import 'models/lf_item.dart';
@@ -50,6 +51,7 @@ abstract final class Routes {
   static const myListings = '/lostfound/mine';
   static const communityCompose = '/community/compose';
   static const settings = '/settings';
+  static const feedback = '/feedback';
   static const worker = '/worker';
   static const workerTask = '/worker/task';
   static const admin = '/admin';
@@ -276,6 +278,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.feedback,
+        builder: (context, state) => const FeedbackContactScreen(),
       ),
       GoRoute(
         path: Routes.worker,
