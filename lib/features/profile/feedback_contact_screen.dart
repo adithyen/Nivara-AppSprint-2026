@@ -45,7 +45,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
   bool _submitting = false;
 
   static const String _developerEmail = 'adityenh@gmail.com';
-  static const String _appVersion = '1.0.43+43';
+  static const String _appVersion = '1.0.44+44';
 
   @override
   void initState() {

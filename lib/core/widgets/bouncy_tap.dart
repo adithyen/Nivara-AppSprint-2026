@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Emil Kowalski-inspired physical spring touch wrapper.
+/// Emil Kowalski-inspired physical spring touch wrapper with accessibility support.
 ///
 /// Gives any interactive widget a tactile scale dip (`0.96`) with subtle
 /// haptic feedback on press down, and snaps back with an organic spring bounce on release.
+/// Automatically respects system & app-level `reduceMotion` preferences and applies button semantics.
 class BouncyTap extends StatefulWidget {
   const BouncyTap({
     super.key,
@@ -14,6 +15,8 @@ class BouncyTap extends StatefulWidget {
     this.scaleFactor = 0.96,
     this.enableHaptics = true,
     this.duration = const Duration(milliseconds: 140),
+    this.semanticsLabel,
+    this.semanticsHint,
   });
 
   final Widget child;
@@ -22,6 +25,8 @@ class BouncyTap extends StatefulWidget {
   final double scaleFactor;
   final bool enableHaptics;
   final Duration duration;
+  final String? semanticsLabel;
+  final String? semanticsHint;
 
   @override
   State<BouncyTap> createState() => _BouncyTapState();
@@ -52,19 +57,39 @@ class _BouncyTapState extends State<BouncyTap> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final isInteractive = widget.onTap != null || widget.onLongPress != null;
+
+    final content = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: _handleTapDown,
       onTapUp: _handleTapUp,
       onTapCancel: _handleTapCancel,
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
-      child: AnimatedScale(
-        scale: _pressed ? widget.scaleFactor : 1.0,
-        duration: widget.duration,
-        curve: _pressed ? Curves.easeOutCubic : Curves.easeOutBack,
-        child: widget.child,
-      ),
+      child: disableAnimations
+          ? Opacity(
+              opacity: _pressed ? 0.7 : 1.0,
+              child: widget.child,
+            )
+          : AnimatedScale(
+              scale: _pressed ? widget.scaleFactor : 1.0,
+              duration: widget.duration,
+              curve: _pressed ? Curves.easeOutCubic : Curves.easeOutBack,
+              child: widget.child,
+            ),
     );
+
+    if (isInteractive || widget.semanticsLabel != null) {
+      return Semantics(
+        button: isInteractive,
+        enabled: isInteractive,
+        label: widget.semanticsLabel,
+        hint: widget.semanticsHint,
+        child: content,
+      );
+    }
+
+    return content;
   }
 }

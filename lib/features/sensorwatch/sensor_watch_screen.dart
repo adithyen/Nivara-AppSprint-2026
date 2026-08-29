@@ -13,12 +13,14 @@ import '../../core/services/shortcut_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/widgets/accessible_widgets.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/connectivity_banner.dart';
 import '../../core/widgets/pulsing_badge.dart';
 import '../../models/enums.dart';
 import '../../models/evidence_package.dart';
 import '../../models/report.dart';
+import '../settings/accessibility_controller.dart';
 
 /// 2026-Level Cyber-Civic SensorWatch Telemetry HUD.
 ///
@@ -45,7 +47,14 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
     final svc = ref.read(sensorWatchServiceProvider);
     _sub = svc.detections.listen((d) {
       if (!mounted) return;
-      HapticFeedback.heavyImpact();
+      if (ref.read(accessibilityControllerProvider).hapticsEnabled) {
+        HapticFeedback.heavyImpact();
+      }
+      if (ref.read(accessibilityControllerProvider).screenReaderAnnouncements) {
+        AccessibleWidgets.announce(
+          'Road impact recorded: ${d.type.label}, magnitude ${d.gAboveBaseline.toStringAsFixed(1)} G force.',
+        );
+      }
       setState(() => _detections.insert(0, d));
     });
 
@@ -76,20 +85,30 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
 
   Future<void> _toggle() async {
     final svc = ref.read(sensorWatchServiceProvider);
+    final a11y = ref.read(accessibilityControllerProvider);
     if (svc.isMonitoring) {
-      HapticFeedback.mediumImpact();
+      if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
+      if (a11y.screenReaderAnnouncements) {
+        AccessibleWidgets.announce('SensorWatch passive road monitoring paused.');
+      }
       await svc.stop();
       return;
     }
     setState(() => _busy = true);
-    HapticFeedback.selectionClick();
+    if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
     final result = await svc.start();
     if (!mounted) return;
     setState(() => _busy = false);
     if (result == StartResult.startedWithoutLocation) {
       _snack('Monitoring active without GPS fix — desk testing mode enabled.');
+      if (a11y.screenReaderAnnouncements) {
+        AccessibleWidgets.announce('SensorWatch monitoring active in desk test mode.');
+      }
     } else if (result == StartResult.started) {
       _snack('SensorWatch active. All highway & road impacts will be logged.');
+      if (a11y.screenReaderAnnouncements) {
+        AccessibleWidgets.announce('SensorWatch monitoring active for road impacts.');
+      }
     }
   }
 
