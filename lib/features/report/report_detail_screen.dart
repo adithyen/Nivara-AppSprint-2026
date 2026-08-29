@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
+import '../../core/services/map_launcher_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
@@ -284,6 +285,58 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                       fontSize: 12,
                       fontFamily: 'monospace',
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => MapLauncherService.launchStreetView(r.lat, r.lng),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(
+                              color: const Color(0xFF00B0FF).withValues(alpha: 0.5),
+                            ),
+                          ),
+                          icon: const Icon(Icons.streetview_rounded, size: 18, color: Color(0xFF00B0FF)),
+                          label: const Text(
+                            'Street View (360°)',
+                            style: TextStyle(
+                              color: Color(0xFF00B0FF),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => MapLauncherService.launchNavigation(r.lat, r.lng),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(
+                              color: NivaraColors.primary.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          icon: const Icon(Icons.directions_rounded, size: 18, color: NivaraColors.primary),
+                          label: const Text(
+                            'Directions',
+                            style: TextStyle(
+                              color: NivaraColors.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

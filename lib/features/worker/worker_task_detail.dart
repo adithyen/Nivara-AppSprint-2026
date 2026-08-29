@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
+import '../../core/services/map_launcher_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
@@ -334,11 +335,70 @@ class _WorkerTaskDetailScreenState extends State<WorkerTaskDetailScreen> {
                     if (r.address?.trim().isNotEmpty == true)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(r.address!.trim()),
+                        child: Text(
+                          r.address!.trim(),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                     Text(
                       '${r.lat.toStringAsFixed(5)}, ${r.lng.toStringAsFixed(5)}',
-                      style: TextStyle(color: scheme.onSurfaceVariant),
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => MapLauncherService.launchStreetView(r.lat, r.lng),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: BorderSide(
+                                color: const Color(0xFF00B0FF).withValues(alpha: 0.5),
+                              ),
+                            ),
+                            icon: const Icon(Icons.streetview_rounded, size: 18, color: Color(0xFF00B0FF)),
+                            label: const Text(
+                              'Street View (360°)',
+                              style: TextStyle(
+                                color: Color(0xFF00B0FF),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => MapLauncherService.launchNavigation(r.lat, r.lng),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: BorderSide(
+                                color: NivaraColors.primary.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            icon: const Icon(Icons.navigation_rounded, size: 18, color: NivaraColors.primary),
+                            label: const Text(
+                              'Navigate',
+                              style: TextStyle(
+                                color: NivaraColors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
