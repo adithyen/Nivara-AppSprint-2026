@@ -123,7 +123,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.sensorWatch,
-        builder: (context, state) => const SensorWatchScreen(),
+        builder: (context, state) {
+          final autoStart = state.uri.queryParameters['autoStart'] == 'true';
+          return SensorWatchScreen(autoStart: autoStart);
+        },
       ),
       GoRoute(
         path: Routes.report,

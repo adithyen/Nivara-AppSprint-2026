@@ -202,7 +202,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   icon: Icons.sensors_rounded,
                   color: NivaraColors.primary,
                   title: 'SensorWatch',
-                  subtitle: 'Passive road bump sensing',
+                  subtitle: 'Highway & road pothole HUD',
                   onTap: () => context.push(Routes.sensorWatch),
                 ),
                 _FeatureModuleTile(

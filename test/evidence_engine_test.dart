@@ -119,9 +119,8 @@ void main() {
   group('classifyImpact thresholds', () {
     test('maps g-force bands to detection types', () {
       expect(classifyImpact(5.0), DetectionType.pothole);
-      expect(classifyImpact(4.5), DetectionType.pothole);
-      expect(classifyImpact(3.2), DetectionType.speedBreaker);
-      expect(classifyImpact(3.0), DetectionType.speedBreaker);
+      expect(classifyImpact(4.0), DetectionType.pothole);
+      expect(classifyImpact(3.2), DetectionType.badRoad);
       expect(classifyImpact(2.6), DetectionType.badRoad);
     });
   });

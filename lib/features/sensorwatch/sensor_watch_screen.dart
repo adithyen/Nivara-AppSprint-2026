@@ -9,6 +9,7 @@ import '../../core/constants.dart';
 import '../../core/services/evidence_engine.dart';
 import '../../core/services/offline_queue_service.dart';
 import '../../core/services/sensor_watch_service.dart';
+import '../../core/services/shortcut_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
@@ -20,8 +21,14 @@ import '../../models/evidence_package.dart';
 import '../../models/report.dart';
 
 /// 2026-Level Cyber-Civic SensorWatch Telemetry HUD.
+///
+/// Features passive road monitoring for highways and city roads,
+/// crowdsourced multi-user consensus verification, 1-tap home screen widget pinning,
+/// and tamper-evident cryptographic evidence packages.
 class SensorWatchScreen extends ConsumerStatefulWidget {
-  const SensorWatchScreen({super.key});
+  const SensorWatchScreen({super.key, this.autoStart = false});
+
+  final bool autoStart;
 
   @override
   ConsumerState<SensorWatchScreen> createState() => _SensorWatchScreenState();
@@ -41,6 +48,23 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
       HapticFeedback.heavyImpact();
       setState(() => _detections.insert(0, d));
     });
+
+    ShortcutService.instance.setShortcutListener((route) {
+      if (route.contains('autoStart=true') && mounted) {
+        final currentSvc = ref.read(sensorWatchServiceProvider);
+        if (!currentSvc.isMonitoring) {
+          _toggle();
+        }
+      }
+    });
+
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !svc.isMonitoring) {
+          _toggle();
+        }
+      });
+    }
   }
 
   @override
@@ -53,23 +77,88 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
   Future<void> _toggle() async {
     final svc = ref.read(sensorWatchServiceProvider);
     if (svc.isMonitoring) {
+      HapticFeedback.mediumImpact();
       await svc.stop();
       return;
     }
     setState(() => _busy = true);
+    HapticFeedback.selectionClick();
     final result = await svc.start();
     if (!mounted) return;
     setState(() => _busy = false);
     if (result == StartResult.startedWithoutLocation) {
-      _snack(
-        'Monitoring active without GPS fix — desk testing mode enabled.',
-      );
+      _snack('Monitoring active without GPS fix — desk testing mode enabled.');
+    } else if (result == StartResult.started) {
+      _snack('SensorWatch active. All highway & road impacts will be logged.');
     }
   }
 
-  Future<void> _simulate() async {
-    HapticFeedback.mediumImpact();
-    await ref.read(sensorWatchServiceProvider).simulateImpact();
+  Future<void> _pinWidget() async {
+    HapticFeedback.selectionClick();
+    final success = await ShortcutService.instance.pinSensorWatchShortcut();
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('SensorWatch 1-Tap Widget pinned to Home Screen!'),
+            backgroundColor: Color(0xFF00E676),
+          ),
+        );
+    } else {
+      _showWidgetInstructionsDialog();
+    }
+  }
+
+  void _showWidgetInstructionsDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.widgets_rounded, color: NivaraColors.primary),
+            SizedBox(width: 10),
+            Text('1-Tap Home Widget', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'To start road monitoring instantly without multiple taps, you can add the '
+          'SensorWatch shortcut directly to your device home screen launcher.',
+          style: TextStyle(fontSize: 13.5, height: 1.4),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCrowdsourceInfoSheet() {
+    HapticFeedback.selectionClick();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      showDragHandle: true,
+      builder: (_) => _CrowdsourceInfoSheet(
+        onStartMonitoring: () {
+          Navigator.pop(context);
+          final svc = ref.read(sensorWatchServiceProvider);
+          if (!svc.isMonitoring) _toggle();
+        },
+      ),
+    );
   }
 
   void _snack(String msg) {
@@ -87,6 +176,21 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
       backgroundColor: isDark ? NivaraColors.canvasDark : const Color(0xFFF6F8FA),
       appBar: AppBar(
         title: const Text('SensorWatch HUD'),
+        actions: [
+          IconButton(
+            tooltip: 'Autonomous Monitoring Info',
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+              ),
+              child: const Icon(Icons.info_outline_rounded, size: 20),
+            ),
+            onPressed: _showCrowdsourceInfoSheet,
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: WithConnectivityBanner(
         child: Column(
@@ -97,15 +201,49 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
                 snap: snap,
                 busy: _busy,
                 onToggle: _toggle,
-                onSimulate: _simulate,
+                onInfoTap: _showCrowdsourceInfoSheet,
               ),
             ),
+            _HomeScreenWidgetCard(onPinTap: _pinWidget),
+            const SizedBox(height: 8),
             Divider(height: 1, color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
+              child: Row(
+                children: [
+                  Text(
+                    'Recorded Defect Shockwaves',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_detections.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: NivaraColors.primary.withValues(alpha: isDark ? 0.15 : 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${_detections.length} log${_detections.length == 1 ? '' : 's'}',
+                        style: const TextStyle(
+                          color: NivaraColors.primary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             Expanded(
               child: _detections.isEmpty
                   ? const _EmptyState()
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       itemCount: _detections.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, i) => _DetectionTile(
@@ -137,13 +275,13 @@ class _StatusPanel extends StatelessWidget {
     required this.snap,
     required this.busy,
     required this.onToggle,
-    required this.onSimulate,
+    required this.onInfoTap,
   });
 
   final SensorSnapshot snap;
   final bool busy;
   final VoidCallback onToggle;
-  final VoidCallback onSimulate;
+  final VoidCallback onInfoTap;
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +291,7 @@ class _StatusPanel extends StatelessWidget {
     final meter = (snap.impactG / (kDetectionThresholdG * 1.5)).clamp(0.0, 1.0);
 
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF10161E) : Colors.white,
@@ -166,9 +304,9 @@ class _StatusPanel extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: (snap.monitoring ? NivaraColors.primary : (isDark ? Colors.black : const Color(0xFF94A3B8)))
-                .withValues(alpha: isDark ? (snap.monitoring ? 0.15 : 0.3) : 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 6),
+                .withValues(alpha: isDark ? (snap.monitoring ? 0.15 : 0.3) : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -262,94 +400,360 @@ class _StatusPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: BouncyTap(
-                  onTap: busy ? null : onToggle,
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: snap.monitoring
-                          ? const LinearGradient(
-                              colors: [NivaraColors.danger, Color(0xFFFF8A80)],
-                            )
-                          : const LinearGradient(
-                              colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
-                            ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (snap.monitoring ? NivaraColors.danger : NivaraColors.primary)
-                              .withValues(alpha: 0.35),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+          BouncyTap(
+            onTap: busy ? null : onToggle,
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: snap.monitoring
+                    ? const LinearGradient(
+                        colors: [NivaraColors.danger, Color(0xFFFF8A80)],
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                      ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: (snap.monitoring ? NivaraColors.danger : const Color(0xFF00E676))
+                        .withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      snap.monitoring ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                      color: Colors.black,
+                      size: 24,
                     ),
-                    child: Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            snap.monitoring ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                            color: Colors.black,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            snap.monitoring ? 'Stop Engine' : 'Start Monitor',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(width: 8),
+                    Text(
+                      snap.monitoring ? 'Stop Monitoring' : 'Start Monitoring',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: BouncyTap(
-                  onTap: busy ? null : onSimulate,
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF131A24) : const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: NivaraColors.accent.withValues(alpha: 0.5),
-                        width: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 1-Tap Home Screen Widget & Shortcut Card
+class _HomeScreenWidgetCard extends StatelessWidget {
+  const _HomeScreenWidgetCard({required this.onPinTap});
+
+  final VoidCallback onPinTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF131A24) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00E676).withValues(alpha: 0.3),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.widgets_rounded, color: Colors.black, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '1-Tap Home Screen Widget',
+                    style: TextStyle(
+                      color: primaryText,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Start monitoring instantly with zero extra taps.',
+                    style: TextStyle(
+                      color: secondaryText,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            BouncyTap(
+              onTap: onPinTap,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: NivaraColors.primary.withValues(alpha: isDark ? 0.16 : 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.4)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_to_home_screen_rounded, size: 15, color: NivaraColors.primary),
+                    SizedBox(width: 4),
+                    Text(
+                      'Add',
+                      style: TextStyle(
+                        color: NivaraColors.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
                       ),
                     ),
-                    child: const Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.bolt_rounded,
-                            color: NivaraColors.accent,
-                            size: 20,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Simulate Impact',
-                            style: TextStyle(
-                              color: NivaraColors.accent,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Educational bottom sheet explaining passive highway monitoring & consensus verification.
+class _CrowdsourceInfoSheet extends StatelessWidget {
+  const _CrowdsourceInfoSheet({required this.onStartMonitoring});
+
+  final VoidCallback onStartMonitoring;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header with glowing icon
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                        blurRadius: 18,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.sensors_rounded, size: 36, color: Colors.black),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Autonomous Road Telemetry',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: primaryText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Zero-Touch Highway Intelligence & Consensus Verification',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: secondaryText,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              _InfoCard(
+                icon: Icons.directions_car_filled_rounded,
+                iconColor: const Color(0xFF00E676),
+                title: 'Start When Travelling Highways & State Roads',
+                description:
+                    'Turn on SensorWatch whenever you drive on arterial roads or highways. '
+                    'All pothole shocks, crater jolts, and damaged road surfaces are recorded continuously in the background.',
+              ),
+              const SizedBox(height: 10),
+              _InfoCard(
+                icon: Icons.shield_rounded,
+                iconColor: const Color(0xFF00B0FF),
+                title: 'Zero-Hazard Reporting (No Photo Required)',
+                description:
+                    'Stopping your vehicle in the middle of busy traffic to take a photo is dangerous and impractical. '
+                    'SensorWatch logs high-precision accelerometer and GPS telemetry automatically without stopping.',
+              ),
+              const SizedBox(height: 10),
+              _InfoCard(
+                icon: Icons.group_work_rounded,
+                iconColor: const Color(0xFFFF9100),
+                title: 'Multi-User Consensus Verification',
+                description:
+                    'To prevent accidental phone drops or deliberate shaking from raising false alarms, road defects are only '
+                    'escalated as official civic reports once a statistically convincing threshold of impacts is logged by multiple independent users at the same location.',
+              ),
+              const SizedBox(height: 10),
+              _InfoCard(
+                icon: Icons.lock_outline_rounded,
+                iconColor: const Color(0xFF7B4BC4),
+                title: 'Tamper-Proof Cryptographic Record',
+                description:
+                    'Each road jolt is cryptographically signed with a SHA-256 seal containing peak g-force, 3-axis gyroscope data, Doppler speed, and GPS timestamp.',
+              ),
+              const SizedBox(height: 22),
+
+              BouncyTap(
+                onTap: onStartMonitoring,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Got It • Start Monitoring',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
                       ),
                     ),
                   ),
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.75) : const Color(0xFF475569);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: isDark ? 0.18 : 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: primaryText,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: secondaryText,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -420,7 +824,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Road Detections Yet',
+              'Ready for Highway & Road Drives',
               style: TextStyle(
                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
@@ -429,7 +833,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Start monitoring and drive over a road jolt or tap Simulate Impact.',
+              'Tap "Start Monitoring" before driving. Potholes and road jolts will be logged and verified with multi-user consensus.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),

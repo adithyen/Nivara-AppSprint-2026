@@ -7,7 +7,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
 # followed by an optional build number separated by a +.
-version: 1.0.37+37
+version: 1.0.38+38
 
 environment:
   sdk: ^3.12.0
@@ -51,7 +51,7 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icon/nivara_icon.png"
-  adaptive_icon_background: "#1B6CA8"
+  adaptive_icon_background: "#0A0F18"
   adaptive_icon_foreground: "assets/icon/nivara_icon_foreground.png"
   min_sdk_android: 21
 

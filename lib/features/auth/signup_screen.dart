@@ -96,15 +96,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: NivaraColors.primary.withValues(alpha: 0.15),
-                      border: Border.all(
-                        color: NivaraColors.primary.withValues(alpha: 0.5),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00E676).withValues(alpha: isDark ? 0.4 : 0.25),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Icons.how_to_reg_rounded,
                       size: 36,
-                      color: NivaraColors.primary,
+                      color: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 16),

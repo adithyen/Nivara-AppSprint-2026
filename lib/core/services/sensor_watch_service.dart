@@ -77,9 +77,8 @@ enum StartResult { started, startedWithoutLocation, alreadyRunning }
 /// Classifies a jolt (linear-accel g) into a civic detection type. Pure, so
 /// it's unit-testable without sensors.
 DetectionType classifyImpact(double joltG) {
-  if (joltG >= 4.5) return DetectionType.pothole;
-  if (joltG >= 3.0) return DetectionType.speedBreaker;
-  return DetectionType.badRoad; // uneven / rough surface
+  if (joltG >= 4.0) return DetectionType.pothole;
+  return DetectionType.badRoad; // uneven / rough / damaged road surface
 }
 
 /// Passive detection engine. Reads **linear acceleration** (gravity removed by
