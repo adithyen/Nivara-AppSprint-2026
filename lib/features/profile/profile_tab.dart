@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/civic_level.dart';
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/services/offline_queue_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
@@ -15,6 +16,7 @@ import '../../models/enums.dart';
 import '../../models/user_profile.dart';
 import '../../router.dart';
 import '../auth/auth_controller.dart';
+import '../settings/language_controller.dart';
 import '../worker/worker_repo.dart';
 
 /// 2026-Level Flagship Profile Dashboard.
@@ -178,8 +180,10 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     final profile = ref.watch(authControllerProvider).asData?.value;
     final isCitizen = profile?.role == UserRole.citizen;
     final isWorker = profile?.isWorker ?? false;
+    final isAdmin = profile?.role == UserRole.admin || profile?.role == UserRole.superadmin;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
+    final currentLang = ref.watch(languageControllerProvider);
 
     return RefreshIndicator(
       color: primary,
@@ -192,22 +196,32 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           _IdentityCard(profile: profile),
           const SizedBox(height: 20),
 
-          _ImpactCard(
-            loading: _loading,
-            score: _civicScore,
-            reports: _reports,
-            confirms: _confirms,
-            finds: _finds,
-          ),
-          const SizedBox(height: 20),
-
-          if (isWorker) ...[
+          // Role-Specific Metrics (No points for Admin!)
+          if (isAdmin) ...[
+            _AdminCommandMetricsCard(profile: profile),
+            const SizedBox(height: 20),
+          ] else if (isWorker) ...[
             _WorkStatusCard(
               onLeave: _onLeave,
               working: _leaveWorking,
               profile: profile,
               onToggleLeave: _toggleLeave,
               onResign: _resign,
+            ),
+            const SizedBox(height: 20),
+            _WorkerServiceCard(
+              loading: _loading,
+              resolvedCount: _confirms,
+              profile: profile,
+            ),
+            const SizedBox(height: 20),
+          ] else ...[
+            _CitizenImpactCard(
+              loading: _loading,
+              score: _civicScore,
+              reports: _reports,
+              confirms: _confirms,
+              finds: _finds,
             ),
             const SizedBox(height: 20),
           ],
@@ -224,9 +238,36 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           ],
 
           _ActionTile(
+            icon: Icons.palette_outlined,
+            color: const Color(0xFF7B4BC4),
+            title: NivaraStrings.tr('settings_appearance', currentLang),
+            subtitle: 'Theme mode (Light/Dark) and brand accent colour',
+            onTap: () => context.push(Routes.settings),
+          ),
+          const SizedBox(height: 12),
+
+          _ActionTile(
+            icon: Icons.accessibility_new_rounded,
+            color: const Color(0xFF00E676),
+            title: NivaraStrings.tr('settings_accessibility', currentLang),
+            subtitle: 'High contrast, reduce motion, text scaling, haptics & CVD support',
+            onTap: () => context.push(Routes.accessibility),
+          ),
+          const SizedBox(height: 12),
+
+          _ActionTile(
+            icon: Icons.translate_rounded,
+            color: const Color(0xFF00B0FF),
+            title: NivaraStrings.tr('settings_language', currentLang),
+            subtitle: 'English • हिन्दी • മലയാളം and 22 Indian languages',
+            onTap: () => context.push(Routes.language),
+          ),
+          const SizedBox(height: 12),
+
+          _ActionTile(
             icon: Icons.history_rounded,
             color: NivaraColors.primary,
-            title: 'My Activity Timeline',
+            title: NivaraStrings.tr('activity_timeline', currentLang),
             subtitle: 'Timeline of your reports, posts, and tasks',
             onTap: () => context.push(Routes.activityLog),
           ),
@@ -235,7 +276,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           _ActionTile(
             icon: Icons.cloud_upload_outlined,
             color: NivaraColors.accent,
-            title: 'Pending Sync Queue',
+            title: NivaraStrings.tr('pending_sync', currentLang),
             subtitle: _pendingCount == 0
                 ? 'All actions synced to cloud'
                 : '$_pendingCount item${_pendingCount == 1 ? '' : 's'} waiting to sync',
@@ -250,25 +291,16 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           _ActionTile(
             icon: Icons.edit_rounded,
             color: NivaraColors.primaryBlue,
-            title: 'Edit Profile',
+            title: NivaraStrings.tr('edit_profile', currentLang),
             subtitle: 'Display name, contact, and ward location',
             onTap: profile == null ? null : () => _editProfile(profile),
           ),
           const SizedBox(height: 12),
 
           _ActionTile(
-            icon: Icons.palette_outlined,
-            color: const Color(0xFF7B4BC4),
-            title: 'Appearance',
-            subtitle: 'Theme mode and accent colour',
-            onTap: () => context.push(Routes.settings),
-          ),
-          const SizedBox(height: 12),
-
-          _ActionTile(
             icon: Icons.feedback_outlined,
-            color: const Color(0xFF00B0FF),
-            title: 'Report Issue / Contact Developer',
+            color: const Color(0xFFFF9100),
+            title: NivaraStrings.tr('report_issue_dev', currentLang),
             subtitle: 'Bug reports, feature suggestions, and developer email',
             onTap: () => context.push(Routes.feedback),
           ),
@@ -277,7 +309,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           _ActionTile(
             icon: Icons.logout_rounded,
             color: NivaraColors.danger,
-            title: 'Sign Out',
+            title: NivaraStrings.tr('sign_out', currentLang),
             subtitle: 'End your session on this device',
             onTap: _signOut,
           ),
@@ -603,8 +635,8 @@ class _IdentityCard extends StatelessWidget {
   }
 }
 
-class _ImpactCard extends StatelessWidget {
-  const _ImpactCard({
+class _CitizenImpactCard extends StatelessWidget {
+  const _CitizenImpactCard({
     required this.loading,
     required this.score,
     required this.reports,
@@ -651,7 +683,7 @@ class _ImpactCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Civic Standing',
+                'Civic Standing & XP',
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF111827),
                   fontWeight: FontWeight.w700,
@@ -702,6 +734,288 @@ class _ImpactCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           CivicLevelBar(standing: civicStandingFor(score), onDark: isDark),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminCommandMetricsCard extends StatelessWidget {
+  const _AdminCommandMetricsCard({required this.profile});
+  final UserProfile? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dept = profile?.department?.label ?? 'Municipal Oversight';
+    final ward = profile?.jurisdictionWard?.trim().isNotEmpty == true
+        ? profile!.jurisdictionWard!.trim()
+        : 'Central Command Ward';
+    final city = profile?.jurisdictionCity?.trim().isNotEmpty == true
+        ? profile!.jurisdictionCity!.trim()
+        : 'Bengaluru Urban';
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: NivaraColors.accent.withValues(alpha: isDark ? 0.35 : 0.4),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: NivaraColors.accent.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.shield_rounded,
+                  color: NivaraColors.accent,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Command Authority & Oversight',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Municipal Official Standing & Dispatch Metrics',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF080D14) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_city_rounded, size: 18, color: NivaraColors.accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$ward • $city',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _AdminStatPill(
+                  label: 'Department',
+                  value: dept,
+                  icon: Icons.account_balance_rounded,
+                  color: const Color(0xFF00B0FF),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: _AdminStatPill(
+                  label: 'Resolution SLA',
+                  value: '98.6% On-Time',
+                  icon: Icons.bolt_rounded,
+                  color: Color(0xFF00E676),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminStatPill extends StatelessWidget {
+  const _AdminStatPill({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.25 : 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkerServiceCard extends StatelessWidget {
+  const _WorkerServiceCard({
+    required this.loading,
+    required this.resolvedCount,
+    required this.profile,
+  });
+
+  final bool loading;
+  final int resolvedCount;
+  final UserProfile? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dept = profile?.department?.label ?? 'Roads & Works';
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10161E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: const Color(0xFF00B0FF).withValues(alpha: isDark ? 0.35 : 0.4),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00B0FF).withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.engineering_rounded,
+                  color: Color(0xFF00B0FF),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Field Service & Resolution Proofs',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Active Duty Track Record',
+                      style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _AdminStatPill(
+                  label: 'Department',
+                  value: dept,
+                  icon: Icons.badge_outlined,
+                  color: const Color(0xFF00B0FF),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _AdminStatPill(
+                  label: 'Verified Proofs',
+                  value: '$resolvedCount Completed',
+                  icon: Icons.verified_rounded,
+                  color: const Color(0xFF00E676),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

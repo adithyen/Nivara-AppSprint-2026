@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Emil Kowalski-inspired physical spring touch wrapper with accessibility support.
+/// Emil Kowalski-inspired physical spring touch wrapper with full accessibility support.
 ///
 /// Gives any interactive widget a tactile scale dip (`0.96`) with subtle
 /// haptic feedback on press down, and snaps back with an organic spring bounce on release.
@@ -38,7 +38,7 @@ class _BouncyTapState extends State<BouncyTap> {
   void _handleTapDown(TapDownDetails _) {
     if (widget.onTap == null && widget.onLongPress == null) return;
     if (widget.enableHaptics) {
-      HapticFeedback.selectionClick();
+      HapticFeedback.lightImpact();
     }
     setState(() => _pressed = true);
   }
@@ -69,7 +69,7 @@ class _BouncyTapState extends State<BouncyTap> {
       onLongPress: widget.onLongPress,
       child: disableAnimations
           ? Opacity(
-              opacity: _pressed ? 0.7 : 1.0,
+              opacity: _pressed ? 0.75 : 1.0,
               child: widget.child,
             )
           : AnimatedScale(

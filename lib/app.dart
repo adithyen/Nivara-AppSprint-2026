@@ -42,8 +42,8 @@ class _NivaraAppState extends ConsumerState<NivaraApp> {
     return MaterialApp.router(
       title: kAppName,
       debugShowCheckedModeBanner: false,
-      theme: NivaraTheme.light(seed),
-      darkTheme: NivaraTheme.dark(seed),
+      theme: NivaraTheme.light(seed, a11y.highContrast),
+      darkTheme: NivaraTheme.dark(seed, a11y.highContrast),
       themeMode: settings.themeMode,
       routerConfig: router,
       builder: (context, child) {

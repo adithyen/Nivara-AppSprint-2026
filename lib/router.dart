@@ -23,6 +23,8 @@ import 'features/map/location_picker_screen.dart';
 import 'features/report/report_detail_screen.dart';
 import 'features/report/report_form_screen.dart';
 import 'features/sensorwatch/sensor_watch_screen.dart';
+import 'features/settings/accessibility_screen.dart';
+import 'features/settings/language_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/home/worker_shell.dart';
 import 'features/worker/worker_task_detail.dart';
@@ -51,6 +53,8 @@ abstract final class Routes {
   static const myListings = '/lostfound/mine';
   static const communityCompose = '/community/compose';
   static const settings = '/settings';
+  static const accessibility = '/accessibility';
+  static const language = '/language';
   static const feedback = '/feedback';
   static const worker = '/worker';
   static const workerTask = '/worker/task';
@@ -278,6 +282,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.accessibility,
+        builder: (context, state) => const AccessibilityScreen(),
+      ),
+      GoRoute(
+        path: Routes.language,
+        builder: (context, state) => const LanguageScreen(),
       ),
       GoRoute(
         path: Routes.feedback,

@@ -38,14 +38,14 @@ abstract final class NivaraColors {
   static const Color surfaceLight = Color(0xFFF6F8FB);
 }
 
-/// Central theme factory configuring both Dark and Light experiences with dynamic accent color seeding.
+/// Central theme factory configuring both Dark and Light experiences with dynamic accent color seeding and High Contrast AAA mode.
 abstract final class NivaraTheme {
-  static ThemeData light([Color seed = NivaraColors.primary]) =>
-      _build(Brightness.light, seed);
-  static ThemeData dark([Color seed = NivaraColors.primary]) =>
-      _build(Brightness.dark, seed);
+  static ThemeData light([Color seed = NivaraColors.primary, bool highContrast = false]) =>
+      _build(Brightness.light, seed, highContrast);
+  static ThemeData dark([Color seed = NivaraColors.primary, bool highContrast = false]) =>
+      _build(Brightness.dark, seed, highContrast);
 
-  static ThemeData _build(Brightness brightness, Color seed) {
+  static ThemeData _build(Brightness brightness, Color seed, bool highContrast) {
     final isDark = brightness == Brightness.dark;
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
@@ -54,12 +54,22 @@ abstract final class NivaraTheme {
       secondary: NivaraColors.primaryBlue,
       tertiary: NivaraColors.accent,
       error: NivaraColors.danger,
-      surface: isDark ? NivaraColors.canvasDark : NivaraColors.surfaceLight,
-      surfaceContainerHigh: isDark ? NivaraColors.cardDark : Colors.white,
-      surfaceContainerLow: isDark ? const Color(0xFF0D131A) : const Color(0xFFF0F4F8),
-      surfaceContainer: isDark ? const Color(0xFF131A24) : const Color(0xFFE8EEF5),
+      surface: highContrast
+          ? (isDark ? Colors.black : Colors.white)
+          : (isDark ? NivaraColors.canvasDark : NivaraColors.surfaceLight),
+      surfaceContainerHigh: highContrast
+          ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+          : (isDark ? NivaraColors.cardDark : Colors.white),
+      surfaceContainerLow: highContrast
+          ? (isDark ? const Color(0xFF050505) : const Color(0xFFF5F5F5))
+          : (isDark ? const Color(0xFF0D131A) : const Color(0xFFF0F4F8)),
+      surfaceContainer: highContrast
+          ? (isDark ? const Color(0xFF0A0A0A) : const Color(0xFFEEEEEE))
+          : (isDark ? const Color(0xFF131A24) : const Color(0xFFE8EEF5)),
       onSurface: isDark ? Colors.white : const Color(0xFF111827),
-      onSurfaceVariant: isDark ? const Color(0xFF9EABB8) : const Color(0xFF6B7280),
+      onSurfaceVariant: isDark
+          ? (highContrast ? Colors.white : const Color(0xFF9EABB8))
+          : (highContrast ? Colors.black : const Color(0xFF6B7280)),
     );
 
     final onPrimary = ThemeData.estimateBrightnessForColor(seed) == Brightness.dark
@@ -70,10 +80,14 @@ abstract final class NivaraTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: isDark ? NivaraColors.canvasDark : NivaraColors.surfaceLight,
+      scaffoldBackgroundColor: highContrast
+          ? (isDark ? Colors.black : Colors.white)
+          : (isDark ? NivaraColors.canvasDark : NivaraColors.surfaceLight),
       fontFamily: 'Inter',
       appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? NivaraColors.canvasDark : Colors.white,
+        backgroundColor: highContrast
+            ? (isDark ? Colors.black : Colors.white)
+            : (isDark ? NivaraColors.canvasDark : Colors.white),
         foregroundColor: isDark ? Colors.white : const Color(0xFF111827),
         elevation: 0,
         centerTitle: false,
@@ -83,7 +97,7 @@ abstract final class NivaraTheme {
         titleTextStyle: TextStyle(
           color: isDark ? Colors.white : const Color(0xFF111827),
           fontSize: 18,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           letterSpacing: -0.2,
         ),
       ),
@@ -92,6 +106,7 @@ abstract final class NivaraTheme {
           backgroundColor: seed,
           foregroundColor: onPrimary,
           minimumSize: const Size.fromHeight(50),
+          side: highContrast ? BorderSide(color: isDark ? Colors.white : Colors.black, width: 2) : null,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -104,24 +119,32 @@ abstract final class NivaraTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? NivaraColors.cardDark : const Color(0xFFF1F5F9),
+        fillColor: highContrast
+            ? (isDark ? Colors.black : Colors.white)
+            : (isDark ? NivaraColors.cardDark : const Color(0xFFF1F5F9)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0),
+            color: highContrast
+                ? (isDark ? Colors.white : Colors.black)
+                : (isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0)),
+            width: highContrast ? 2.0 : 1.0,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0),
+            color: highContrast
+                ? (isDark ? Colors.white : Colors.black)
+                : (isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0)),
+            width: highContrast ? 2.0 : 1.0,
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
             color: seed,
-            width: 1.8,
+            width: 2.2,
           ),
         ),
         contentPadding: const EdgeInsets.symmetric(
@@ -129,21 +152,27 @@ abstract final class NivaraTheme {
           vertical: 14,
         ),
         labelStyle: TextStyle(
-          color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+          color: isDark ? Colors.white : const Color(0xFF111827),
           fontSize: 13.5,
+          fontWeight: highContrast ? FontWeight.w700 : FontWeight.w500,
         ),
         hintStyle: TextStyle(
-          color: isDark ? Colors.white38 : const Color(0xFF9CA3AF),
+          color: isDark ? (highContrast ? Colors.white70 : Colors.white38) : const Color(0xFF9CA3AF),
           fontSize: 13.5,
         ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: isDark ? NivaraColors.cardDark : Colors.white,
+        color: highContrast
+            ? (isDark ? Colors.black : Colors.white)
+            : (isDark ? NivaraColors.cardDark : Colors.white),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE5E7EB),
+            color: highContrast
+                ? (isDark ? Colors.white : Colors.black)
+                : (isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE5E7EB)),
+            width: highContrast ? 2.0 : 1.0,
           ),
         ),
         clipBehavior: Clip.antiAlias,
@@ -157,7 +186,10 @@ abstract final class NivaraTheme {
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: highContrast ? BorderSide(color: isDark ? Colors.white : Colors.black, width: 2) : BorderSide.none,
+        ),
       ),
     );
   }
