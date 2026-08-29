@@ -1,13 +1,13 @@
+import 'dart:async';
+
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
 import '../../models/lf_claim.dart';
 import '../../models/lf_item.dart';
 
-/// Thin wrapper over the Lost & Found claim flow. Writes go through the
-/// SECURITY DEFINER RPCs (`lf_create_claim` / `lf_complete_claim` /
-/// `lf_reject_claim`) added in migration 0005 — cross-user resolution can't be
-/// done with a direct table write. Self-close is the one exception: it's an
-/// owner updating their own row, which `lf_update_own` already permits.
+/// Wrapper over the Lost & Found claim flow and Handover Verification.
+/// Writes go through SECURITY DEFINER RPCs (`lf_create_claim` / `lf_complete_claim` /
+/// `lf_reject_claim` / `lf_generate_handover_pass` / `lf_verify_handover`).
 class LFClaimsRepo {
   const LFClaimsRepo._();
 
@@ -30,14 +30,39 @@ class LFClaimsRepo {
     return id as String;
   }
 
-  /// The listing owner accepts a claim — resolves both listings and rejects
+  /// Generates a dynamic 6-digit OTP and cryptographic handover token for the claim.
+  static Future<Map<String, dynamic>> generateHandoverPass(String claimId) async {
+    final res = await supabase.rpc(
+      'lf_generate_handover_pass',
+      params: {'p_claim_id': claimId},
+    );
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  /// Verifies the physical handover via QR token or 6-digit PIN handshake.
+  static Future<Map<String, dynamic>> verifyHandover({
+    required String claimId,
+    String? token,
+    String? otp,
+  }) async {
+    final res = await supabase.rpc(
+      'lf_verify_handover',
+      params: {
+        'p_claim_id': claimId,
+        'p_token': token,
+        'p_otp': otp,
+      },
+    );
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  /// The listing owner directly accepts a claim — resolves both listings and rejects
   /// any sibling pending claims.
   static Future<void> completeClaim(String claimId) async {
     await supabase.rpc('lf_complete_claim', params: {'p_claim_id': claimId});
   }
 
-  /// Owner rejects / claimant withdraws a pending claim. Both listings stay
-  /// active.
+  /// Owner rejects / claimant withdraws a pending claim. Both listings stay active.
   static Future<void> rejectClaim(String claimId) async {
     await supabase.rpc('lf_reject_claim', params: {'p_claim_id': claimId});
   }
@@ -48,6 +73,26 @@ class LFClaimsRepo {
         .from(kTableLfItems)
         .update({'status': 'RESOLVED'})
         .eq('id', itemId);
+  }
+
+  /// Fetch a single claim by id.
+  static Future<LFClaim?> getClaim(String claimId) async {
+    final row = await supabase
+        .from(kTableLfClaims)
+        .select()
+        .eq('id', claimId)
+        .maybeSingle();
+    if (row == null) return null;
+    return LFClaim.fromMap(row);
+  }
+
+  /// Stream a claim in real-time to listen for completion events.
+  static Stream<LFClaim?> streamClaim(String claimId) {
+    return supabase
+        .from(kTableLfClaims)
+        .stream(primaryKey: ['id'])
+        .eq('id', claimId)
+        .map((rows) => rows.isNotEmpty ? LFClaim.fromMap(rows.first) : null);
   }
 
   /// The current user's own listings (any status), newest first.
@@ -100,8 +145,7 @@ class LFClaimsRepo {
         .toList();
   }
 
-  /// Fetch several listings by id in one query — resolves the item behind each
-  /// claim without an N+1 fan-out. Returns a map keyed by id.
+  /// Fetch several listings by id in one query.
   static Future<Map<String, LFItem>> itemsByIds(Iterable<String> ids) async {
     final list = ids.toSet().toList();
     if (list.isEmpty) return {};
@@ -117,8 +161,7 @@ class LFClaimsRepo {
     return map;
   }
 
-  /// Display names for a set of user ids, for labelling claims. Missing/failed
-  /// lookups are simply absent from the map.
+  /// Display names for a set of user ids.
   static Future<Map<String, String>> displayNames(Iterable<String> ids) async {
     final list = ids.toSet().toList();
     if (list.isEmpty) return {};

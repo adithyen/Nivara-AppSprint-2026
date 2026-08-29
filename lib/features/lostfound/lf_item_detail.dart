@@ -6,6 +6,7 @@ import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import '../../models/lf_claim.dart';
 import '../../models/lf_item.dart';
@@ -13,19 +14,16 @@ import '../auth/auth_controller.dart';
 import 'item_card.dart';
 import 'lf_claims_repo.dart';
 import 'lf_contact.dart';
+import 'lf_handover_dialog.dart';
 
 /// Full view of one Lost & Found item — reached by tapping a match result or a
 /// hub card. Shows the counterpart's photos (tap to zoom, to verify ownership)
 /// and a one-tap contact action via [launchLFContact].
 ///
-/// It also carries the claim flow: a viewer who recognises the item can send a
-/// claim ("this is mine"), optionally linking their own opposite listing; the
-/// listing's owner sees pending claims here and completes or declines them, or
-/// closes the listing themselves once recovered.
-///
-/// It renders the passed [item] immediately, then re-fetches the full row by id
-/// so photos + contact are present even when the caller only had a partial
-/// record (e.g. an older `find_nearby_items` payload).
+/// It also carries the direct handover flow: a viewer who finds or recognizes the item
+/// can send a claim / handover intent directly without filing a duplicate listing,
+/// and both parties can execute mutual verification via dynamic QR code passes
+/// or 6-digit proximity PIN handshakes.
 class LFItemDetailScreen extends ConsumerStatefulWidget {
   const LFItemDetailScreen({
     super.key,
@@ -162,16 +160,31 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
         claimantItemId: result.linkedId,
         message: result.message,
       ),
-      'Claim sent. The owner will confirm the hand-over.',
+      _item.isLost
+          ? 'Handover intent sent to the owner! You can now verify in person.'
+          : 'Claim sent. The finder will confirm the handover.',
     );
+  }
+
+  Future<void> _openHandoverDialog(LFClaim claim) async {
+    final resolved = await LFHandoverDialog.show(
+      context,
+      claim: claim,
+      item: _item,
+      isOwner: _isOwner,
+    );
+    if (resolved == true && mounted) {
+      _snack('Item Handover Verified & Completed!');
+      await _refreshFull();
+      await _loadClaimContext();
+    }
   }
 
   Future<void> _completeClaim(LFClaim claim) async {
     if (!await _confirm(
-      'Complete this claim?',
-      'This confirms the hand-over: your listing — and the claimant\'s linked '
-          'listing, if any — are marked resolved and leave Lost & Found. This '
-          'can\'t be undone.',
+      'Directly complete this claim?',
+      'This marks both listings resolved and removes them from the Lost & Found feed. '
+          'Tip: Use "Verify Handover (QR / PIN)" when meeting in person for mutual verification.',
       'Complete',
     )) {
       return;
@@ -192,8 +205,7 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
   Future<void> _selfClose() async {
     if (!await _confirm(
       'Mark as resolved?',
-      'This removes your listing from Lost & Found. Do this once you have the '
-          'item back.',
+      'This removes your listing from Lost & Found. Do this once you have the item back.',
       'Mark resolved',
     )) {
       return;
@@ -319,9 +331,9 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
         padding: const EdgeInsets.only(top: 16),
         child: _Banner(
           color: color,
-          icon: resolved ? Icons.check_circle : Icons.info_outline,
+          icon: resolved ? Icons.check_circle_rounded : Icons.info_outline,
           text: resolved
-              ? 'This item has been resolved and is no longer active.'
+              ? 'This item has been safely transferred and resolved.'
               : 'This listing is ${_item.status.toLowerCase()}.',
         ),
       );
@@ -339,38 +351,39 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (pending.isEmpty)
-            _Banner(
+            const _Banner(
               color: NivaraColors.primary,
               icon: Icons.person_pin_circle_outlined,
               text:
-                  'This is your listing. Mark it resolved when you get it '
-                  'back, or wait for someone to claim it.',
+                  'This is your listing. When someone finds or claims it, you can verify '
+                  'the physical handover here via Dynamic QR Code or 6-Digit PIN.',
             )
           else ...[
             Text(
-              'Claims on this listing',
+              'Handover Requests & Claims',
               style: Theme.of(
                 context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             for (final c in pending) ...[
               _OwnerClaimTile(
                 claim: c,
                 busy: _busy,
+                onVerifyHandover: () => _openHandoverDialog(c),
                 onComplete: () => _completeClaim(c),
                 onDecline: () => _rejectClaim(c, asOwner: true),
               ),
               const SizedBox(height: 8),
             ],
           ],
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: _busy ? null : _selfClose,
               icon: const Icon(Icons.task_alt, size: 18),
-              label: const Text('Mark resolved (I got it myself)'),
+              label: const Text('Mark resolved (Recovered directly)'),
             ),
           ),
         ],
@@ -379,28 +392,62 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
   }
 
   Widget _viewerSection() {
-    final accent = _item.isLost ? NivaraColors.danger : NivaraColors.success;
     final mine = _myClaim;
     if (mine != null && mine.isPending) {
       return Padding(
         padding: const EdgeInsets.only(top: 16),
         child: Column(
           children: [
-            _Banner(
-              color: NivaraColors.accent,
-              icon: Icons.hourglass_top,
+            const _Banner(
+              color: Color(0xFF00E676),
+              icon: Icons.handshake_rounded,
               text:
-                  'You\'ve claimed this. The owner will confirm the '
-                  'hand-over — you\'ll see it update here.',
+                  'Handover request active! When you meet the counterpart, open the '
+                  'Handover Pass to display your QR code or enter their 6-digit PIN.',
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+            BouncyTap(
+              onTap: () => _openHandoverDialog(mine),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00E676).withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.qr_code_scanner_rounded, color: Colors.black, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Open Handover Pass (QR / PIN)',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
             SizedBox(
               width: double.infinity,
               child: TextButton(
                 onPressed: _busy
                     ? null
                     : () => _rejectClaim(mine, asOwner: false),
-                child: const Text('Withdraw claim'),
+                child: const Text('Withdraw request'),
               ),
             ),
           ],
@@ -408,15 +455,50 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
       );
     }
 
+    final isLost = _item.isLost;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: _busy ? null : _sendClaim,
-          style: FilledButton.styleFrom(backgroundColor: accent),
-          icon: const Icon(Icons.pan_tool_alt_outlined),
-          label: Text(_item.isLost ? 'I found this' : 'This is mine'),
+      child: BouncyTap(
+        onTap: _busy ? null : _sendClaim,
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            gradient: isLost
+                ? const LinearGradient(
+                    colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFF00B0FF), Color(0xFF7B4BC4)],
+                  ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
+                    .withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isLost ? Icons.volunteer_activism_rounded : Icons.verified_rounded,
+                color: Colors.black,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isLost ? 'I Found This Item (Start Handover)' : 'This Is Mine (Claim Item)',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14.5,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -453,17 +535,19 @@ class _Banner extends StatelessWidget {
   }
 }
 
-/// One pending claim, shown to the listing owner with accept/decline actions.
+/// One pending claim, shown to the listing owner with verify and decline actions.
 class _OwnerClaimTile extends StatelessWidget {
   const _OwnerClaimTile({
     required this.claim,
     required this.busy,
+    required this.onVerifyHandover,
     required this.onComplete,
     required this.onDecline,
   });
 
   final LFClaim claim;
   final bool busy;
+  final VoidCallback onVerifyHandover;
   final VoidCallback onComplete;
   final VoidCallback onDecline;
 
@@ -471,11 +555,11 @@ class _OwnerClaimTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: NivaraColors.accent.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: NivaraColors.accent.withValues(alpha: 0.3)),
+        color: NivaraColors.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: NivaraColors.accent.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,17 +567,18 @@ class _OwnerClaimTile extends StatelessWidget {
           Row(
             children: [
               const Icon(
-                Icons.pan_tool_alt_outlined,
+                Icons.handshake_rounded,
                 color: NivaraColors.accent,
-                size: 18,
+                size: 20,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Someone says this is theirs',
+                  'Handover Claim Received',
                   style: TextStyle(
                     color: scheme.onSurface,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -501,20 +586,55 @@ class _OwnerClaimTile extends StatelessWidget {
           ),
           if (claim.message != null && claim.message!.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text('“${claim.message!.trim()}”'),
+            Text(
+              '“${claim.message!.trim()}”',
+              style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 13),
+            ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: FilledButton(
-                  onPressed: busy ? null : onComplete,
-                  child: const Text('Complete claim'),
+                child: BouncyTap(
+                  onTap: busy ? null : onVerifyHandover,
+                  child: Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00E676).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.qr_code_rounded, color: Colors.black, size: 18),
+                        SizedBox(width: 6),
+                        Text(
+                          'Verify (QR/PIN)',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: busy ? null : onDecline,
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
                 child: const Text('Decline'),
               ),
             ],
@@ -547,10 +667,8 @@ class _MatchBanner extends StatelessWidget {
           Expanded(
             child: Text(
               isLost
-                  ? 'Someone reported losing this. Check the photos — if it '
-                        'matches what you found, reach out below.'
-                  : 'Someone found this nearby. Check the photos to confirm '
-                        "it's yours, then contact them below.",
+                  ? 'Someone reported losing this. Check the photos — if it matches what you found, start the handover below.'
+                  : 'Someone found this nearby. Check the photos to confirm it is yours, then claim it below.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -586,8 +704,6 @@ class _TypePill extends StatelessWidget {
 }
 
 /// Horizontal strip of photos; tapping one opens a fullscreen, zoomable viewer.
-/// When there are no photos it says so plainly — important when the whole point
-/// is verifying ownership by sight.
 class _PhotoGallery extends StatelessWidget {
   const _PhotoGallery({required this.urls});
   final List<String> urls;
@@ -765,8 +881,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   }
 }
 
-/// One-tap contact. Shows the method with a meaningful icon + label and the
-/// value, launches the relevant app on tap, and offers a copy fallback.
+/// One-tap contact card.
 class _ContactCard extends StatelessWidget {
   const _ContactCard({
     required this.item,
@@ -932,9 +1047,9 @@ class _MetaRow extends StatelessWidget {
   }
 }
 
-/// The claim composer: an optional note to the owner and — if the claimant has
+/// The claim / handover composer: an optional note to the owner and — if the claimant has
 /// matching listings of their own — an option to link one so completing the
-/// claim resolves both. Pops a `(message, linkedId)` record, or null on cancel.
+/// claim resolves both.
 class _ClaimSheet extends StatefulWidget {
   const _ClaimSheet({required this.item, required this.linkable});
   final LFItem item;
@@ -958,6 +1073,7 @@ class _ClaimSheetState extends State<_ClaimSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final oppositeWord = widget.item.isLost ? 'found' : 'lost';
+    final isLost = widget.item.isLost;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + bottom),
       child: Column(
@@ -965,15 +1081,17 @@ class _ClaimSheetState extends State<_ClaimSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            widget.item.isLost ? 'I found this item' : 'This item is mine',
+            isLost ? 'I Found This Item (Start Handover)' : 'This Item Is Mine (Claim)',
             style: Theme.of(
               context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           Text(
-            'The owner will be notified and confirms the hand-over. Add a note '
-            'to help them recognise you.',
+            isLost
+                ? 'Notify the owner that you found their item. You will be able to verify '
+                  'the transfer in person using a dynamic QR code or 6-digit PIN.'
+                : 'Notify the finder that you own this item. Add a note describing identifying details.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -983,22 +1101,23 @@ class _ClaimSheetState extends State<_ClaimSheet> {
             controller: _msgCtrl,
             maxLines: 3,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Message (optional)',
-              hintText: 'e.g. I lost this near the market on Tuesday',
+            decoration: InputDecoration(
+              labelText: isLost ? 'Handover note (optional)' : 'Identifying details (optional)',
+              hintText: isLost
+                  ? 'e.g. Safe with me at Metro Station Info Desk'
+                  : 'e.g. It has a blue tag on the zipper',
               alignLabelWithHint: true,
             ),
           ),
           if (widget.linkable.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'Link your own $oppositeWord listing (optional)',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              'Link your existing $oppositeWord listing (optional)',
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 2),
             Text(
-              'If you already posted this, linking it resolves both when the '
-              'owner completes the claim.',
+              'If you already posted this earlier, linking it resolves both when verified.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -1022,6 +1141,7 @@ class _ClaimSheetState extends State<_ClaimSheet> {
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
+            height: 48,
             child: FilledButton.icon(
               onPressed: () => Navigator.pop(context, (
                 message: _msgCtrl.text.trim().isEmpty
@@ -1029,8 +1149,8 @@ class _ClaimSheetState extends State<_ClaimSheet> {
                     : _msgCtrl.text.trim(),
                 linkedId: _linkedId,
               )),
-              icon: const Icon(Icons.send),
-              label: const Text('Send claim'),
+              icon: const Icon(Icons.send_rounded),
+              label: Text(isLost ? 'Send Handover Intent' : 'Send Claim'),
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import '../../models/lf_claim.dart';
 import '../../models/lf_item.dart';
@@ -11,17 +12,17 @@ import '../../router.dart';
 import '../auth/auth_controller.dart';
 import 'item_card.dart';
 import 'lf_claims_repo.dart';
+import 'lf_handover_dialog.dart';
 
 /// "My Lost & Found" — the one place a user closes the loop on their own posts.
 ///
 /// Three sections, in order of what needs the user's attention:
 ///   1. **Claims to review** — someone says one of your listings is theirs.
-///      Complete the hand-over (resolves both listings) or decline.
+///      Complete the handover (resolves both listings) via QR/PIN verification or decline.
 ///   2. **My listings** — everything you've posted. Active ones can be closed
-///      directly ("I got it back myself"); each shows how many people have
-///      claimed it.
+///      directly ("I got it back myself"); each shows how many people have claimed it.
 ///   3. **Claims you've sent** — listings you've claimed as yours, with live
-///      status; pending ones can be withdrawn.
+///      status; pending ones can be withdrawn or verified via QR/PIN.
 class MyListingsScreen extends ConsumerStatefulWidget {
   const MyListingsScreen({super.key});
 
@@ -137,34 +138,45 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
     }
   }
 
+  Future<void> _verifyHandover(LFClaim claim, LFItem? item) async {
+    if (item == null) return;
+    final uid = ref.read(authControllerProvider).asData?.value?.id;
+    final isOwner = uid != null && uid == item.userId;
+    final resolved = await LFHandoverDialog.show(
+      context,
+      claim: claim,
+      item: item,
+      isOwner: isOwner,
+    );
+    if (resolved == true && mounted) {
+      _snack('Item Handover Verified & Completed!');
+      _load();
+    }
+  }
+
   Future<void> _selfClose(LFItem item) async {
+    final title = _label(item);
     if (!await _confirm(
       'Mark as resolved?',
-      'This removes "${_label(item)}" from Lost & Found. Do this once you have '
-          'the item back.',
+      'This removes "$title" from Lost & Found. Do this once you have the item back.',
       'Mark resolved',
     )) {
       return;
     }
-    await _run(
-      () => LFClaimsRepo.selfClose(item.id),
-      'Listing marked resolved.',
-    );
+    await _run(() => LFClaimsRepo.selfClose(item.id), 'Listing resolved.');
   }
 
   Future<void> _completeClaim(LFClaim claim) async {
     if (!await _confirm(
-      'Complete this claim?',
-      'This confirms the hand-over: your listing — and the claimant\'s linked '
-          'listing, if any — are marked resolved and leave Lost & Found. This '
-          'can\'t be undone.',
+      'Directly complete this claim?',
+      'This marks both listings resolved and removes them from the Lost & Found feed.',
       'Complete',
     )) {
       return;
     }
     await _run(
       () => LFClaimsRepo.completeClaim(claim.id),
-      'Claim completed — both listings resolved.',
+      'Claim completed — listings resolved.',
     );
   }
 
@@ -173,8 +185,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
     if (!await _confirm(
       '$verb claim?',
       asOwner
-          ? 'The claimant will be told their claim was declined. Your listing '
-                'stays active.'
+          ? 'The claimant will be told their claim was declined. Your listing stays active.'
           : 'Your claim will be withdrawn. The listing stays active for others.',
       verb,
     )) {
@@ -265,6 +276,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                   : _itemsById[c.claimantItemId!],
               claimantName: _names[c.claimantId],
               busy: _busy,
+              onVerifyHandover: () => _verifyHandover(c, _itemsById[c.itemId]),
               onComplete: () => _completeClaim(c),
               onDecline: () => _rejectClaim(c, asOwner: true),
             ),
@@ -275,7 +287,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
         _SectionTitle('My listings', count: _myItems.length),
         const SizedBox(height: 8),
         if (_myItems.isEmpty)
-          _MutedNote('You have no active listings.')
+          const _MutedNote('You have no active listings.')
         else
           for (final item in _myItems) ...[
             _MyItemCard(
@@ -299,6 +311,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
               claim: c,
               item: _itemsById[c.itemId],
               busy: _busy,
+              onVerifyHandover: () => _verifyHandover(c, _itemsById[c.itemId]),
               onWithdraw: c.isPending
                   ? () => _rejectClaim(c, asOwner: false)
                   : null,
@@ -379,6 +392,7 @@ class _IncomingClaimCard extends StatelessWidget {
     required this.linked,
     required this.claimantName,
     required this.busy,
+    required this.onVerifyHandover,
     required this.onComplete,
     required this.onDecline,
   });
@@ -388,6 +402,7 @@ class _IncomingClaimCard extends StatelessWidget {
   final LFItem? linked;
   final String? claimantName;
   final bool busy;
+  final VoidCallback onVerifyHandover;
   final VoidCallback onComplete;
   final VoidCallback onDecline;
 
@@ -407,7 +422,7 @@ class _IncomingClaimCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       color: NivaraColors.accent.withValues(alpha: 0.06),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: NivaraColors.accent.withValues(alpha: 0.35)),
       ),
       child: Padding(
@@ -420,7 +435,7 @@ class _IncomingClaimCard extends StatelessWidget {
                 CircleAvatar(
                   backgroundColor: NivaraColors.accent.withValues(alpha: 0.18),
                   child: const Icon(
-                    Icons.pan_tool_alt_outlined,
+                    Icons.handshake_rounded,
                     color: NivaraColors.accent,
                   ),
                 ),
@@ -495,15 +510,46 @@ class _IncomingClaimCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: busy ? null : onComplete,
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Complete claim'),
+                  child: BouncyTap(
+                    onTap: busy ? null : onVerifyHandover,
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00E676).withValues(alpha: 0.25),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.qr_code_rounded, color: Colors.black, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Verify (QR/PIN)',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 OutlinedButton(
                   onPressed: busy ? null : onDecline,
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                   child: const Text('Decline'),
                 ),
               ],
@@ -591,7 +637,7 @@ class _MyItemCard extends StatelessWidget {
                 Row(
                   children: [
                     const Icon(
-                      Icons.pan_tool_alt_outlined,
+                      Icons.handshake_rounded,
                       size: 15,
                       color: NivaraColors.accent,
                     ),
@@ -651,12 +697,14 @@ class _SentClaimCard extends StatelessWidget {
     required this.claim,
     required this.item,
     required this.busy,
+    this.onVerifyHandover,
     required this.onWithdraw,
   });
 
   final LFClaim claim;
   final LFItem? item;
   final bool busy;
+  final VoidCallback? onVerifyHandover;
   final VoidCallback? onWithdraw;
 
   @override
@@ -678,36 +726,70 @@ class _SentClaimCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
+        child: Column(
           children: [
-            CircleAvatar(
-              backgroundColor: color.withValues(alpha: 0.15),
-              child: Icon(icon, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'You claimed $title',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: color.withValues(alpha: 0.15),
+                  child: Icon(icon, color: color),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'You claimed $title',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        claim.status.label,
+                        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    claim.status.label,
-                    style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                ),
+                if (onWithdraw != null)
+                  TextButton(
+                    onPressed: busy ? null : onWithdraw,
+                    child: const Text('Withdraw'),
                   ),
-                ],
-              ),
+              ],
             ),
-            if (onWithdraw != null)
-              TextButton(
-                onPressed: busy ? null : onWithdraw,
-                child: const Text('Withdraw'),
+            if (claim.isPending && onVerifyHandover != null) ...[
+              const SizedBox(height: 10),
+              BouncyTap(
+                onTap: busy ? null : onVerifyHandover,
+                child: Container(
+                  height: 38,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.qr_code_scanner_rounded, color: Colors.black, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Open Handover Pass (QR / PIN)',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
+            ],
           ],
         ),
       ),

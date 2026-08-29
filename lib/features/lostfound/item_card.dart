@@ -143,6 +143,38 @@ class LFItemCard extends StatelessWidget {
                         ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
+                          .withValues(alpha: isDark ? 0.12 : 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
+                            .withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isLost ? Icons.volunteer_activism_rounded : Icons.verified_rounded,
+                          size: 12,
+                          color: isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isLost ? 'Direct Handover' : 'Direct Claim',
+                          style: TextStyle(
+                            color: isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

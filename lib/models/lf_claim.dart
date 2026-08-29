@@ -2,8 +2,7 @@ import '../core/utils.dart';
 import 'enums.dart';
 
 /// A row of `lf_claims` — one person's claim on another person's Lost & Found
-/// listing. Writes go exclusively through the `lf_create_claim` /
-/// `lf_complete_claim` / `lf_reject_claim` RPCs; the app only ever reads this.
+/// listing with dynamic verification and handover metadata.
 class LFClaim {
   final String id;
 
@@ -18,6 +17,14 @@ class LFClaim {
 
   final String? message;
   final LFClaimStatus status;
+
+  /// Handover verification metadata
+  final String? handoverOtp;
+  final String? handoverToken;
+  final DateTime? handoverGeneratedAt;
+  final DateTime? handoverVerifiedAt;
+  final String? handoverVerifiedBy;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -29,6 +36,11 @@ class LFClaim {
     this.claimantItemId,
     this.message,
     this.status = LFClaimStatus.pending,
+    this.handoverOtp,
+    this.handoverToken,
+    this.handoverGeneratedAt,
+    this.handoverVerifiedAt,
+    this.handoverVerifiedBy,
     this.createdAt,
     this.updatedAt,
   });
@@ -44,6 +56,11 @@ class LFClaim {
     claimantItemId: map['claimant_item_id'] as String?,
     message: map['message'] as String?,
     status: LFClaimStatus.fromWire(map['status'] as String?),
+    handoverOtp: map['handover_otp'] as String?,
+    handoverToken: map['handover_token'] as String?,
+    handoverGeneratedAt: toDateTimeOrNull(map['handover_generated_at']),
+    handoverVerifiedAt: toDateTimeOrNull(map['handover_verified_at']),
+    handoverVerifiedBy: map['handover_verified_by'] as String?,
     createdAt: toDateTimeOrNull(map['created_at']),
     updatedAt: toDateTimeOrNull(map['updated_at']),
   );
