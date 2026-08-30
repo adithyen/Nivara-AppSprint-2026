@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,8 +18,8 @@ class AccessibilityState {
     this.textScaleFactor = 1.0,
     this.highContrast = false,
     this.colorBlindAssistance = false,
-    this.hapticsEnabled = true,
-    this.screenReaderAnnouncements = true,
+    this.hapticsEnabled = false,
+    this.screenReaderAnnouncements = false,
   });
 
   AccessibilityState copyWith({
@@ -67,8 +68,8 @@ class AccessibilityController extends Notifier<AccessibilityState> {
       textScaleFactor: prefs.getDouble(_kTextScale) ?? 1.0,
       highContrast: prefs.getBool(_kHighContrast) ?? false,
       colorBlindAssistance: prefs.getBool(_kColorBlind) ?? false,
-      hapticsEnabled: prefs.getBool(_kHaptics) ?? true,
-      screenReaderAnnouncements: prefs.getBool(_kAnnounce) ?? true,
+      hapticsEnabled: prefs.getBool(_kHaptics) ?? false,
+      screenReaderAnnouncements: prefs.getBool(_kAnnounce) ?? false,
     );
   }
 
@@ -98,6 +99,10 @@ class AccessibilityController extends Notifier<AccessibilityState> {
 
   Future<void> setHapticsEnabled(bool value) async {
     state = state.copyWith(hapticsEnabled: value);
+    if (value) {
+      HapticFeedback.vibrate();
+      HapticFeedback.heavyImpact();
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kHaptics, value);
   }

@@ -13,8 +13,8 @@ void main() {
       expect(state.textScaleFactor, 1.0);
       expect(state.highContrast, isFalse);
       expect(state.colorBlindAssistance, isFalse);
-      expect(state.hapticsEnabled, isTrue);
-      expect(state.screenReaderAnnouncements, isTrue);
+      expect(state.hapticsEnabled, isFalse);
+      expect(state.screenReaderAnnouncements, isFalse);
     });
 
     test('copyWith updates state immutably', () {

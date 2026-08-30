@@ -4,15 +4,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/connectivity_banner.dart';
 import '../community/community_tab.dart';
 import '../profile/profile_tab.dart';
 import '../pulse/pulse_tab.dart';
+import '../settings/accessibility_controller.dart';
+import '../settings/language_controller.dart';
 import '../worker/worker_dashboard.dart';
 import 'home_tab.dart';
 
-/// 2026-Level Field Worker Shell featuring floating glass navbar and rapid task access.
+/// 2026-Level Field Worker Shell with dynamic localization and high-contrast styling.
 class WorkerShell extends ConsumerStatefulWidget {
   const WorkerShell({super.key});
 
@@ -23,46 +26,49 @@ class WorkerShell extends ConsumerStatefulWidget {
 class _WorkerShellState extends ConsumerState<WorkerShell> {
   int _index = 0;
 
-  static const _tabs = <_TabSpec>[
-    _TabSpec(
-      title: 'Field Tasks',
-      icon: Icons.engineering_outlined,
-      selectedIcon: Icons.engineering_rounded,
-      label: 'Tasks',
-      body: WorkerDashboard(),
-    ),
-    _TabSpec(
-      title: kAppName,
-      icon: Icons.home_outlined,
-      selectedIcon: Icons.home_rounded,
-      label: 'Home',
-      body: HomeTab(),
-    ),
-    _TabSpec(
-      title: 'City Pulse',
-      icon: Icons.graphic_eq_outlined,
-      selectedIcon: Icons.graphic_eq_rounded,
-      label: 'Pulse',
-      body: PulseTab(),
-    ),
-    _TabSpec(
-      title: 'Community',
-      icon: Icons.forum_outlined,
-      selectedIcon: Icons.forum_rounded,
-      label: 'Community',
-      body: CommunityTab(),
-    ),
-    _TabSpec(
-      title: 'Staff Profile',
-      icon: Icons.person_outline_rounded,
-      selectedIcon: Icons.person_rounded,
-      label: 'Profile',
-      body: ProfileTab(),
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
+    final a11y = ref.watch(accessibilityControllerProvider);
+
+    final tabs = <_TabSpec>[
+      _TabSpec(
+        title: 'Field Tasks',
+        icon: Icons.engineering_outlined,
+        selectedIcon: Icons.engineering_rounded,
+        label: NivaraStrings.tr('nav_tasks', currentLang),
+        body: const WorkerDashboard(),
+      ),
+      _TabSpec(
+        title: kAppName,
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home_rounded,
+        label: NivaraStrings.tr('nav_home', currentLang),
+        body: const HomeTab(),
+      ),
+      _TabSpec(
+        title: 'City Pulse',
+        icon: Icons.graphic_eq_outlined,
+        selectedIcon: Icons.graphic_eq_rounded,
+        label: NivaraStrings.tr('nav_pulse', currentLang),
+        body: const PulseTab(),
+      ),
+      _TabSpec(
+        title: 'Community',
+        icon: Icons.forum_outlined,
+        selectedIcon: Icons.forum_rounded,
+        label: NivaraStrings.tr('nav_community', currentLang),
+        body: const CommunityTab(),
+      ),
+      _TabSpec(
+        title: 'Staff Profile',
+        icon: Icons.person_outline_rounded,
+        selectedIcon: Icons.person_rounded,
+        label: NivaraStrings.tr('nav_profile', currentLang),
+        body: const ProfileTab(),
+      ),
+    ];
+
     return Scaffold(
       extendBody: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -71,21 +77,21 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
           bottom: false,
           child: IndexedStack(
             index: _index,
-            children: [for (final t in _tabs) t.body],
+            children: [for (final t in tabs) t.body],
           ),
         ),
       ),
-      bottomNavigationBar: _buildGlassNavBar(),
+      bottomNavigationBar: _buildGlassNavBar(tabs, a11y),
     );
   }
 
-  Widget _buildGlassNavBar() {
+  Widget _buildGlassNavBar(List<_TabSpec> tabs, AccessibilityState a11y) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
 
     return SafeArea(
       child: Container(
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         height: 66,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
@@ -104,29 +110,33 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF10161E).withValues(alpha: 0.88)
-                    : Colors.white.withValues(alpha: 0.92),
+                color: a11y.highContrast
+                    ? (isDark ? Colors.black : Colors.white)
+                    : (isDark
+                        ? const Color(0xFF10161E).withValues(alpha: 0.88)
+                        : Colors.white.withValues(alpha: 0.92)),
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.black.withValues(alpha: 0.08),
-                  width: 1.2,
+                  color: a11y.highContrast
+                      ? primary
+                      : (isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : Colors.black.withValues(alpha: 0.08)),
+                  width: a11y.highContrast ? 2.5 : 1.2,
                 ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(_tabs.length, (i) {
-                  final t = _tabs[i];
+                children: List.generate(tabs.length, (i) {
+                  final t = tabs[i];
                   final isSelected = _index == i;
                   return BouncyTap(
                     scaleFactor: 0.92,
                     onTap: () {
                       if (_index != i) {
-                        HapticFeedback.lightImpact();
+                        if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
                         setState(() => _index = i);
                       }
                     },
@@ -145,7 +155,7 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
                         border: isSelected
                             ? Border.all(
                                 color: primary.withValues(alpha: isDark ? 0.6 : 0.4),
-                                width: 1.2,
+                                width: a11y.highContrast ? 2.0 : 1.2,
                               )
                             : null,
                       ),
@@ -165,7 +175,7 @@ class _WorkerShellState extends ConsumerState<WorkerShell> {
                               t.label,
                               style: TextStyle(
                                 color: primary,
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.2,
                               ),

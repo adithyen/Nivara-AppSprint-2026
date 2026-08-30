@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/civic_level.dart';
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
@@ -11,8 +12,10 @@ import '../../core/widgets/civic_level_view.dart';
 import '../../core/widgets/staggered_entrance.dart';
 import '../../router.dart';
 import '../auth/auth_controller.dart';
+import '../settings/accessibility_controller.dart';
+import '../settings/language_controller.dart';
 
-/// 2026-Level Flagship Citizen Home Dashboard.
+/// 2026-Level Flagship Citizen Home Dashboard with dynamic localization and accessibility contrast tokens.
 class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({super.key});
 
@@ -95,8 +98,12 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(authControllerProvider).asData?.value;
+    final currentLang = ref.watch(languageControllerProvider);
+    final a11y = ref.watch(accessibilityControllerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
+
+    final citizenTitle = profile?.displayName ?? NivaraStrings.tr('role_citizen', currentLang);
 
     return RefreshIndicator(
       color: scheme.primary,
@@ -116,7 +123,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welcome, ${profile?.displayName ?? 'Citizen'}',
+                      '${NivaraStrings.tr('welcome_user', currentLang)}, $citizenTitle',
                       style: TextStyle(
                         color: scheme.onSurface,
                         fontSize: 22,
@@ -126,7 +133,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      kAppTagline,
+                      NivaraStrings.tr('app_tagline', currentLang),
                       style: TextStyle(
                         color: scheme.onSurfaceVariant,
                         fontSize: 12.5,
@@ -143,7 +150,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: scheme.primary.withValues(alpha: isDark ? 0.4 : 0.5),
-                      width: 1.5,
+                      width: a11y.highContrast ? 2.5 : 1.5,
                     ),
                   ),
                   child: Center(
@@ -174,15 +181,17 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               reports: _myReports,
               confirms: _myConfirms,
               finds: _myFinds,
+              currentLang: currentLang,
+              a11y: a11y,
             ),
           ),
 
           const SizedBox(height: 24),
 
           // Section Title
-          const StaggeredEntrance(
+          StaggeredEntrance(
             index: 2,
-            child: _SectionHeader('Civic Modules'),
+            child: _SectionHeader(NivaraStrings.tr('civic_modules', currentLang)),
           ),
 
           const SizedBox(height: 12),
@@ -201,30 +210,34 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 _FeatureModuleTile(
                   icon: Icons.sensors_rounded,
                   color: NivaraColors.primary,
-                  title: 'SensorWatch',
-                  subtitle: 'Highway & road pothole HUD',
+                  title: NivaraStrings.tr('nav_sensor_watch', currentLang),
+                  subtitle: NivaraStrings.tr('module_sensorwatch_sub', currentLang),
                   onTap: () => context.push(Routes.sensorWatch),
+                  a11y: a11y,
                 ),
                 _FeatureModuleTile(
                   icon: Icons.campaign_rounded,
                   color: NivaraColors.accent,
-                  title: 'CivicReport',
-                  subtitle: 'Report 19 issue categories',
+                  title: NivaraStrings.tr('nav_report', currentLang),
+                  subtitle: NivaraStrings.tr('module_report_sub', currentLang),
                   onTap: () => context.push(Routes.report),
+                  a11y: a11y,
                 ),
                 _FeatureModuleTile(
                   icon: Icons.map_rounded,
                   color: NivaraColors.primaryBlue,
-                  title: 'CivicMap',
-                  subtitle: 'Real-time civic map & reports',
+                  title: NivaraStrings.tr('nav_map', currentLang),
+                  subtitle: NivaraStrings.tr('module_map_sub', currentLang),
                   onTap: () => context.push(Routes.map),
+                  a11y: a11y,
                 ),
                 _FeatureModuleTile(
                   icon: Icons.travel_explore_rounded,
                   color: NivaraColors.danger,
-                  title: 'Lost & Found',
-                  subtitle: 'Radar item matching',
+                  title: NivaraStrings.tr('nav_lost_found', currentLang),
+                  subtitle: NivaraStrings.tr('module_lost_found_sub', currentLang),
                   onTap: () => context.push(Routes.lostFound),
+                  a11y: a11y,
                 ),
               ],
             ),
@@ -242,6 +255,8 @@ class _ImpactCard extends StatelessWidget {
     required this.reports,
     required this.confirms,
     required this.finds,
+    required this.currentLang,
+    required this.a11y,
   });
 
   final bool loading;
@@ -249,6 +264,8 @@ class _ImpactCard extends StatelessWidget {
   final int reports;
   final int confirms;
   final int finds;
+  final AppLanguage currentLang;
+  final AccessibilityState a11y;
 
   @override
   Widget build(BuildContext context) {
@@ -258,27 +275,36 @@ class _ImpactCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF101B2B), Color(0xFF0D141E)]
-              : const [Colors.white, Color(0xFFF6F9FD)],
-        ),
+        color: a11y.highContrast
+            ? (isDark ? Colors.black : Colors.white)
+            : null,
+        gradient: a11y.highContrast
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? const [Color(0xFF101B2B), Color(0xFF0D141E)]
+                    : const [Colors.white, Color(0xFFF6F9FD)],
+              ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: primary.withValues(alpha: isDark ? 0.35 : 0.4),
-          width: 1.2,
+          color: a11y.highContrast
+              ? primary
+              : primary.withValues(alpha: isDark ? 0.35 : 0.4),
+          width: a11y.highContrast ? 2.5 : 1.2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? primary.withValues(alpha: 0.12)
-                : Colors.black.withValues(alpha: 0.06),
-            blurRadius: isDark ? 28 : 16,
-            offset: isDark ? const Offset(0, 8) : const Offset(0, 4),
-          ),
-        ],
+        boxShadow: a11y.highContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: isDark
+                      ? primary.withValues(alpha: 0.12)
+                      : Colors.black.withValues(alpha: 0.06),
+                  blurRadius: isDark ? 28 : 16,
+                  offset: isDark ? const Offset(0, 8) : const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,7 +325,7 @@ class _ImpactCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                'Civic Standing & Impact',
+                NivaraStrings.tr('civic_standing', currentLang),
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF111827),
                   fontWeight: FontWeight.w700,
@@ -354,7 +380,7 @@ class _ImpactCard extends StatelessWidget {
               _ImpactStat(
                 icon: Icons.report_gmailerrorred_rounded,
                 value: reports,
-                label: 'Reports',
+                label: NivaraStrings.tr('stat_reports', currentLang),
                 loading: loading,
                 color: NivaraColors.accent,
                 isDark: isDark,
@@ -363,7 +389,7 @@ class _ImpactCard extends StatelessWidget {
               _ImpactStat(
                 icon: Icons.thumb_up_alt_rounded,
                 value: confirms,
-                label: 'Confirms',
+                label: NivaraStrings.tr('stat_confirms', currentLang),
                 loading: loading,
                 color: primary,
                 isDark: isDark,
@@ -372,7 +398,7 @@ class _ImpactCard extends StatelessWidget {
               _ImpactStat(
                 icon: Icons.volunteer_activism_rounded,
                 value: finds,
-                label: 'Finds',
+                label: NivaraStrings.tr('stat_finds', currentLang),
                 loading: loading,
                 color: NivaraColors.primaryBlue,
                 isDark: isDark,
@@ -473,6 +499,7 @@ class _FeatureModuleTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    required this.a11y,
   });
 
   final IconData icon;
@@ -480,6 +507,7 @@ class _FeatureModuleTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final AccessibilityState a11y;
 
   @override
   Widget build(BuildContext context) {
@@ -490,21 +518,27 @@ class _FeatureModuleTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF10161E) : Colors.white,
+          color: a11y.highContrast
+              ? (isDark ? Colors.black : Colors.white)
+              : (isDark ? const Color(0xFF10161E) : Colors.white),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: color.withValues(alpha: isDark ? 0.35 : 0.4),
-            width: 1.2,
+            color: a11y.highContrast
+                ? color
+                : color.withValues(alpha: isDark ? 0.35 : 0.4),
+            width: a11y.highContrast ? 2.5 : 1.2,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? color.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
-              blurRadius: isDark ? 16 : 10,
-              offset: isDark ? const Offset(0, 4) : const Offset(0, 3),
-            ),
-          ],
+          boxShadow: a11y.highContrast
+              ? null
+              : [
+                  BoxShadow(
+                    color: isDark
+                        ? color.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.05),
+                    blurRadius: isDark ? 16 : 10,
+                    offset: isDark ? const Offset(0, 4) : const Offset(0, 3),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

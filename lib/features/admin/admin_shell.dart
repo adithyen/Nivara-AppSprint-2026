@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/localization/app_localizations.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/connectivity_banner.dart';
 import '../profile/profile_tab.dart';
+import '../settings/accessibility_controller.dart';
+import '../settings/language_controller.dart';
 import 'admin_community_tab.dart';
 import 'admin_insights.dart';
 import 'admin_queue.dart';
 import 'manage_team_screen.dart';
 
-/// 2026-Level Municipal Command Center Shell with floating glass navbar.
+/// 2026-Level Municipal Command Center Shell with dynamic localization and high-contrast styling.
 class AdminShell extends ConsumerStatefulWidget {
   const AdminShell({super.key});
 
@@ -24,45 +27,46 @@ class _AdminShellState extends ConsumerState<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
+    final a11y = ref.watch(accessibilityControllerProvider);
+
     final tabs = <_TabSpec>[
-      const _TabSpec(
+      _TabSpec(
         title: 'Dispatch Queue',
         icon: Icons.inbox_outlined,
         selectedIcon: Icons.inbox_rounded,
-        label: 'Queue',
-        body: AdminQueue(),
+        label: NivaraStrings.tr('nav_queue', currentLang),
+        body: const AdminQueue(),
       ),
-      const _TabSpec(
+      _TabSpec(
         title: 'City Insights',
         icon: Icons.insights_outlined,
         selectedIcon: Icons.insights_rounded,
-        label: 'Insights',
-        body: AdminInsights(),
+        label: NivaraStrings.tr('nav_insights', currentLang),
+        body: const AdminInsights(),
       ),
-      const _TabSpec(
+      _TabSpec(
         title: 'Municipal Forum',
         icon: Icons.groups_outlined,
         selectedIcon: Icons.groups_rounded,
-        label: 'Community',
-        body: AdminCommunityTab(),
+        label: NivaraStrings.tr('nav_community', currentLang),
+        body: const AdminCommunityTab(),
       ),
-      const _TabSpec(
+      _TabSpec(
         title: 'Staff & Field Team',
         icon: Icons.badge_outlined,
         selectedIcon: Icons.badge_rounded,
-        label: 'Team',
-        body: ManageTeamScreen(),
+        label: NivaraStrings.tr('nav_team', currentLang),
+        body: const ManageTeamScreen(),
       ),
-      const _TabSpec(
+      _TabSpec(
         title: 'Admin Profile',
         icon: Icons.shield_outlined,
         selectedIcon: Icons.shield_rounded,
-        label: 'Profile',
-        body: ProfileTab(),
+        label: NivaraStrings.tr('nav_profile', currentLang),
+        body: const ProfileTab(),
       ),
     ];
-
-    final index = _index.clamp(0, tabs.length - 1);
 
     return Scaffold(
       extendBody: true,
@@ -71,22 +75,22 @@ class _AdminShellState extends ConsumerState<AdminShell> {
         child: SafeArea(
           bottom: false,
           child: IndexedStack(
-            index: index,
+            index: _index,
             children: [for (final t in tabs) t.body],
           ),
         ),
       ),
-      bottomNavigationBar: _buildGlassNavBar(tabs, index),
+      bottomNavigationBar: _buildGlassNavBar(tabs, a11y),
     );
   }
 
-  Widget _buildGlassNavBar(List<_TabSpec> tabs, int index) {
+  Widget _buildGlassNavBar(List<_TabSpec> tabs, AccessibilityState a11y) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
 
     return SafeArea(
       child: Container(
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         height: 66,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
@@ -105,29 +109,33 @@ class _AdminShellState extends ConsumerState<AdminShell> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF10161E).withValues(alpha: 0.88)
-                    : Colors.white.withValues(alpha: 0.92),
+                color: a11y.highContrast
+                    ? (isDark ? Colors.black : Colors.white)
+                    : (isDark
+                        ? const Color(0xFF10161E).withValues(alpha: 0.88)
+                        : Colors.white.withValues(alpha: 0.92)),
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.black.withValues(alpha: 0.08),
-                  width: 1.2,
+                  color: a11y.highContrast
+                      ? primary
+                      : (isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : Colors.black.withValues(alpha: 0.08)),
+                  width: a11y.highContrast ? 2.5 : 1.2,
                 ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: List.generate(tabs.length, (i) {
                   final t = tabs[i];
-                  final isSelected = index == i;
+                  final isSelected = _index == i;
                   return BouncyTap(
                     scaleFactor: 0.92,
                     onTap: () {
                       if (_index != i) {
-                        HapticFeedback.lightImpact();
+                        if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
                         setState(() => _index = i);
                       }
                     },
@@ -146,7 +154,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
                         border: isSelected
                             ? Border.all(
                                 color: primary.withValues(alpha: isDark ? 0.6 : 0.4),
-                                width: 1.2,
+                                width: a11y.highContrast ? 2.0 : 1.2,
                               )
                             : null,
                       ),
@@ -166,7 +174,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
                               t.label,
                               style: TextStyle(
                                 color: primary,
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.2,
                               ),

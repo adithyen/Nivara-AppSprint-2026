@@ -230,8 +230,8 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             _ActionTile(
               icon: Icons.handshake_rounded,
               color: NivaraColors.accent,
-              title: 'Work with Nivara',
-              subtitle: 'Become a verified field worker in your ward',
+              title: NivaraStrings.tr('work_with_nivara', currentLang),
+              subtitle: NivaraStrings.tr('work_with_nivara_sub', currentLang),
               onTap: () => _workWithNivara(profile),
             ),
             const SizedBox(height: 12),
@@ -1355,15 +1355,15 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   }
 }
 
-class _WorkWithNivaraSheet extends StatefulWidget {
+class _WorkWithNivaraSheet extends ConsumerStatefulWidget {
   const _WorkWithNivaraSheet({this.profile});
   final UserProfile? profile;
 
   @override
-  State<_WorkWithNivaraSheet> createState() => _WorkWithNivaraSheetState();
+  ConsumerState<_WorkWithNivaraSheet> createState() => _WorkWithNivaraSheetState();
 }
 
-class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
+class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
   late final _nameCtrl = TextEditingController(text: widget.profile?.displayName ?? '');
   late final _phoneCtrl = TextEditingController(text: widget.profile?.phone ?? '');
   late final _wardCtrl = TextEditingController(text: widget.profile?.ward ?? '');
@@ -1469,6 +1469,7 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1497,7 +1498,7 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Work with Nivara',
+                      NivaraStrings.tr('work_with_nivara', currentLang),
                       style: TextStyle(
                         color: scheme.onSurface,
                         fontSize: 18,
@@ -1505,7 +1506,7 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                       ),
                     ),
                     Text(
-                      'Municipal Field Workforce Application',
+                      NivaraStrings.tr('workforce_application', currentLang),
                       style: TextStyle(
                         color: scheme.onSurfaceVariant,
                         fontSize: 12,
@@ -1529,10 +1530,10 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                 children: [
                   const Icon(Icons.check_circle_rounded, color: NivaraColors.success, size: 48),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Application Submitted Successfully!',
+                  Text(
+                    NivaraStrings.tr('app_submitted_success', currentLang),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: NivaraColors.success,
@@ -1540,7 +1541,7 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Your application has been dispatched to municipal administrators for review and ward allocation.',
+                    NivaraStrings.tr('app_dispatched_msg', currentLang),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: scheme.onSurfaceVariant,
@@ -1586,7 +1587,7 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
               textCapitalization: TextCapitalization.words,
               style: TextStyle(color: scheme.onSurface),
               decoration: InputDecoration(
-                labelText: 'Full Legal Name *',
+                labelText: '${NivaraStrings.tr('full_legal_name', currentLang)} *',
                 prefixIcon: Icon(Icons.person_outline, color: scheme.onSurfaceVariant),
               ),
             ),
@@ -1599,7 +1600,7 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                     keyboardType: TextInputType.phone,
                     style: TextStyle(color: scheme.onSurface),
                     decoration: InputDecoration(
-                      labelText: 'Phone Number *',
+                      labelText: '${NivaraStrings.tr('phone_contact', currentLang)} *',
                       prefixIcon: Icon(Icons.phone_outlined, color: scheme.onSurfaceVariant),
                     ),
                   ),
@@ -1611,7 +1612,7 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                     textCapitalization: TextCapitalization.words,
                     style: TextStyle(color: scheme.onSurface),
                     decoration: InputDecoration(
-                      labelText: 'Ward / Area',
+                      labelText: NivaraStrings.tr('ward_neighborhood', currentLang),
                       prefixIcon: Icon(Icons.location_city_outlined, color: scheme.onSurfaceVariant),
                     ),
                   ),
@@ -1832,7 +1833,9 @@ class _WorkWithNivaraSheetState extends State<_WorkWithNivaraSheet> {
                             : Colors.black,
                       ),
                 label: Text(
-                  _submitting ? 'Submitting Application…' : 'Submit Application',
+                  _submitting
+                      ? 'Submitting Application…'
+                      : NivaraStrings.tr('submit_application', currentLang),
                   style: TextStyle(
                     color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
                         ? Colors.white

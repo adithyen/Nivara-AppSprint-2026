@@ -279,9 +279,9 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
                             color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Text(
-                            'Scheduled',
-                            style: TextStyle(
+                          child: Text(
+                            NivaraStrings.tr('coming_soon', currentLang),
+                            style: const TextStyle(
                               fontSize: 11,
                               color: Colors.grey,
                               fontWeight: FontWeight.w600,
@@ -299,7 +299,7 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
                         ..showSnackBar(
                           SnackBar(
                             content: Text(
-                              '${item.name} (${item.nativeName}) is scheduled. Defaulting to English interface with regional geocoding.',
+                              '${item.name} (${item.nativeName}) is coming soon. Defaulting to English interface with regional geocoding.',
                             ),
                           ),
                         );
