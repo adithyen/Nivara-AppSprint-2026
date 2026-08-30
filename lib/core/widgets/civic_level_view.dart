@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../../features/settings/language_controller.dart';
 import '../civic_level.dart';
 
 /// Compact level badge + progress bar for the civic-impact cards. Renders in
 /// two skins: [onDark] for the gradient Home hero (white text/track) and the
 /// default light skin for the Profile card (uses the level's own colour).
 class CivicLevelBar extends StatelessWidget {
-  const CivicLevelBar({super.key, required this.standing, this.onDark = false});
+  const CivicLevelBar({
+    super.key,
+    required this.standing,
+    this.onDark = false,
+    this.currentLang = AppLanguage.en,
+  });
 
   final CivicStanding standing;
   final bool onDark;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +36,24 @@ class CivicLevelBar extends StatelessWidget {
         : level.color.withValues(alpha: 0.15);
     final iconColor = onDark ? Colors.white : level.color;
 
+    final localizedTitle = switch (currentLang) {
+      AppLanguage.ml => 'ലെവൽ ${level.rank} · ${level.localizedName(currentLang)}',
+      AppLanguage.hi => 'लेवल ${level.rank} · ${level.localizedName(currentLang)}',
+      _ => 'Level ${level.rank} · ${level.name}',
+    };
+
+    final localizedProgress = level.isMax
+        ? (switch (currentLang) {
+            AppLanguage.ml => 'പരമോന്നത പദവി — നിങ്ങൾ നിവാര ലെജൻഡ് ആണ്.',
+            AppLanguage.hi => 'सर्वोच्च स्तर प्राप्त — आप निवारा लीजेंड हैं।',
+            _ => 'Top rank reached — you\'re a Nivara Legend.',
+          })
+        : (switch (currentLang) {
+            AppLanguage.ml => 'ലെവൽ ${level.rank + 1}-ലേക്ക് ${standing.pointsToNext} പോയിന്റുകൾ',
+            AppLanguage.hi => 'लेवल ${level.rank + 1} हेतु ${standing.pointsToNext} अंक शेष',
+            _ => '${standing.pointsToNext} pts to Level ${level.rank + 1}',
+          });
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -45,7 +70,7 @@ class CivicLevelBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Level ${level.rank} · ${level.name}',
+                    localizedTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -55,7 +80,7 @@ class CivicLevelBar extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    level.blurb,
+                    level.localizedBlurb(currentLang),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: subColor, fontSize: 11.5),
@@ -77,9 +102,7 @@ class CivicLevelBar extends StatelessWidget {
         ),
         const SizedBox(height: 5),
         Text(
-          level.isMax
-              ? 'Top rank reached — you\'re a Nivara Legend.'
-              : '${standing.pointsToNext} pts to Level ${level.rank + 1}',
+          localizedProgress,
           style: TextStyle(color: subColor, fontSize: 11.5),
         ),
       ],

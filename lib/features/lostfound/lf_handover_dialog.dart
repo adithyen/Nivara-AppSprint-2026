@@ -218,7 +218,11 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // Chalo-Style Dynamic Anti-Screenshot Live Security Ribbon
+              _ChaloSecurityRibbon(isDark: isDark),
+              const SizedBox(height: 14),
 
               // Tab Bar (Show Pass / Verify Code)
               Container(
@@ -671,4 +675,103 @@ class _CyberQRPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CyberQRPainter oldDelegate) => oldDelegate.data != data;
+}
+
+/// Chalo-Style Dynamic Anti-Screenshot Live Security Ribbon with real-time milliseconds ticker.
+class _ChaloSecurityRibbon extends StatefulWidget {
+  const _ChaloSecurityRibbon({required this.isDark});
+  final bool isDark;
+
+  @override
+  State<_ChaloSecurityRibbon> createState() => _ChaloSecurityRibbonState();
+}
+
+class _ChaloSecurityRibbonState extends State<_ChaloSecurityRibbon>
+    with SingleTickerProviderStateMixin {
+  late Timer _timer;
+  late AnimationController _pulseCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (mounted) setState(() {});
+    });
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}.${(now.millisecond ~/ 100)}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF00E676).withValues(alpha: widget.isDark ? 0.18 : 0.12),
+            const Color(0xFF00B0FF).withValues(alpha: widget.isDark ? 0.18 : 0.12),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF00E676).withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFF00E676),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: Color(0xFF00E676), blurRadius: 6),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'CHALO-PROXIMITY SECURE PASS',
+            style: TextStyle(
+              color: widget.isDark ? Colors.white70 : const Color(0xFF0F172A),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: widget.isDark ? Colors.black45 : Colors.white70,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              timeStr,
+              style: const TextStyle(
+                color: Color(0xFF00E676),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

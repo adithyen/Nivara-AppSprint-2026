@@ -317,7 +317,10 @@ class AccessibilityScreen extends ConsumerWidget {
                   contentPadding: EdgeInsets.zero,
                   value: a11y.reduceMotion,
                   onChanged: (v) {
-                    if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
+                    if (a11y.hapticsEnabled) {
+                      HapticFeedback.vibrate();
+                      HapticFeedback.selectionClick();
+                    }
                     a11yCtrl.setReduceMotion(v);
                   },
                   title: Text(
@@ -333,7 +336,11 @@ class AccessibilityScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+
+                // Live Dynamic Motion Visualizer
+                _LiveMotionPreview(reduceMotion: a11y.reduceMotion, isDark: isDark, primary: primary),
+                const SizedBox(height: 12),
 
                 // Interactive Motion Tester Button
                 BouncyTap(
@@ -346,8 +353,8 @@ class AccessibilityScreen extends ConsumerWidget {
                           duration: const Duration(seconds: 1),
                           content: Text(
                             a11y.reduceMotion
-                                ? 'Reduce Motion is ON: Tap uses instant opacity snap.'
-                                : 'Reduce Motion is OFF: Tap uses physical spring bounce.',
+                                ? 'Reduce Motion is ON: Touch uses flat static opacity.'
+                                : 'Reduce Motion is OFF: Touch uses dynamic physical spring bounce.',
                           ),
                         ),
                       );
@@ -373,8 +380,8 @@ class AccessibilityScreen extends ConsumerWidget {
                         const SizedBox(width: 8),
                         Text(
                           a11y.reduceMotion
-                              ? 'Tap to Test Instant Touch Response'
-                              : 'Tap to Test Spring Bounce Dynamics',
+                              ? 'Tap to Test Instant Touch (Static)'
+                              : 'Tap to Test Spring Bounce (Dynamic)',
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
@@ -416,12 +423,17 @@ class AccessibilityScreen extends ConsumerWidget {
                     ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: a11y.hapticsEnabled,
                   onChanged: (v) {
                     a11yCtrl.setHapticsEnabled(v);
+                    if (v) {
+                      HapticFeedback.vibrate();
+                      HapticFeedback.heavyImpact();
+                    }
                   },
                   title: Text(
                     NivaraStrings.tr('a11y_haptics', currentLang),
@@ -436,27 +448,121 @@ class AccessibilityScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
-                // Live Haptic Pulse Test Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      HapticFeedback.vibrate();
-                      HapticFeedback.heavyImpact();
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            duration: Duration(seconds: 1),
-                            content: Text('Tactile physical haptic pulse triggered!'),
-                          ),
-                        );
-                    },
-                    icon: const Icon(Icons.vibration_rounded, size: 18),
-                    label: const Text('Test Physical Vibration Pulse'),
+                // 3 Distinct Haptic Intensity Test Buttons
+                Text(
+                  'TEST PHYSICAL VIBRATION PROFILES',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
                   ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: BouncyTap(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              const SnackBar(
+                                duration: Duration(milliseconds: 900),
+                                content: Text('Light Click triggered.'),
+                              ),
+                            );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark ? Colors.white12 : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.touch_app_rounded, size: 18, color: NivaraColors.primaryBlue),
+                              SizedBox(height: 4),
+                              Text('Light Click', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: BouncyTap(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              const SnackBar(
+                                duration: Duration(milliseconds: 900),
+                                content: Text('Medium Pulse triggered.'),
+                              ),
+                            );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark ? Colors.white12 : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.vibration_rounded, size: 18, color: NivaraColors.accent),
+                              SizedBox(height: 4),
+                              Text('Medium Pulse', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: BouncyTap(
+                        onTap: () {
+                          HapticFeedback.vibrate();
+                          HapticFeedback.heavyImpact();
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              const SnackBar(
+                                duration: Duration(milliseconds: 900),
+                                content: Text('Heavy Vibration Motor Buzz triggered!'),
+                              ),
+                            );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark ? Colors.white12 : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.bolt_rounded, size: 18, color: NivaraColors.danger),
+                              SizedBox(height: 4),
+                              Text('Heavy Buzz', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 const Divider(height: 24),
@@ -501,7 +607,7 @@ class AccessibilityScreen extends ConsumerWidget {
                         );
                     },
                     icon: const Icon(Icons.record_voice_over_rounded, size: 18),
-                    label: const Text('Test Screen Reader Announcement'),
+                    label: const Text('Test Screen Reader Voice Dispatch'),
                   ),
                 ),
               ],
@@ -616,6 +722,132 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _LiveMotionPreview extends StatefulWidget {
+  const _LiveMotionPreview({
+    required this.reduceMotion,
+    required this.isDark,
+    required this.primary,
+  });
+
+  final bool reduceMotion;
+  final bool isDark;
+  final Color primary;
+
+  @override
+  State<_LiveMotionPreview> createState() => _LiveMotionPreviewState();
+}
+
+class _LiveMotionPreviewState extends State<_LiveMotionPreview>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+    if (!widget.reduceMotion) _ctrl.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveMotionPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.reduceMotion != oldWidget.reduceMotion) {
+      if (widget.reduceMotion) {
+        _ctrl.stop();
+        _ctrl.value = 0.5;
+      } else {
+        _ctrl.repeat(reverse: true);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: widget.isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: widget.isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                widget.reduceMotion ? Icons.pause_circle_rounded : Icons.motion_photos_on_rounded,
+                size: 16,
+                color: widget.reduceMotion ? Colors.grey : widget.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                widget.reduceMotion
+                    ? 'Motion Preview: FROZEN (Reduced Motion Active)'
+                    : 'Motion Preview: ANIMATING (Full Motion Active)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: widget.reduceMotion ? Colors.grey : widget.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          AnimatedBuilder(
+            animation: _ctrl,
+            builder: (context, _) {
+              final pos = widget.reduceMotion ? 0.5 : _ctrl.value;
+              return Stack(
+                children: [
+                  Container(
+                    height: 8,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: widget.isDark ? Colors.white10 : Colors.black12,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment(pos * 2 - 1, 0),
+                    child: Container(
+                      width: 24,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: widget.reduceMotion ? Colors.grey : widget.primary,
+                        borderRadius: BorderRadius.circular(4),
+                        boxShadow: widget.reduceMotion
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: widget.primary.withValues(alpha: 0.5),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }

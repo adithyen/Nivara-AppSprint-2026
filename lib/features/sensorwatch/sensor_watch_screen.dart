@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/categorize.dart';
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/services/evidence_engine.dart';
 import '../../core/services/offline_queue_service.dart';
 import '../../core/services/sensor_watch_service.dart';
@@ -21,6 +22,7 @@ import '../../models/enums.dart';
 import '../../models/evidence_package.dart';
 import '../../models/report.dart';
 import '../settings/accessibility_controller.dart';
+import '../settings/language_controller.dart';
 
 /// 2026-Level Cyber-Civic SensorWatch Telemetry HUD.
 ///
@@ -188,13 +190,17 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final svc = ref.watch(sensorWatchServiceProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final svc = ref.watch(sensorWatchServiceProvider);
+    final currentLang = ref.watch(languageControllerProvider);
 
     return Scaffold(
       backgroundColor: isDark ? NivaraColors.canvasDark : const Color(0xFFF6F8FA),
       appBar: AppBar(
-        title: const Text('SensorWatch HUD'),
+        title: Text(
+          NivaraStrings.tr('sensorwatch_hud_title', currentLang),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
           IconButton(
             tooltip: 'Autonomous Monitoring Info',
@@ -219,11 +225,12 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
               builder: (context, snap, _) => _StatusPanel(
                 snap: snap,
                 busy: _busy,
+                currentLang: currentLang,
                 onToggle: _toggle,
                 onInfoTap: _showCrowdsourceInfoSheet,
               ),
             ),
-            _HomeScreenWidgetCard(onPinTap: _pinWidget),
+            _HomeScreenWidgetCard(onPinTap: _pinWidget, currentLang: currentLang),
             const SizedBox(height: 8),
             Divider(height: 1, color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
             Padding(
@@ -231,7 +238,7 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
               child: Row(
                 children: [
                   Text(
-                    'Recorded Defect Shockwaves',
+                    NivaraStrings.tr('sensorwatch_shockwaves', currentLang),
                     style: TextStyle(
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                       fontWeight: FontWeight.w800,
@@ -260,7 +267,7 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
             ),
             Expanded(
               child: _detections.isEmpty
-                  ? const _EmptyState()
+                  ? _EmptyState(currentLang: currentLang)
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       itemCount: _detections.length,
@@ -293,12 +300,14 @@ class _StatusPanel extends StatelessWidget {
   const _StatusPanel({
     required this.snap,
     required this.busy,
+    required this.currentLang,
     required this.onToggle,
     required this.onInfoTap,
   });
 
   final SensorSnapshot snap;
   final bool busy;
+  final AppLanguage currentLang;
   final VoidCallback onToggle;
   final VoidCallback onInfoTap;
 
@@ -335,7 +344,7 @@ class _StatusPanel extends StatelessWidget {
           Row(
             children: [
               if (snap.monitoring)
-                const PulsingBadge(label: 'LIVE SENSOR HUD')
+                PulsingBadge(label: NivaraStrings.tr('sensorwatch_monitoring', currentLang))
               else
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -344,7 +353,7 @@ class _StatusPanel extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'IDLE',
+                    NivaraStrings.tr('sensorwatch_idle', currentLang),
                     style: TextStyle(
                       color: isDark ? Colors.white60 : const Color(0xFF64748B),
                       fontSize: 11.5,
@@ -354,7 +363,7 @@ class _StatusPanel extends StatelessWidget {
                 ),
               const Spacer(),
               Text(
-                '${snap.detectionCount} Captured',
+                '${snap.detectionCount} ${NivaraStrings.tr('sensorwatch_captured', currentLang)}',
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF0F172A),
                   fontWeight: FontWeight.w800,
@@ -380,7 +389,7 @@ class _StatusPanel extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'g Impact Force',
+                NivaraStrings.tr('sensorwatch_impact_force', currentLang),
                 style: TextStyle(
                   color: isDark ? Colors.white70 : const Color(0xFF64748B),
                   fontSize: 14,
@@ -402,18 +411,18 @@ class _StatusPanel extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _Stat(label: 'Peak', value: '${snap.peakG.toStringAsFixed(2)} g'),
+              _Stat(label: NivaraStrings.tr('sensorwatch_peak', currentLang), value: '${snap.peakG.toStringAsFixed(2)} g'),
               _Stat(
-                label: 'Speed',
+                label: NivaraStrings.tr('sensorwatch_speed', currentLang),
                 value: '${snap.speedKmph.toStringAsFixed(0)} km/h',
               ),
               _Stat(
-                label: 'GPS Fix',
-                value: snap.hasFix ? 'Active' : 'No Fix',
+                label: NivaraStrings.tr('sensorwatch_gps_fix', currentLang),
+                value: snap.hasFix ? NivaraStrings.tr('active', currentLang) : NivaraStrings.tr('sensorwatch_no_fix', currentLang),
                 valueColor: snap.hasFix ? NivaraColors.success : (isDark ? Colors.white60 : const Color(0xFF64748B)),
               ),
               _Stat(
-                label: 'Threshold',
+                label: NivaraStrings.tr('sensorwatch_threshold', currentLang),
                 value: '${kDetectionThresholdG.toStringAsFixed(1)} g',
               ),
             ],
@@ -472,9 +481,10 @@ class _StatusPanel extends StatelessWidget {
 
 /// 1-Tap Home Screen Widget & Shortcut Card
 class _HomeScreenWidgetCard extends StatelessWidget {
-  const _HomeScreenWidgetCard({required this.onPinTap});
+  const _HomeScreenWidgetCard({required this.onPinTap, required this.currentLang});
 
   final VoidCallback onPinTap;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -524,7 +534,7 @@ class _HomeScreenWidgetCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '1-Tap Home Screen Widget',
+                    NivaraStrings.tr('sensorwatch_widget_title', currentLang),
                     style: TextStyle(
                       color: primaryText,
                       fontWeight: FontWeight.w800,
@@ -533,7 +543,7 @@ class _HomeScreenWidgetCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Start monitoring instantly with zero extra taps.',
+                    NivaraStrings.tr('sensorwatch_widget_sub', currentLang),
                     style: TextStyle(
                       color: secondaryText,
                       fontSize: 11.5,
@@ -551,14 +561,14 @@ class _HomeScreenWidgetCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.4)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add_to_home_screen_rounded, size: 15, color: NivaraColors.primary),
-                    SizedBox(width: 4),
+                    const Icon(Icons.add_to_home_screen_rounded, size: 15, color: NivaraColors.primary),
+                    const SizedBox(width: 4),
                     Text(
-                      'Add',
-                      style: TextStyle(
+                      NivaraStrings.tr('sensorwatch_widget_add', currentLang),
+                      style: const TextStyle(
                         color: NivaraColors.primary,
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
@@ -818,7 +828,8 @@ class _Stat extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.currentLang});
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -843,7 +854,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Ready for Highway & Road Drives',
+              NivaraStrings.tr('sensorwatch_ready_title', currentLang),
               style: TextStyle(
                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
@@ -852,7 +863,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Tap "Start Monitoring" before driving. Potholes and road jolts will be logged and verified with multi-user consensus.',
+              NivaraStrings.tr('sensorwatch_ready_sub', currentLang),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),

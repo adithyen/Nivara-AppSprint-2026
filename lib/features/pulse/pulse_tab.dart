@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/services/location_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
@@ -14,6 +15,7 @@ import '../../models/report.dart';
 import '../../router.dart';
 import '../admin/status_style.dart';
 import '../report/category_grid.dart';
+import '../settings/language_controller.dart';
 
 /// 2026-Level Neighborhood City Pulse Dashboard.
 class PulseTab extends ConsumerStatefulWidget {
@@ -103,6 +105,8 @@ class _PulseTabState extends ConsumerState<PulseTab> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
+
     return RefreshIndicator(
       color: NivaraColors.primary,
       backgroundColor: const Color(0xFF10161E),
@@ -115,12 +119,13 @@ class _PulseTabState extends ConsumerState<PulseTab> {
             radiusKm: _radiusKm,
             locating: _locating,
             usingDefault: _pos == null,
+            currentLang: currentLang,
             onChanged: (v) => setState(() => _radiusKm = v),
             onChangeEnd: (_) => _load(),
           ),
           const SizedBox(height: 20),
 
-          _SectionHeader('Live Telemetry within ${_radiusKm.round()} km'),
+          _SectionHeader('${NivaraStrings.tr('live_telemetry_within', currentLang)} ${_radiusKm.round()} km'),
           const SizedBox(height: 10),
           _AreaStatsCard(
             loading: _loading,
@@ -128,12 +133,13 @@ class _PulseTabState extends ConsumerState<PulseTab> {
             inProgress: _inProgressCount,
             resolved: _resolvedCount,
             total: _reports.length,
+            currentLang: currentLang,
           ),
           const SizedBox(height: 24),
 
           Row(
             children: [
-              Expanded(child: _SectionHeader('Recent Nearby Issues')),
+              Expanded(child: _SectionHeader(NivaraStrings.tr('recent_nearby_issues', currentLang))),
               if (_reports.isNotEmpty)
                 BouncyTap(
                   onTap: () => context.push(Routes.map),
@@ -144,14 +150,14 @@ class _PulseTabState extends ConsumerState<PulseTab> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: NivaraColors.primary.withValues(alpha: 0.4)),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.map_rounded, size: 14, color: NivaraColors.primary),
-                        SizedBox(width: 4),
+                        const Icon(Icons.map_rounded, size: 14, color: NivaraColors.primary),
+                        const SizedBox(width: 4),
                         Text(
-                          'View on Map',
-                          style: TextStyle(
+                          NivaraStrings.tr('view_on_map', currentLang),
+                          style: const TextStyle(
                             color: NivaraColors.primary,
                             fontWeight: FontWeight.w800,
                             fontSize: 11.5,
@@ -183,6 +189,7 @@ class _PulseTabState extends ConsumerState<PulseTab> {
                     child: _AreaReportTile(
                       report: r,
                       distanceMeters: haversineMeters(_lat, _lng, r.lat, r.lng),
+                      currentLang: currentLang,
                       onTap: () => context.push(Routes.reportDetail, extra: r),
                     ),
                   ),
@@ -198,6 +205,7 @@ class _RadiusCard extends StatelessWidget {
     required this.radiusKm,
     required this.locating,
     required this.usingDefault,
+    required this.currentLang,
     required this.onChanged,
     required this.onChangeEnd,
   });
@@ -205,6 +213,7 @@ class _RadiusCard extends StatelessWidget {
   final double radiusKm;
   final bool locating;
   final bool usingDefault;
+  final AppLanguage currentLang;
   final ValueChanged<double> onChanged;
   final ValueChanged<double> onChangeEnd;
 
@@ -251,7 +260,7 @@ class _RadiusCard extends StatelessWidget {
                       ? 'Acquiring GPS fix…'
                       : usingDefault
                           ? 'Using city center'
-                          : 'Proximity Filter',
+                          : NivaraStrings.tr('proximity_filter', currentLang),
                   style: TextStyle(
                     color: isDark ? Colors.white : const Color(0xFF111827),
                     fontWeight: FontWeight.w700,
@@ -267,7 +276,7 @@ class _RadiusCard extends StatelessWidget {
                   border: Border.all(color: primary.withValues(alpha: 0.5)),
                 ),
                 child: Text(
-                  '${radiusKm.round()} km radius',
+                  '${radiusKm.round()} km ${NivaraStrings.tr('radius_label', currentLang)}',
                   style: TextStyle(
                     color: primary,
                     fontWeight: FontWeight.w800,
@@ -344,6 +353,7 @@ class _AreaStatsCard extends StatelessWidget {
     required this.inProgress,
     required this.resolved,
     required this.total,
+    required this.currentLang,
   });
 
   final bool loading;
@@ -351,6 +361,7 @@ class _AreaStatsCard extends StatelessWidget {
   final int inProgress;
   final int resolved;
   final int total;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -378,19 +389,19 @@ class _AreaStatsCard extends StatelessWidget {
             children: [
               _Stat(
                 value: loading ? null : open,
-                label: 'Active',
+                label: NivaraStrings.tr('active', currentLang),
                 color: NivaraColors.accent,
                 isDark: isDark,
               ),
               _Stat(
                 value: loading ? null : inProgress,
-                label: 'In Progress',
+                label: NivaraStrings.tr('status_in_progress', currentLang),
                 color: NivaraColors.primaryBlue,
                 isDark: isDark,
               ),
               _Stat(
                 value: loading ? null : resolved,
-                label: 'Resolved',
+                label: NivaraStrings.tr('status_resolved', currentLang),
                 color: NivaraColors.success,
                 isDark: isDark,
               ),
@@ -401,7 +412,7 @@ class _AreaStatsCard extends StatelessWidget {
             Text(
               total == 0
                   ? 'No reports in this area'
-                  : '$total total issue${total == 1 ? '' : 's'} recorded',
+                  : '$total ${NivaraStrings.tr('total_issues_recorded', currentLang)}',
               style: TextStyle(
                 color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF6B7280),
                 fontSize: 11.5,
@@ -460,11 +471,13 @@ class _AreaReportTile extends StatelessWidget {
   const _AreaReportTile({
     required this.report,
     required this.distanceMeters,
+    required this.currentLang,
     required this.onTap,
   });
 
   final Report report;
   final double distanceMeters;
+  final AppLanguage currentLang;
   final VoidCallback onTap;
 
   @override
@@ -474,7 +487,7 @@ class _AreaReportTile extends StatelessWidget {
     final status = statusColor(report.status);
     final title = report.title?.trim().isNotEmpty == true
         ? report.title!.trim()
-        : report.category.label;
+        : report.category.localizedName(currentLang);
 
     return BouncyTap(
       onTap: onTap,
@@ -525,7 +538,7 @@ class _AreaReportTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${formatDistance(distanceMeters)} away · ${timeAgo(report.createdAt)}',
+                    '${formatLocalizedDistance(distanceMeters, currentLang)} · ${timeAgo(report.createdAt)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -545,7 +558,7 @@ class _AreaReportTile extends StatelessWidget {
                 border: Border.all(color: status.withValues(alpha: 0.5)),
               ),
               child: Text(
-                report.status.label,
+                report.status.localizedName(currentLang),
                 style: TextStyle(
                   color: status,
                   fontWeight: FontWeight.w800,

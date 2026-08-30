@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/services/location_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
@@ -14,6 +15,7 @@ import '../../models/community_post.dart';
 import '../../models/enums.dart';
 import '../../router.dart';
 import '../lostfound/lf_contact.dart';
+import '../settings/language_controller.dart';
 
 Color communityTypeColor(CommunityPostType t) => switch (t) {
   CommunityPostType.general => NivaraColors.primary,
@@ -243,6 +245,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
   Widget build(BuildContext context) {
     final myUid = currentUserId;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentLang = ref.watch(languageControllerProvider);
 
     return RefreshIndicator(
       color: NivaraColors.primary,
@@ -252,12 +255,12 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 110),
         children: [
-          _ComposerPrompt(onPick: _compose),
+          _ComposerPrompt(onPick: _compose, currentLang: currentLang),
           const SizedBox(height: 20),
           Row(
             children: [
               Text(
-                'Neighborhood Feed',
+                NivaraStrings.tr('neighborhood_feed', currentLang),
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF111827),
                   fontSize: 16,
@@ -286,7 +289,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
               ),
             )
           else if (_posts.isEmpty)
-            const _EmptyFeed()
+            _EmptyFeed(currentLang: currentLang)
           else
             ..._posts.map((p) {
               final isMine = myUid != null && p.authorId == myUid;
@@ -315,8 +318,9 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
 }
 
 class _ComposerPrompt extends StatelessWidget {
-  const _ComposerPrompt({required this.onPick});
+  const _ComposerPrompt({required this.onPick, required this.currentLang});
   final ValueChanged<CommunityPostType> onPick;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -342,7 +346,7 @@ class _ComposerPrompt extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Share with your community',
+            NivaraStrings.tr('community_share_title', currentLang),
             style: TextStyle(
               color: isDark ? Colors.white : const Color(0xFF111827),
               fontWeight: FontWeight.w800,
@@ -351,7 +355,7 @@ class _ComposerPrompt extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Post questions, start polls, offer jobs, or broadcast alerts.',
+            NivaraStrings.tr('community_share_sub', currentLang),
             style: TextStyle(
               color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),
               fontSize: 12,
@@ -362,11 +366,13 @@ class _ComposerPrompt extends StatelessWidget {
             children: [
               _TemplateButton(
                 type: CommunityPostType.general,
+                label: NivaraStrings.tr('btn_post', currentLang),
                 onTap: () => onPick(CommunityPostType.general),
               ),
               const SizedBox(width: 8),
               _TemplateButton(
                 type: CommunityPostType.poll,
+                label: NivaraStrings.tr('btn_poll', currentLang),
                 onTap: () => onPick(CommunityPostType.poll),
               ),
             ],
@@ -376,11 +382,13 @@ class _ComposerPrompt extends StatelessWidget {
             children: [
               _TemplateButton(
                 type: CommunityPostType.job,
+                label: NivaraStrings.tr('btn_job', currentLang),
                 onTap: () => onPick(CommunityPostType.job),
               ),
               const SizedBox(width: 8),
               _TemplateButton(
                 type: CommunityPostType.announcement,
+                label: NivaraStrings.tr('btn_announcement', currentLang),
                 onTap: () => onPick(CommunityPostType.announcement),
               ),
             ],
@@ -392,8 +400,13 @@ class _ComposerPrompt extends StatelessWidget {
 }
 
 class _TemplateButton extends StatelessWidget {
-  const _TemplateButton({required this.type, required this.onTap});
+  const _TemplateButton({
+    required this.type,
+    required this.label,
+    required this.onTap,
+  });
   final CommunityPostType type;
+  final String label;
   final VoidCallback onTap;
 
   @override
@@ -416,12 +429,16 @@ class _TemplateButton extends StatelessWidget {
             children: [
               Icon(communityTypeIcon(type), color: color, size: 18),
               const SizedBox(width: 6),
-              Text(
-                type.label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12.5,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
+                  ),
                 ),
               ),
             ],
@@ -783,7 +800,8 @@ class _ContactPill extends StatelessWidget {
 }
 
 class _EmptyFeed extends StatelessWidget {
-  const _EmptyFeed();
+  const _EmptyFeed({required this.currentLang});
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -809,7 +827,7 @@ class _EmptyFeed extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'No Community Posts Yet',
+              NivaraStrings.tr('no_community_posts', currentLang),
               style: TextStyle(
                 color: isDark ? Colors.white : const Color(0xFF111827),
                 fontWeight: FontWeight.w800,
@@ -818,7 +836,7 @@ class _EmptyFeed extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Be the first to post a question, start a poll, or announce a civic update.',
+              NivaraStrings.tr('no_community_posts_sub', currentLang),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF6B7280),

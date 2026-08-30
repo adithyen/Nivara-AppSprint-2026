@@ -363,7 +363,7 @@ class _ImpactCard extends StatelessWidget {
                     ),
               const SizedBox(width: 8),
               Text(
-                'XP Points',
+                NivaraStrings.tr('xp_points', currentLang),
                 style: TextStyle(
                   color: primary,
                   fontWeight: FontWeight.w800,
@@ -373,7 +373,11 @@ class _ImpactCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          CivicLevelBar(standing: civicStandingFor(score), onDark: isDark),
+          CivicLevelBar(
+            standing: civicStandingFor(score),
+            onDark: isDark,
+            currentLang: currentLang,
+          ),
           const SizedBox(height: 18),
           Row(
             children: [

@@ -38,7 +38,7 @@ class _BouncyTapState extends State<BouncyTap> {
   void _handleTapDown(TapDownDetails _) {
     if (widget.onTap == null && widget.onLongPress == null) return;
     if (widget.enableHaptics) {
-      HapticFeedback.lightImpact();
+      HapticFeedback.selectionClick();
     }
     setState(() => _pressed = true);
   }

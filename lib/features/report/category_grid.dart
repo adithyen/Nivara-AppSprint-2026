@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
+import '../settings/language_controller.dart';
 
 IconData categoryIcon(ReportCategory c) => switch (c) {
   ReportCategory.pothole => Icons.dangerous_rounded,
@@ -32,10 +33,12 @@ class CategoryGrid extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onSelect,
+    this.currentLang = AppLanguage.en,
   });
 
   final ReportCategory? selected;
   final ValueChanged<ReportCategory> onSelect;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +54,7 @@ class CategoryGrid extends StatelessWidget {
           _CategoryTile(
             category: c,
             selected: c == selected,
+            currentLang: currentLang,
             onTap: () => onSelect(c),
           ),
       ],
@@ -63,11 +67,13 @@ class _CategoryTile extends StatelessWidget {
     required this.category,
     required this.selected,
     required this.onTap,
+    this.currentLang = AppLanguage.en,
   });
 
   final ReportCategory category;
   final bool selected;
   final VoidCallback onTap;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +122,7 @@ class _CategoryTile extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              category.label,
+              category.localizedName(currentLang),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

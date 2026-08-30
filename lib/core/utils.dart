@@ -26,6 +26,17 @@ String formatDistance(double meters) {
   return '${km.toStringAsFixed(km < 10 ? 1 : 0)} km';
 }
 
+/// Localized distance, e.g. `340 മീറ്റർ അകലെ` / `340 मीटर दूर` / `340 m away`.
+String formatLocalizedDistance(double meters, dynamic lang) {
+  final langCode = lang.toString().split('.').last;
+  final suffix = (meters < 1000)
+      ? (langCode == 'ml' ? 'മീറ്റർ അകലെ' : (langCode == 'hi' ? 'मीटर दूर' : 'm away'))
+      : (langCode == 'ml' ? 'കി.മീ അകലെ' : (langCode == 'hi' ? 'किमी दूर' : 'km away'));
+  if (meters < 1000) return '${meters.round()} $suffix';
+  final km = meters / 1000;
+  return '${km.toStringAsFixed(km < 10 ? 1 : 0)} $suffix';
+}
+
 /// Absolute date/time, e.g. `12 Jul 2026, 2:34 PM`.
 String formatDateTime(DateTime dt) =>
     DateFormat('d MMM y, h:mm a').format(dt.toLocal());

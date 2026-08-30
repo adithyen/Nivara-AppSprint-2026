@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/offline_queue_service.dart';
 import '../../core/services/ola_maps_service.dart';
@@ -15,6 +17,7 @@ import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../map/location_picker_screen.dart';
+import '../settings/language_controller.dart';
 import 'category_grid.dart';
 
 /// Manual CivicReport filing.
@@ -23,7 +26,7 @@ import 'category_grid.dart';
 /// 1. Category Selection: User picks a category from a modern searchable grid.
 /// 2. Details Form: Immediately opens details form with preselected category banner,
 ///    Ola Map location picker, photo evidence, and submit.
-class ReportFormScreen extends StatefulWidget {
+class ReportFormScreen extends ConsumerStatefulWidget {
   const ReportFormScreen({
     super.key,
     this.initialCategory,
@@ -39,10 +42,10 @@ class ReportFormScreen extends StatefulWidget {
   final String? initialAddress;
 
   @override
-  State<ReportFormScreen> createState() => _ReportFormScreenState();
+  ConsumerState<ReportFormScreen> createState() => _ReportFormScreenState();
 }
 
-class _ReportFormScreenState extends State<ReportFormScreen> {
+class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
   final _location = const LocationService();
   final _ola = OlaMapsService.instance;
   final _picker = ImagePicker();
@@ -283,24 +286,30 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
+
     if (_category == null) {
-      return _buildCategorySelectionScreen();
+      return _buildCategorySelectionScreen(currentLang);
     }
-    return _buildDetailsFormScreen();
+    return _buildDetailsFormScreen(currentLang);
   }
 
   // ── Step 1: Dedicated Category Selection Screen ───────────────────────────
-  Widget _buildCategorySelectionScreen() {
+  Widget _buildCategorySelectionScreen(AppLanguage currentLang) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final query = _categoryFilterCtrl.text.trim().toLowerCase();
     final filteredCategories = ReportCategory.values.where((c) {
       if (query.isEmpty) return true;
-      return c.label.toLowerCase().contains(query);
+      return c.label.toLowerCase().contains(query) ||
+          c.localizedName(currentLang).toLowerCase().contains(query);
     }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Issue Category'),
+        title: Text(
+          NivaraStrings.tr('select_issue_category', currentLang),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -315,7 +324,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                 controller: _categoryFilterCtrl,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Search categories (e.g. pothole, light, drain)…',
+                  hintText: NivaraStrings.tr('search_categories_hint', currentLang),
                   prefixIcon: const Icon(Icons.search, size: 20),
                   suffixIcon: _categoryFilterCtrl.text.isNotEmpty
                       ? IconButton(
@@ -401,7 +410,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  cat.label,
+                                  cat.localizedName(currentLang),
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -425,10 +434,13 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   }
 
   // ── Step 2: Details Form Screen ───────────────────────────────────────────
-  Widget _buildDetailsFormScreen() {
+  Widget _buildDetailsFormScreen(AppLanguage currentLang) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Report Details'),
+        title: Text(
+          NivaraStrings.tr('report_details', currentLang),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -476,7 +488,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Issue Category',
+                            NivaraStrings.tr('select_issue_category', currentLang),
                             style: TextStyle(
                               fontSize: 11,
                               color: Theme.of(context).brightness == Brightness.dark
@@ -485,7 +497,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                             ),
                           ),
                           Text(
-                            _category!.label,
+                            _category!.localizedName(currentLang),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
@@ -506,7 +518,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                       ),
                       onPressed: () => setState(() => _category = null),
                       icon: const Icon(Icons.swap_horiz, size: 16),
-                      label: const Text('Change'),
+                      label: Text(NivaraStrings.tr('change', currentLang)),
                     ),
                   ],
                 ),
@@ -514,13 +526,13 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
               const SizedBox(height: 20),
 
-              _SectionLabel('1. Issue Details'),
+              _SectionLabel(NivaraStrings.tr('sec_issue_details', currentLang)),
               const SizedBox(height: 8),
               TextField(
                 controller: _titleCtrl,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Title (optional)',
+                decoration: InputDecoration(
+                  labelText: NivaraStrings.tr('title_optional', currentLang),
                   hintText: 'e.g. Deep pothole near junction',
                 ),
               ),
@@ -529,29 +541,34 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                 controller: _descCtrl,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Description *',
+                decoration: InputDecoration(
+                  labelText: NivaraStrings.tr('description_req', currentLang),
                   hintText: 'Describe what you see and any hazard it poses.',
                   alignLabelWithHint: true,
                 ),
               ),
 
               const SizedBox(height: 16),
-              Text('Severity', style: Theme.of(context).textTheme.labelLarge),
+              Text(
+                NivaraStrings.tr('severity', currentLang),
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
               const SizedBox(height: 8),
               _SeveritySelector(
                 value: _severity,
+                currentLang: currentLang,
                 onChanged: (s) => setState(() => _severity = s),
               ),
 
               const SizedBox(height: 20),
-              _SectionLabel('2. Location'),
+              _SectionLabel(NivaraStrings.tr('sec_location', currentLang)),
               const SizedBox(height: 8),
               _LocationCard(
                 pos: _pos,
                 customLat: _customLat,
                 customLng: _customLng,
                 locating: _locating,
+                currentLang: currentLang,
                 onRefresh: _fetchLocation,
                 onPickOnMap: _pickLocationOnMap,
               ),
@@ -559,17 +576,18 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
               TextField(
                 controller: _addressCtrl,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Landmark / address (optional)',
-                  prefixIcon: Icon(Icons.place_outlined),
+                decoration: InputDecoration(
+                  labelText: NivaraStrings.tr('landmark_optional', currentLang),
+                  prefixIcon: const Icon(Icons.place_outlined),
                 ),
               ),
 
               const SizedBox(height: 20),
-              _SectionLabel('3. Photos (optional)'),
+              _SectionLabel(NivaraStrings.tr('sec_photos', currentLang)),
               const SizedBox(height: 8),
               _PhotoStrip(
                 photos: _photos,
+                currentLang: currentLang,
                 onAdd: _choosePhotoSource,
                 onRemove: (i) => setState(() => _photos.removeAt(i)),
               ),
@@ -584,7 +602,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.send),
-                label: Text(_submitting ? 'Submitting…' : 'Submit report'),
+                label: Text(_submitting
+                    ? 'Submitting…'
+                    : NivaraStrings.tr('submit_report_short', currentLang)),
               ),
               const SizedBox(height: 40),
             ],
@@ -611,15 +631,24 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _SeveritySelector extends StatelessWidget {
-  const _SeveritySelector({required this.value, required this.onChanged});
+  const _SeveritySelector({
+    required this.value,
+    required this.currentLang,
+    required this.onChanged,
+  });
+
   final Severity value;
+  final AppLanguage currentLang;
   final ValueChanged<Severity> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return SegmentedButton<Severity>(
       segments: Severity.values
-          .map((s) => ButtonSegment(value: s, label: Text(s.label)))
+          .map((s) => ButtonSegment(
+                value: s,
+                label: Text(s.localizedName(currentLang)),
+              ))
           .toList(),
       selected: {value},
       onSelectionChanged: (set) => onChanged(set.first),
@@ -633,6 +662,7 @@ class _LocationCard extends StatelessWidget {
     this.customLat,
     this.customLng,
     required this.locating,
+    required this.currentLang,
     required this.onRefresh,
     required this.onPickOnMap,
   });
@@ -641,6 +671,7 @@ class _LocationCard extends StatelessWidget {
   final double? customLat;
   final double? customLng;
   final bool locating;
+  final AppLanguage currentLang;
   final VoidCallback onRefresh;
   final VoidCallback onPickOnMap;
 
@@ -679,8 +710,8 @@ class _LocationCard extends StatelessWidget {
                               children: [
                                 Text(
                                   _hasCustom
-                                      ? 'Selected on map'
-                                      : 'GPS location captured',
+                                      ? NivaraStrings.tr('select_on_map', currentLang)
+                                      : NivaraStrings.tr('gps_captured', currentLang),
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13,
@@ -717,7 +748,7 @@ class _LocationCard extends StatelessWidget {
                 onPressed: onPickOnMap,
                 icon: const Icon(Icons.map, size: 18),
                 label: Text(
-                  _hasCustom ? 'Change on map' : 'Select on map',
+                  NivaraStrings.tr('select_on_map', currentLang),
                 ),
               ),
             ),
@@ -731,11 +762,13 @@ class _LocationCard extends StatelessWidget {
 class _PhotoStrip extends StatelessWidget {
   const _PhotoStrip({
     required this.photos,
+    required this.currentLang,
     required this.onAdd,
     required this.onRemove,
   });
 
   final List<XFile> photos;
+  final AppLanguage currentLang;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
 
@@ -804,7 +837,7 @@ class _PhotoStrip extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Add (${photos.length}/3)',
+                      '${NivaraStrings.tr('add_photos', currentLang)} (${photos.length}/3)',
                       style: Theme.of(context).textTheme.labelSmall,
                     ),
                   ],

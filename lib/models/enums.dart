@@ -73,6 +73,56 @@ enum ReportCategory {
 
   static ReportCategory fromWire(String? w) =>
       values.firstWhere((e) => e.wire == w, orElse: () => ReportCategory.other);
+
+  String localizedName(dynamic lang) {
+    final langCode = lang.toString().split('.').last;
+    if (langCode == 'ml') {
+      return switch (this) {
+        ReportCategory.pothole => 'റോഡിലെ കുഴി',
+        ReportCategory.brokenFootpath => 'തകർന്ന നടപ്പാത',
+        ReportCategory.openManhole => 'തുറന്ന മാൻഹോൾ',
+        ReportCategory.fallenTree => 'വീണ മരം',
+        ReportCategory.waterlogging => 'വെള്ളക്കെട്ട്',
+        ReportCategory.roadSign => 'റോഡ് സൈൻ ബോർഡ്',
+        ReportCategory.garbage => 'മാലിന്യം',
+        ReportCategory.blockedDrain => 'തടസ്സപ്പെട്ട ഓട',
+        ReportCategory.sewage => 'മലിനജലം',
+        ReportCategory.streetLight => 'തെരുവ് വിളക്ക്',
+        ReportCategory.damagedPole => 'തകർന്ന പോസ്റ്റ്',
+        ReportCategory.powerIssue => 'വൈദ്യുതി തടസ്സം',
+        ReportCategory.waterSupply => 'കുടിവെള്ള വിതരണം',
+        ReportCategory.pipeLeak => 'പൈപ്പ് ചോർച്ച',
+        ReportCategory.encroachment => 'കയ്യേറ്റം',
+        ReportCategory.brokenProperty => 'പൊതുമുതൽ നാശനഷ്ടം',
+        ReportCategory.strayAnimals => 'തെരുവ് മൃഗങ്ങൾ',
+        ReportCategory.noise => 'ശബ്ദ മലിനീകരണം',
+        ReportCategory.other => 'മറ്റുള്ളവ',
+      };
+    } else if (langCode == 'hi') {
+      return switch (this) {
+        ReportCategory.pothole => 'सड़क का गड्ढा',
+        ReportCategory.brokenFootpath => 'टूटा फुटपाथ',
+        ReportCategory.openManhole => 'खुला मैनहोल',
+        ReportCategory.fallenTree => 'गिरा हुआ पेड़',
+        ReportCategory.waterlogging => 'जलभराव',
+        ReportCategory.roadSign => 'सड़क संकेत',
+        ReportCategory.garbage => 'कचरा',
+        ReportCategory.blockedDrain => 'अवरुद्ध नाली',
+        ReportCategory.sewage => 'सीवेज',
+        ReportCategory.streetLight => 'स्ट्रीट लाइट',
+        ReportCategory.damagedPole => 'क्षतिग्रस्त खंभा',
+        ReportCategory.powerIssue => 'बिजली समस्या',
+        ReportCategory.waterSupply => 'जल आपूर्ति',
+        ReportCategory.pipeLeak => 'पाइप रिसाव',
+        ReportCategory.encroachment => 'अतिक्रमण',
+        ReportCategory.brokenProperty => 'सार्वजनिक संपत्ति क्षति',
+        ReportCategory.strayAnimals => 'आवारा पशु',
+        ReportCategory.noise => 'ध्वनि प्रदूषण',
+        ReportCategory.other => 'अन्य',
+      };
+    }
+    return label;
+  }
 }
 
 enum ReportStatus {
@@ -91,6 +141,30 @@ enum ReportStatus {
     (e) => e.wire == w,
     orElse: () => ReportStatus.submitted,
   );
+
+  String localizedName(dynamic lang) {
+    final langCode = lang.toString().split('.').last;
+    if (langCode == 'ml') {
+      return switch (this) {
+        ReportStatus.submitted => 'രേഖപ്പെടുത്തി',
+        ReportStatus.acknowledged => 'സ്വീകരിച്ചു',
+        ReportStatus.inProgress => 'നടപടിയിൽ',
+        ReportStatus.resolved => 'പരിഹരിച്ചു',
+        ReportStatus.closed => 'പൂർത്തിയായി',
+        ReportStatus.duplicate => 'മറ്റൊരു പരാതിയുണ്ട്',
+      };
+    } else if (langCode == 'hi') {
+      return switch (this) {
+        ReportStatus.submitted => 'दर्ज',
+        ReportStatus.acknowledged => 'स्वीकृत',
+        ReportStatus.inProgress => 'प्रगति पर',
+        ReportStatus.resolved => 'समाधानित',
+        ReportStatus.closed => 'बंद',
+        ReportStatus.duplicate => 'समान',
+      };
+    }
+    return label;
+  }
 }
 
 enum Severity {
@@ -105,6 +179,26 @@ enum Severity {
 
   static Severity fromWire(String? w) =>
       values.firstWhere((e) => e.wire == w, orElse: () => Severity.medium);
+
+  String localizedName(dynamic lang) {
+    final langCode = lang.toString().split('.').last;
+    if (langCode == 'ml') {
+      return switch (this) {
+        Severity.low => 'കുറഞ്ഞത്',
+        Severity.medium => 'ഇടത്തരം',
+        Severity.high => 'കൂടിയത്',
+        Severity.emergency => 'അടിയന്തിരം',
+      };
+    } else if (langCode == 'hi') {
+      return switch (this) {
+        Severity.low => 'कम',
+        Severity.medium => 'मध्यम',
+        Severity.high => 'उच्च',
+        Severity.emergency => 'आपातकालीन',
+      };
+    }
+    return label;
+  }
 }
 
 enum DetectionType {

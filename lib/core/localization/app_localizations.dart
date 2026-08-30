@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../features/settings/language_controller.dart';
+import '../../models/enums.dart';
 
 /// Meaningful, idiomatic civic localization dictionary for English, Hindi, and Malayalam.
 abstract final class NivaraStrings {
@@ -36,6 +37,11 @@ abstract final class NivaraStrings {
       AppLanguage.en: 'Municipal Officer',
       AppLanguage.hi: 'नगर निगम अधिकारी',
       AppLanguage.ml: 'നഗരസഭാ ഉദ്യോഗസ്ഥൻ',
+    },
+    'role_superadmin': {
+      AppLanguage.en: 'Super Admin',
+      AppLanguage.hi: 'मुख्य प्रशासक',
+      AppLanguage.ml: 'മുഖ്യ അഡ്മിൻ',
     },
 
     // Navigation & Shells
@@ -103,7 +109,7 @@ abstract final class NivaraStrings {
     // Home Screen Sections
     'civic_standing': {
       AppLanguage.en: 'Civic Standing & XP',
-      AppLanguage.hi: 'नागरिक प्रतिष्ठा एवं स्कोर (XP)',
+      AppLanguage.hi: 'नागरिक प्रतिष्ठा एवं XP',
       AppLanguage.ml: 'പൗരസ്കോറും പദവിയും (XP)',
     },
     'civic_modules': {
@@ -113,7 +119,7 @@ abstract final class NivaraStrings {
     },
     'stat_reports': {
       AppLanguage.en: 'Reports',
-      AppLanguage.hi: 'दर्ज शिकायतें',
+      AppLanguage.hi: 'शिकायतें',
       AppLanguage.ml: 'പരാതികൾ',
     },
     'stat_confirms': {
@@ -123,8 +129,18 @@ abstract final class NivaraStrings {
     },
     'stat_finds': {
       AppLanguage.en: 'Finds',
-      AppLanguage.hi: 'प्राप्त वस्तुएं',
+      AppLanguage.hi: 'കണ്ടെത്തിയവ',
       AppLanguage.ml: 'കണ്ടെത്തിയവ',
+    },
+    'xp_points': {
+      AppLanguage.en: 'XP Points',
+      AppLanguage.hi: 'XP अंक',
+      AppLanguage.ml: 'XP പോയിന്റുകൾ',
+    },
+    'pts_to_level': {
+      AppLanguage.en: 'pts to Level',
+      AppLanguage.hi: 'अंक शेष लेवल',
+      AppLanguage.ml: 'പോയിന്റുകൾ അടുത്ത ലെവലിലേക്ക്',
     },
     'module_sensorwatch_sub': {
       AppLanguage.en: 'Highway & road pothole HUD',
@@ -153,15 +169,50 @@ abstract final class NivaraStrings {
       AppLanguage.hi: 'दिखावट एवं थीम',
       AppLanguage.ml: 'ഡിസൈനും തീമും',
     },
+    'sub_appearance': {
+      AppLanguage.en: 'Theme mode (Light/Dark) and brand accent colour',
+      AppLanguage.hi: 'थीम मोड (लाइट/डार्क) एवं ब्रांड रंग',
+      AppLanguage.ml: 'തീം മോഡും (Light/Dark) നിറങ്ങളും',
+    },
     'settings_accessibility': {
       AppLanguage.en: 'Accessibility',
       AppLanguage.hi: 'सुलभता एवं सहायक सुविधाएं',
       AppLanguage.ml: 'സഹായ സൗകര്യങ്ങൾ (Accessibility)',
     },
+    'sub_accessibility': {
+      AppLanguage.en: 'High contrast, reduce motion, text scaling, haptics & CVD support',
+      AppLanguage.hi: 'उच्च कंट्रास्ट, टेक्स्ट स्केलिंग, कंपन एवं CVD सहायता',
+      AppLanguage.ml: 'ഹൈ കോൺട്രാസ്റ്റ്, ടെക്സ്റ്റ് സ്കെയിലിംഗ്, വൈബ്രേഷൻ',
+    },
     'settings_language': {
       AppLanguage.en: 'App Language',
       AppLanguage.hi: 'भाषा (Language)',
       AppLanguage.ml: 'ഭാഷ (Language)',
+    },
+    'sub_language': {
+      AppLanguage.en: 'English • हिन्दी • മലയാളം and 22 Indian languages',
+      AppLanguage.hi: 'अंग्रेजी, हिन्दी, मलयालम सहित 22 भाषाएं',
+      AppLanguage.ml: 'ഇംഗ്ലീഷ്, ഹിന്ദി, മലയാളം ഉൾപ്പെടെ 22 ഭാഷകൾ',
+    },
+    'sub_timeline': {
+      AppLanguage.en: 'Full history of your filed reports, confirmations, and finds',
+      AppLanguage.hi: 'आपकी शिकायतों, सत्यापनों और प्राप्तियों का संपूर्ण इतिहास',
+      AppLanguage.ml: 'നിങ്ങൾ നൽകിയ പരാതികളുടെയും കണ്ടെത്തലുകളുടെയും ചരിത്രം',
+    },
+    'sub_pending_sync': {
+      AppLanguage.en: 'View and manage locally queued offline actions',
+      AppLanguage.hi: 'स्थानीय रूप से सहेजी गई ऑफ़लाइन क्रियाएं प्रबंधित करें',
+      AppLanguage.ml: 'ഓഫ്‌ലൈൻ സമന്വയ നിര പരിശോധിക്കുക',
+    },
+    'sub_contact_dev': {
+      AppLanguage.en: 'Submit feedback or report application bugs',
+      AppLanguage.hi: 'प्रतिक्रिया भेजें या बग की सूचना दें',
+      AppLanguage.ml: 'അഭിപ്രായങ്ങൾ രേഖപ്പെടുത്തുക / ബന്ധപ്പെടുക',
+    },
+    'sub_sign_out': {
+      AppLanguage.en: 'Sign out of your Nivara account',
+      AppLanguage.hi: 'अपने निवारा खाते से साइन आउट करें',
+      AppLanguage.ml: 'നിവാര അക്കൗണ്ടിൽ നിന്ന് ലോഗ് ഔട്ട് ചെയ്യുക',
     },
     'coming_soon': {
       AppLanguage.en: 'Coming Soon',
@@ -172,6 +223,288 @@ abstract final class NivaraStrings {
       AppLanguage.en: 'Active',
       AppLanguage.hi: 'सक्रिय',
       AppLanguage.ml: 'സജീവം',
+    },
+
+    // Language Screen
+    'lang_banner_title': {
+      AppLanguage.en: 'Multilingual Civic Access',
+      AppLanguage.hi: 'बहुभाषी नागरिक पहुंच',
+      AppLanguage.ml: 'ബഹുഭാഷാ പൗരസേവനം',
+    },
+    'lang_banner_sub': {
+      AppLanguage.en: 'Select your preferred language. All buttons, civic terms, and statuses will adapt instantly.',
+      AppLanguage.hi: 'अपनी पसंदीदा भाषा चुनें। सभी बटन, नागरिक शब्द और स्थितियां तुरंत बदल जाएंगी।',
+      AppLanguage.ml: 'നിങ്ങളുടെ ഭാഷ തിരഞ്ഞെടുക്കുക. എല്ലാ ബട്ടണുകളും വിവരങ്ങളും തത്സമയം മാറും.',
+    },
+    'fully_supported_langs': {
+      AppLanguage.en: 'Fully Supported Languages',
+      AppLanguage.hi: 'पूर्णतः समर्थित भाषाएं',
+      AppLanguage.ml: 'പൂർണ്ണ പിന്തുണയുള്ള ഭാഷകൾ',
+    },
+    'official_langs_india': {
+      AppLanguage.en: 'Official Languages of India',
+      AppLanguage.hi: 'भारत की आधिकारिक भाषाएं',
+      AppLanguage.ml: 'ഇന്ത്യയിലെ ഔദ്യോഗിക ഭാഷകൾ',
+    },
+    'official_langs_sub': {
+      AppLanguage.en: 'Search from all 22 official Eighth Schedule languages of India:',
+      AppLanguage.hi: 'भारत की 22 आधिकारिक 8वीं अनुसूची भाषाओं में खोजें:',
+      AppLanguage.ml: 'ഇന്ത്യയിലെ 22 ഔദ്യോഗിക ഭാഷകളിൽ നിന്ന് തിരയുക:',
+    },
+    'search_lang_hint': {
+      AppLanguage.en: 'Search language (e.g. Tamil, Kannada, Marathi)...',
+      AppLanguage.hi: 'भाषा खोजें (उदा. तमिल, कन्नड़, मराठी)...',
+      AppLanguage.ml: 'ഭാഷ തിരയുക (ഉദാ: തമിഴ്, കന്നഡ, മറാഠി)...',
+    },
+
+    // Community Tab
+    'community_share_title': {
+      AppLanguage.en: 'Share with your community',
+      AppLanguage.hi: 'अपने समुदाय के साथ साझा करें',
+      AppLanguage.ml: 'നിങ്ങളുടെ സമൂഹവുമായി പങ്കിടുക',
+    },
+    'community_share_sub': {
+      AppLanguage.en: 'Post questions, start polls, offer jobs, or broadcast alerts.',
+      AppLanguage.hi: 'प्रश्न पूछें, पोल शुरू करें, सेवा दें या सूचनाएं प्रसारित करें।',
+      AppLanguage.ml: 'ചോദ്യങ്ങൾ ചോദിക്കുക, വോട്ടെടുപ്പ് നടത്തുക, അല്ലെങ്കിൽ അറിയിപ്പുകൾ നൽകുക.',
+    },
+    'btn_post': {
+      AppLanguage.en: 'Post',
+      AppLanguage.hi: 'पोस्ट',
+      AppLanguage.ml: 'പോസ്റ്റ്',
+    },
+    'btn_poll': {
+      AppLanguage.en: 'Poll',
+      AppLanguage.hi: 'पोल',
+      AppLanguage.ml: 'വോട്ടെടുപ്പ്',
+    },
+    'btn_job': {
+      AppLanguage.en: 'Job / Service',
+      AppLanguage.hi: 'कार्य / सेवा',
+      AppLanguage.ml: 'ജോലി / സേവനം',
+    },
+    'btn_announcement': {
+      AppLanguage.en: 'Announcement',
+      AppLanguage.hi: 'घोषणा',
+      AppLanguage.ml: 'അറിയിപ്പ്',
+    },
+    'neighborhood_feed': {
+      AppLanguage.en: 'Neighborhood Feed',
+      AppLanguage.hi: 'स्थानीय फीड',
+      AppLanguage.ml: 'പ്രാദേശിക ഫീഡ്',
+    },
+    'no_community_posts': {
+      AppLanguage.en: 'No Community Posts Yet',
+      AppLanguage.hi: 'अभी कोई सामुदायिक पोस्ट नहीं है',
+      AppLanguage.ml: 'പോസ്റ്റുകളൊന്നും ലഭ്യമല്ല',
+    },
+    'no_community_posts_sub': {
+      AppLanguage.en: 'Be the first to post a question, start a poll, or announce a civic update.',
+      AppLanguage.hi: 'प्रश्न पूछने, पोल शुरू करने या नागरिक सूचना देने वाले पहले व्यक्ति बनें।',
+      AppLanguage.ml: 'ആദ്യമായി ഒരു ചോദ്യം ചോദിക്കൂ, അല്ലെങ്കിൽ അറിയിപ്പുകൾ നൽകൂ.',
+    },
+
+    // Pulse Tab
+    'proximity_filter': {
+      AppLanguage.en: 'Proximity Filter',
+      AppLanguage.hi: 'दूरी फ़िल्टर',
+      AppLanguage.ml: 'ദൂര പരിധി',
+    },
+    'radius_label': {
+      AppLanguage.en: 'radius',
+      AppLanguage.hi: 'दायरा',
+      AppLanguage.ml: 'ചുറ്റളവ്',
+    },
+    'live_telemetry_within': {
+      AppLanguage.en: 'Live Telemetry within',
+      AppLanguage.hi: 'में लाइव टेलीमेट्री',
+      AppLanguage.ml: 'തത്സമയ വിവരങ്ങൾ',
+    },
+    'recent_nearby_issues': {
+      AppLanguage.en: 'Recent Nearby Issues',
+      AppLanguage.hi: 'हाल की नजदीकी शिकायतें',
+      AppLanguage.ml: 'സമീപകാല പരാതികൾ',
+    },
+    'view_on_map': {
+      AppLanguage.en: 'View on Map',
+      AppLanguage.hi: 'मानचित्र पर देखें',
+      AppLanguage.ml: 'മാപ്പിൽ കാണുക',
+    },
+    'total_issues_recorded': {
+      AppLanguage.en: 'total issues recorded',
+      AppLanguage.hi: 'कुल शिकायतें दर्ज',
+      AppLanguage.ml: 'പരാതികൾ രേഖപ്പെടുത്തി',
+    },
+    'meters_away': {
+      AppLanguage.en: 'm away',
+      AppLanguage.hi: 'मीटर दूर',
+      AppLanguage.ml: 'മീറ്റർ അകലെ',
+    },
+    'km_away': {
+      AppLanguage.en: 'km away',
+      AppLanguage.hi: 'किमी दूर',
+      AppLanguage.ml: 'കി.മീ അകലെ',
+    },
+
+    // SensorWatch HUD
+    'sensorwatch_hud_title': {
+      AppLanguage.en: 'SensorWatch HUD',
+      AppLanguage.hi: 'सड़क सेंसर वॉच HUD',
+      AppLanguage.ml: 'സെൻസർ വാച്ച് HUD',
+    },
+    'sensorwatch_idle': {
+      AppLanguage.en: 'IDLE',
+      AppLanguage.hi: 'निष्क्रिय',
+      AppLanguage.ml: 'നിഷ്‌ക്രിയം',
+    },
+    'sensorwatch_monitoring': {
+      AppLanguage.en: 'MONITORING',
+      AppLanguage.hi: 'निगरानी जारी',
+      AppLanguage.ml: 'നിരീക്ഷിക്കുന്നു',
+    },
+    'sensorwatch_captured': {
+      AppLanguage.en: 'Captured',
+      AppLanguage.hi: 'दर्ज',
+      AppLanguage.ml: 'കണ്ടെത്തി',
+    },
+    'sensorwatch_impact_force': {
+      AppLanguage.en: 'g Impact Force',
+      AppLanguage.hi: 'g झटका बल',
+      AppLanguage.ml: 'g ആഘാത തീവ്രത',
+    },
+    'sensorwatch_peak': {
+      AppLanguage.en: 'Peak',
+      AppLanguage.hi: 'अधिकतम',
+      AppLanguage.ml: 'പരമാവധി',
+    },
+    'sensorwatch_speed': {
+      AppLanguage.en: 'Speed',
+      AppLanguage.hi: 'गति',
+      AppLanguage.ml: 'വേഗത',
+    },
+    'sensorwatch_gps_fix': {
+      AppLanguage.en: 'GPS Fix',
+      AppLanguage.hi: 'GPS सिग्नल',
+      AppLanguage.ml: 'GPS സിഗ്നൽ',
+    },
+    'sensorwatch_no_fix': {
+      AppLanguage.en: 'No Fix',
+      AppLanguage.hi: 'सिग्नल नहीं',
+      AppLanguage.ml: 'സിഗ്നൽ ഇല്ല',
+    },
+    'sensorwatch_threshold': {
+      AppLanguage.en: 'Threshold',
+      AppLanguage.hi: 'सीमा',
+      AppLanguage.ml: 'പരിധി',
+    },
+    'sensorwatch_widget_title': {
+      AppLanguage.en: '1-Tap Home Screen Widget',
+      AppLanguage.hi: '1-टैप होम स्क्रीन विजेट',
+      AppLanguage.ml: 'ഹോം സ്ക്രീൻ വിജറ്റ്',
+    },
+    'sensorwatch_widget_sub': {
+      AppLanguage.en: 'Start monitoring instantly with zero extra taps.',
+      AppLanguage.hi: 'बिना रुकावट तुरंत निगरानी शुरू करें।',
+      AppLanguage.ml: 'ഒറ്റ ടാപ്പിൽ നിരീക്ഷണം തുടങ്ങാം.',
+    },
+    'sensorwatch_widget_add': {
+      AppLanguage.en: 'Add',
+      AppLanguage.hi: 'जोड़ें',
+      AppLanguage.ml: 'ചേർക്കുക',
+    },
+    'sensorwatch_shockwaves': {
+      AppLanguage.en: 'Recorded Defect Shockwaves',
+      AppLanguage.hi: 'दर्ज सड़क झटके व गड्ढे',
+      AppLanguage.ml: 'രേഖപ്പെടുത്തിയ റോഡ് കുഴികൾ',
+    },
+    'sensorwatch_ready_title': {
+      AppLanguage.en: 'Ready for Highway & Road Drives',
+      AppLanguage.hi: 'सड़क यात्रा हेतु तैयार',
+      AppLanguage.ml: 'യാത്രകൾക്ക് സജ്ജം',
+    },
+    'sensorwatch_ready_sub': {
+      AppLanguage.en: 'Tap "Start Monitoring" before driving. Potholes and road jolts will be logged and verified with multi-user consensus.',
+      AppLanguage.hi: 'गाड़ी चलाने से पहले "निगरानी शुरू करें" दबाएं। सड़क के गड्ढे स्वचालित रूप से दर्ज व सत्यापित होंगे।',
+      AppLanguage.ml: 'ഡ്രൈവിംഗിന് മുൻപ് "നിരീക്ഷണം ആരംഭിക്കുക" ടാപ്പ് ചെയ്യുക. കുഴികൾ തത്സമയം രേഖപ്പെടുത്തും.',
+    },
+
+    // Category Grid & Selection
+    'select_issue_category': {
+      AppLanguage.en: 'Select Issue Category',
+      AppLanguage.hi: 'समस्या श्रेणी चुनें',
+      AppLanguage.ml: 'പരാതി വിഭാഗം തിരഞ്ഞെടുക്കുക',
+    },
+    'search_categories_hint': {
+      AppLanguage.en: 'Search categories (e.g. pothole, light, drain)...',
+      AppLanguage.hi: 'श्रेणी खोजें (उदा. गड्ढा, लाइट, नाली)...',
+      AppLanguage.ml: 'വിഭാഗങ്ങൾ തിരയുക (ഉദാ: റോഡിലെ കുഴി, ലൈറ്റ്)...',
+    },
+
+    // Report Form
+    'report_details': {
+      AppLanguage.en: 'Report Details',
+      AppLanguage.hi: 'शिकायत विवरण',
+      AppLanguage.ml: 'പരാതി വിവരങ്ങൾ',
+    },
+    'change': {
+      AppLanguage.en: 'Change',
+      AppLanguage.hi: 'बदलें',
+      AppLanguage.ml: 'മാറ്റുക',
+    },
+    'sec_issue_details': {
+      AppLanguage.en: '1. Issue Details',
+      AppLanguage.hi: '1. समस्या का विवरण',
+      AppLanguage.ml: '1. പരാതിയുടെ വിവരങ്ങൾ',
+    },
+    'title_optional': {
+      AppLanguage.en: 'Title (optional)',
+      AppLanguage.hi: 'शीर्षक (वैकल्पिक)',
+      AppLanguage.ml: 'വിഷയം (ഐച്ഛികം)',
+    },
+    'description_req': {
+      AppLanguage.en: 'Description *',
+      AppLanguage.hi: 'विवरण *',
+      AppLanguage.ml: 'വിശദ വിവരണം *',
+    },
+    'severity': {
+      AppLanguage.en: 'Severity',
+      AppLanguage.hi: 'गंभीरता (Severity)',
+      AppLanguage.ml: 'തീവ്രത',
+    },
+    'sec_location': {
+      AppLanguage.en: '2. Location',
+      AppLanguage.hi: '2. स्थान',
+      AppLanguage.ml: '2. സ്ഥലം',
+    },
+    'gps_captured': {
+      AppLanguage.en: 'GPS location captured',
+      AppLanguage.hi: 'GPS स्थान दर्ज',
+      AppLanguage.ml: 'GPS സ്ഥാനം രേഖപ്പെടുത്തി',
+    },
+    'select_on_map': {
+      AppLanguage.en: 'Select on map',
+      AppLanguage.hi: 'मानचित्र पर चुनें',
+      AppLanguage.ml: 'മാപ്പിൽ തിരഞ്ഞെടുക്കുക',
+    },
+    'landmark_optional': {
+      AppLanguage.en: 'Landmark / address (optional)',
+      AppLanguage.hi: 'लैंडमार्क / पता (वैकल्पिक)',
+      AppLanguage.ml: 'വിലാസം / ലാൻഡ്മാർക്ക് (ഐച്ഛികം)',
+    },
+    'sec_photos': {
+      AppLanguage.en: '3. Photos (optional)',
+      AppLanguage.hi: '3. तस्वीरें (वैकल्पिक)',
+      AppLanguage.ml: '3. ഫോട്ടോകൾ (ഐച്ഛികം)',
+    },
+    'add_photos': {
+      AppLanguage.en: 'Add',
+      AppLanguage.hi: 'जोड़ें',
+      AppLanguage.ml: 'ചേർക്കുക',
+    },
+    'submit_report_short': {
+      AppLanguage.en: 'Submit report',
+      AppLanguage.hi: 'शिकायत दर्ज करें',
+      AppLanguage.ml: 'പരാതി സമർപ്പിക്കുക',
     },
 
     // Work With Nivara
@@ -196,22 +529,17 @@ abstract final class NivaraStrings {
       AppLanguage.ml: 'പൂർണ്ണമായ പേര്',
     },
     'phone_contact': {
-      AppLanguage.en: 'Contact Phone Number',
-      AppLanguage.hi: 'संपर्क फोन नंबर',
+      AppLanguage.en: 'Phone Number',
+      AppLanguage.hi: 'फोन नंबर',
       AppLanguage.ml: 'ഫോൺ നമ്പർ',
     },
     'ward_neighborhood': {
-      AppLanguage.en: 'Assigned Ward / Neighborhood',
-      AppLanguage.hi: 'वार्ड / मोहल्ला',
+      AppLanguage.en: 'Ward / Area',
+      AppLanguage.hi: 'वार्ड / क्षेत्र',
       AppLanguage.ml: 'വാർഡ് / പ്രദേശം',
     },
-    'field_of_interest': {
-      AppLanguage.en: 'Field of Expertise & Department',
-      AppLanguage.hi: 'कार्य क्षेत्र एवं विभाग',
-      AppLanguage.ml: 'താല്പര്യമുള്ള മേഖല / വകുപ്പ്',
-    },
     'submit_application': {
-      AppLanguage.en: 'Submit Verified Application',
+      AppLanguage.en: 'Submit Application',
       AppLanguage.hi: 'आवेदन पत्र जमा करें',
       AppLanguage.ml: 'അപേക്ഷ സമർപ്പിക്കുക',
     },
@@ -253,201 +581,155 @@ abstract final class NivaraStrings {
       AppLanguage.ml: 'ലോഗ് ഔട്ട് ചെയ്യുക',
     },
 
-    // Report Filing Form
-    'report_civic_issue': {
-      AppLanguage.en: 'Report Civic Issue',
-      AppLanguage.hi: 'नागरिक समस्या दर्ज करें',
-      AppLanguage.ml: 'പരാതി രേഖപ്പെടുത്തുക',
-    },
-    'issue_title': {
-      AppLanguage.en: 'Issue Title / Summary',
-      AppLanguage.hi: 'समस्या का शीर्षक / विवरण',
-      AppLanguage.ml: 'വിഷയം / ചുരുക്കം',
-    },
-    'issue_category': {
-      AppLanguage.en: 'Category',
-      AppLanguage.hi: 'श्रेणी (Category)',
-      AppLanguage.ml: 'വിഭാഗം (Category)',
-    },
-    'issue_description': {
-      AppLanguage.en: 'Detailed Description',
-      AppLanguage.hi: 'विस्तृत विवरण',
-      AppLanguage.ml: 'വിശദ വിവരണം',
-    },
-    'issue_severity': {
-      AppLanguage.en: 'Severity Level',
-      AppLanguage.hi: 'गंभीरता का स्तर (Severity)',
-      AppLanguage.ml: 'തീവ്രത (Severity)',
-    },
-    'photo_evidence': {
-      AppLanguage.en: 'Photo Evidence',
-      AppLanguage.hi: 'फोटो साक्ष्य',
-      AppLanguage.ml: 'ഫോട്ടോ തെളിവുകൾ',
-    },
-    'location_address': {
-      AppLanguage.en: 'Location & Address',
-      AppLanguage.hi: 'स्थान एवं पता',
-      AppLanguage.ml: 'സ്ഥലവും വിലാസവും',
-    },
-    'pick_on_map': {
-      AppLanguage.en: 'Pick Exact Pin on Map',
-      AppLanguage.hi: 'मानचित्र पर सही स्थान चुनें',
-      AppLanguage.ml: 'മാപ്പിൽ സ്ഥലം അടയാളപ്പെടുത്തുക',
-    },
-    'submit_report_button': {
-      AppLanguage.en: 'Submit Cryptographically Sealed Report',
-      AppLanguage.hi: 'डिजिटल मुहर सहित शिकायत दर्ज करें',
-      AppLanguage.ml: 'പരാതി ഔദ്യോഗികമായി സമർപ്പിക്കുക',
-    },
-
-    // Lost & Found
-    'report_lost_item': {
-      AppLanguage.en: 'Report Lost Item',
-      AppLanguage.hi: 'खोई वस्तु की सूचना दें',
-      AppLanguage.ml: 'നഷ്ടപ്പെട്ട സാധനം രേഖപ്പെടുത്തുക',
-    },
-    'report_found_item': {
-      AppLanguage.en: 'Report Found Item',
-      AppLanguage.hi: 'पाई गई वस्तु की सूचना दें',
-      AppLanguage.ml: 'കണ്ടുകിട്ടിയ സാധനം രേഖപ്പെടുത്തുക',
-    },
-    'my_listings': {
-      AppLanguage.en: 'My Listings',
-      AppLanguage.hi: 'मेरी लिस्टिंग',
-      AppLanguage.ml: 'എന്റെ ലിസ്റ്റിംഗുകൾ',
-    },
-    'matching_radar': {
-      AppLanguage.en: 'Discovery Radar',
-      AppLanguage.hi: 'खोज रडार (Discovery Radar)',
-      AppLanguage.ml: 'റഡാർ മാച്ചിംഗ്',
-    },
-    'all_items': {
-      AppLanguage.en: 'All Items',
-      AppLanguage.hi: 'सभी वस्तुएं',
-      AppLanguage.ml: 'എല്ലാം',
-    },
-    'lost_tab': {
-      AppLanguage.en: 'Lost',
-      AppLanguage.hi: 'खोया हुआ',
-      AppLanguage.ml: 'നഷ്ടപ്പെട്ടത്',
-    },
-    'found_tab': {
-      AppLanguage.en: 'Found',
-      AppLanguage.hi: 'കണ്ടുകിട്ടിയത്',
-      AppLanguage.ml: 'കണ്ടുകിട്ടിയത്',
-    },
-    'handover_pass': {
-      AppLanguage.en: 'QR Handover Pass',
-      AppLanguage.hi: 'QR हस्तांतरण पास',
-      AppLanguage.ml: 'QR കൈമാറ്റ പാസ്',
-    },
-
-    // SensorWatch
-    'sensorwatch_title': {
-      AppLanguage.en: 'SensorWatch Road Telemetry',
-      AppLanguage.hi: 'सड़क सेंसर वॉच टेलीमेट्री',
-      AppLanguage.ml: 'റോഡ് സെൻസർ വാച്ച് ടെലിമെട്രി',
-    },
-    'sensorwatch_start': {
-      AppLanguage.en: 'Start Road Monitor',
-      AppLanguage.hi: 'सड़क निगरानी शुरू करें',
-      AppLanguage.ml: 'നിരീക്ഷണം ആരംഭിക്കുക',
-    },
-    'sensorwatch_stop': {
-      AppLanguage.en: 'Stop Monitoring',
-      AppLanguage.hi: 'निगरानी रोकें',
-      AppLanguage.ml: 'നിരീക്ഷണം നിർത്തുക',
-    },
-    'pothole_detected': {
-      AppLanguage.en: 'Road Impact / Pothole Logged',
-      AppLanguage.hi: 'सड़क गड्ढा / झटका दर्ज हुआ',
-      AppLanguage.ml: 'റോഡിലെ കുഴി രേഖപ്പെടുത്തി',
-    },
-
-    // Admin Specific
-    'admin_command_center': {
-      AppLanguage.en: 'Municipal Command Center',
-      AppLanguage.hi: 'नगर निगम नियंत्रण केंद्र',
-      AppLanguage.ml: 'നഗരസഭാ കമാൻഡ് സെന്റർ',
-    },
-    'admin_dispatched_tasks': {
-      AppLanguage.en: 'Dispatched Tasks',
-      AppLanguage.hi: 'आवंटित कार्य',
-      AppLanguage.ml: 'നൽകിയ ചുമതലകൾ',
-    },
-    'admin_sla_efficiency': {
-      AppLanguage.en: 'Resolution Efficiency',
-      AppLanguage.hi: 'समाधान दर एवं दक्षता',
-      AppLanguage.ml: 'പരിഹാര കാര്യക്ഷമത',
-    },
-    'admin_supervised_workers': {
-      AppLanguage.en: 'Supervised Team',
-      AppLanguage.hi: 'निगरानी टीम',
-      AppLanguage.ml: 'ഫീൽഡ് ജീവനക്കാർ',
-    },
-
-    // Accessibility Strings
-    'a11y_high_contrast': {
-      AppLanguage.en: 'High Contrast Mode',
-      AppLanguage.hi: 'उच्च कंट्रास्ट मोड',
-      AppLanguage.ml: 'ഹൈ കോൺട്രാസ്റ്റ് മോഡ്',
-    },
-    'a11y_reduce_motion': {
-      AppLanguage.en: 'Reduce Motion',
-      AppLanguage.hi: 'कम गति (Reduce Motion)',
-      AppLanguage.ml: 'ചലനങ്ങൾ കുറയ്ക്കുക',
-    },
-    'a11y_color_blind': {
-      AppLanguage.en: 'Color Blindness Shape Markers',
-      AppLanguage.hi: 'वर्णांधता सहायक प्रतीक (CVD)',
-      AppLanguage.ml: 'കളർ ബ്ലൈൻഡ് സഹായ ചിഹ്നങ്ങൾ',
-    },
-    'a11y_text_scale': {
-      AppLanguage.en: 'In-App Text Scaling',
-      AppLanguage.hi: 'अक्षर का आकार (Text Scaling)',
-      AppLanguage.ml: 'അക്ഷരങ്ങളുടെ വലിപ്പം',
-    },
-    'a11y_haptics': {
-      AppLanguage.en: 'Haptic Vibration Feedback',
-      AppLanguage.hi: 'स्पर्श कंपन प्रतिक्रिया (Haptics)',
-      AppLanguage.ml: 'വൈബ്രേഷൻ ഫീഡ്‌ബാക്ക്',
-    },
-    'a11y_voice_alerts': {
-      AppLanguage.en: 'TalkBack Spoken Alerts',
-      AppLanguage.hi: 'ध्वनि सूचनाएं (Screen Reader)',
-      AppLanguage.ml: 'ശബ്ദ അറിയിപ്പുകൾ (TalkBack)',
-    },
-
-    // Status
+    // Statuses
     'status_submitted': {
       AppLanguage.en: 'Submitted',
-      AppLanguage.hi: 'दर्ज किया गया',
+      AppLanguage.hi: 'दर्ज',
       AppLanguage.ml: 'രേഖപ്പെടുത്തി',
     },
     'status_acknowledged': {
       AppLanguage.en: 'Acknowledged',
-      AppLanguage.hi: 'स्वीकार किया गया',
+      AppLanguage.hi: 'स्वीकृत',
       AppLanguage.ml: 'സ്വീകരിച്ചു',
     },
     'status_in_progress': {
       AppLanguage.en: 'In Progress',
       AppLanguage.hi: 'प्रगति पर',
-      AppLanguage.ml: 'നടപപടിയിൽ',
+      AppLanguage.ml: 'നടപടിയിൽ',
     },
     'status_resolved': {
       AppLanguage.en: 'Resolved',
-      AppLanguage.hi: 'समाधान हो गया',
+      AppLanguage.hi: 'समाधानित',
       AppLanguage.ml: 'പരിഹരിച്ചു',
     },
     'status_closed': {
       AppLanguage.en: 'Closed',
-      AppLanguage.hi: 'बंद कर दिया गया',
+      AppLanguage.hi: 'बंद',
       AppLanguage.ml: 'പൂർത്തിയായി',
     },
     'status_duplicate': {
       AppLanguage.en: 'Duplicate',
-      AppLanguage.hi: 'समान शिकायत',
+      AppLanguage.hi: 'समान',
       AppLanguage.ml: 'മറ്റൊരു പരാതിയുണ്ട്',
+    },
+
+    // Severities
+    'sev_low': {
+      AppLanguage.en: 'Low',
+      AppLanguage.hi: 'कम',
+      AppLanguage.ml: 'കുറഞ്ഞത്',
+    },
+    'sev_medium': {
+      AppLanguage.en: 'Medium',
+      AppLanguage.hi: 'मध्यम',
+      AppLanguage.ml: 'ഇടത്തരം',
+    },
+    'sev_high': {
+      AppLanguage.en: 'High',
+      AppLanguage.hi: 'उच्च',
+      AppLanguage.ml: 'കൂടിയത്',
+    },
+    'sev_emergency': {
+      AppLanguage.en: 'Emergency',
+      AppLanguage.hi: 'आपातकालीन',
+      AppLanguage.ml: 'അടിയന്തിരം',
+    },
+
+    // Categories
+    'cat_pothole': {
+      AppLanguage.en: 'Pothole',
+      AppLanguage.hi: 'सड़क का गड्ढा',
+      AppLanguage.ml: 'റോഡിലെ കുഴി',
+    },
+    'cat_brokenFootpath': {
+      AppLanguage.en: 'Broken Footpath',
+      AppLanguage.hi: 'टूटा फुटपाथ',
+      AppLanguage.ml: 'തകർന്ന നടപ്പാത',
+    },
+    'cat_openManhole': {
+      AppLanguage.en: 'Open Manhole',
+      AppLanguage.hi: 'खुला मैनहोल',
+      AppLanguage.ml: 'തുറന്ന മാൻഹോൾ',
+    },
+    'cat_fallenTree': {
+      AppLanguage.en: 'Fallen Tree',
+      AppLanguage.hi: 'गिरा हुआ पेड़',
+      AppLanguage.ml: 'വീണ മരം',
+    },
+    'cat_waterlogging': {
+      AppLanguage.en: 'Waterlogging',
+      AppLanguage.hi: 'जलभराव',
+      AppLanguage.ml: 'വെള്ളക്കെട്ട്',
+    },
+    'cat_roadSign': {
+      AppLanguage.en: 'Road Sign',
+      AppLanguage.hi: 'सड़क संकेत',
+      AppLanguage.ml: 'റോഡ് സൈൻ ബോർഡ്',
+    },
+    'cat_garbage': {
+      AppLanguage.en: 'Garbage',
+      AppLanguage.hi: 'कचरा',
+      AppLanguage.ml: 'മാലിന്യം',
+    },
+    'cat_blockedDrain': {
+      AppLanguage.en: 'Blocked Drain',
+      AppLanguage.hi: 'अवरुद्ध नाली',
+      AppLanguage.ml: 'തടസ്സപ്പെട്ട ഓട',
+    },
+    'cat_sewage': {
+      AppLanguage.en: 'Sewage',
+      AppLanguage.hi: 'सीवेज',
+      AppLanguage.ml: 'മലിനജലം',
+    },
+    'cat_streetLight': {
+      AppLanguage.en: 'Street Light',
+      AppLanguage.hi: 'स्ट्रीट लाइट',
+      AppLanguage.ml: 'തെരുവ് വിളക്ക്',
+    },
+    'cat_damagedPole': {
+      AppLanguage.en: 'Damaged Pole',
+      AppLanguage.hi: 'क्षतिग्रस्त खंभा',
+      AppLanguage.ml: 'തകർന്ന പോസ്റ്റ്',
+    },
+    'cat_powerIssue': {
+      AppLanguage.en: 'Power Issue',
+      AppLanguage.hi: 'बिजली समस्या',
+      AppLanguage.ml: 'വൈദ്യുതി തടസ്സം',
+    },
+    'cat_waterSupply': {
+      AppLanguage.en: 'Water Supply',
+      AppLanguage.hi: 'जल आपूर्ति',
+      AppLanguage.ml: 'കുടിവെള്ള വിതരണം',
+    },
+    'cat_pipeLeak': {
+      AppLanguage.en: 'Pipe Leak',
+      AppLanguage.hi: 'पाइप रिसाव',
+      AppLanguage.ml: 'പൈപ്പ് ചോർച്ച',
+    },
+    'cat_encroachment': {
+      AppLanguage.en: 'Encroachment',
+      AppLanguage.hi: 'अतिक्रमण',
+      AppLanguage.ml: 'കയ്യേറ്റം',
+    },
+    'cat_brokenProperty': {
+      AppLanguage.en: 'Broken Property',
+      AppLanguage.hi: 'सार्वजनिक संपत्ति क्षति',
+      AppLanguage.ml: 'പൊതുമുതൽ നാശനഷ്ടം',
+    },
+    'cat_strayAnimals': {
+      AppLanguage.en: 'Stray Animals',
+      AppLanguage.hi: 'आवारा पशु',
+      AppLanguage.ml: 'തെരുവ് മൃഗങ്ങൾ',
+    },
+    'cat_noise': {
+      AppLanguage.en: 'Noise Pollution',
+      AppLanguage.hi: 'ध्वनि प्रदूषण',
+      AppLanguage.ml: 'ശബ്ദ മലിനീകരണം',
+    },
+    'cat_other': {
+      AppLanguage.en: 'Other',
+      AppLanguage.hi: 'अन्य',
+      AppLanguage.ml: 'മറ്റുള്ളവ',
     },
   };
 
@@ -456,5 +738,25 @@ abstract final class NivaraStrings {
     final entry = _dict[key];
     if (entry == null) return key;
     return entry[lang] ?? entry[AppLanguage.en] ?? key;
+  }
+
+  /// Translate category name
+  static String categoryName(ReportCategory category, AppLanguage lang) {
+    return tr('cat_${category.name}', lang);
+  }
+
+  /// Translate severity name
+  static String severityName(Severity severity, AppLanguage lang) {
+    return tr('sev_${severity.name}', lang);
+  }
+
+  /// Translate status name
+  static String statusName(ReportStatus status, AppLanguage lang) {
+    return tr('status_${status.wire.toLowerCase()}', lang);
+  }
+
+  /// Translate role name
+  static String roleName(UserRole role, AppLanguage lang) {
+    return tr('role_${role.name}', lang);
   }
 }

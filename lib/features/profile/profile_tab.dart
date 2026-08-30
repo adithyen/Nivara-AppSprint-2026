@@ -241,7 +241,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.palette_outlined,
             color: const Color(0xFF7B4BC4),
             title: NivaraStrings.tr('settings_appearance', currentLang),
-            subtitle: 'Theme mode (Light/Dark) and brand accent colour',
+            subtitle: NivaraStrings.tr('sub_appearance', currentLang),
             onTap: () => context.push(Routes.settings),
           ),
           const SizedBox(height: 12),
@@ -250,7 +250,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.accessibility_new_rounded,
             color: const Color(0xFF00E676),
             title: NivaraStrings.tr('settings_accessibility', currentLang),
-            subtitle: 'High contrast, reduce motion, text scaling, haptics & CVD support',
+            subtitle: NivaraStrings.tr('sub_accessibility', currentLang),
             onTap: () => context.push(Routes.accessibility),
           ),
           const SizedBox(height: 12),
@@ -259,7 +259,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.translate_rounded,
             color: const Color(0xFF00B0FF),
             title: NivaraStrings.tr('settings_language', currentLang),
-            subtitle: 'English • हिन्दी • മലയാളം and 22 Indian languages',
+            subtitle: NivaraStrings.tr('sub_language', currentLang),
             onTap: () => context.push(Routes.language),
           ),
           const SizedBox(height: 12),
@@ -268,7 +268,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.history_rounded,
             color: NivaraColors.primary,
             title: NivaraStrings.tr('activity_timeline', currentLang),
-            subtitle: 'Timeline of your reports, posts, and tasks',
+            subtitle: NivaraStrings.tr('sub_timeline', currentLang),
             onTap: () => context.push(Routes.activityLog),
           ),
           const SizedBox(height: 12),
@@ -278,7 +278,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             color: NivaraColors.accent,
             title: NivaraStrings.tr('pending_sync', currentLang),
             subtitle: _pendingCount == 0
-                ? 'All actions synced to cloud'
+                ? NivaraStrings.tr('sub_pending_sync', currentLang)
                 : '$_pendingCount item${_pendingCount == 1 ? '' : 's'} waiting to sync',
             badge: _pendingCount > 0 ? '$_pendingCount' : null,
             onTap: () async {
@@ -496,15 +496,16 @@ class _WorkStatusCard extends StatelessWidget {
   }
 }
 
-class _IdentityCard extends StatelessWidget {
+class _IdentityCard extends ConsumerWidget {
   const _IdentityCard({required this.profile});
   final UserProfile? profile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentLang = ref.watch(languageControllerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
-    final name = profile?.displayName ?? 'Citizen';
+    final name = profile?.displayName ?? NivaraStrings.roleName(UserRole.citizen, currentLang);
     final area = [
       if (profile?.ward != null && profile!.ward!.trim().isNotEmpty)
         profile!.ward!.trim(),
@@ -594,7 +595,7 @@ class _IdentityCard extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    (profile?.role ?? UserRole.citizen).label,
+                    NivaraStrings.roleName(profile?.role ?? UserRole.citizen, currentLang),
                     style: TextStyle(
                       color: primary,
                       fontWeight: FontWeight.w700,
@@ -635,7 +636,7 @@ class _IdentityCard extends StatelessWidget {
   }
 }
 
-class _CitizenImpactCard extends StatelessWidget {
+class _CitizenImpactCard extends ConsumerWidget {
   const _CitizenImpactCard({
     required this.loading,
     required this.score,
@@ -651,7 +652,8 @@ class _CitizenImpactCard extends StatelessWidget {
   final int finds;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentLang = ref.watch(languageControllerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
 
@@ -683,7 +685,7 @@ class _CitizenImpactCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Civic Standing & XP',
+                NivaraStrings.tr('civic_standing', currentLang),
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF111827),
                   fontWeight: FontWeight.w700,
@@ -707,7 +709,7 @@ class _CitizenImpactCard extends StatelessWidget {
               _Stat(
                 icon: Icons.report_gmailerrorred_rounded,
                 value: reports,
-                label: 'Reports',
+                label: NivaraStrings.tr('stat_reports', currentLang),
                 loading: loading,
                 isDark: isDark,
                 color: NivaraColors.accent,
@@ -716,7 +718,7 @@ class _CitizenImpactCard extends StatelessWidget {
               _Stat(
                 icon: Icons.thumb_up_alt_rounded,
                 value: confirms,
-                label: 'Confirms',
+                label: NivaraStrings.tr('stat_confirms', currentLang),
                 loading: loading,
                 isDark: isDark,
                 color: primary,
@@ -725,7 +727,7 @@ class _CitizenImpactCard extends StatelessWidget {
               _Stat(
                 icon: Icons.volunteer_activism_rounded,
                 value: finds,
-                label: 'Finds',
+                label: NivaraStrings.tr('stat_finds', currentLang),
                 loading: loading,
                 isDark: isDark,
                 color: NivaraColors.primaryBlue,
@@ -733,7 +735,11 @@ class _CitizenImpactCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          CivicLevelBar(standing: civicStandingFor(score), onDark: isDark),
+          CivicLevelBar(
+            standing: civicStandingFor(score),
+            onDark: isDark,
+            currentLang: currentLang,
+          ),
         ],
       ),
     );

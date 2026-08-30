@@ -1,8 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Nivara: network for Supabase/Ola/OSM; GPS for SensorWatch + CivicMap. -->
+    <!-- Nivara: network for Supabase/Ola/OSM; GPS for SensorWatch + CivicMap; VIBRATE for haptics. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- Best-effort public Download/ access for the on-device debug log on
          Android ≤10. On 11+ the logger falls back to the app external-files
          dir (no permission needed) and shows the resolved path on-screen. -->

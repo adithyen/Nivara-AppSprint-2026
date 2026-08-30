@@ -79,16 +79,16 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Multilingual Civic Access',
-                        style: TextStyle(
+                      Text(
+                        NivaraStrings.tr('lang_banner_title', currentLang),
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 14.5,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Select your preferred language. All buttons, civic terms, and statuses will adapt instantly.',
+                        NivaraStrings.tr('lang_banner_sub', currentLang),
                         style: TextStyle(
                           color: isDark ? Colors.white60 : const Color(0xFF64748B),
                           fontSize: 12,
@@ -104,9 +104,9 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
           const SizedBox(height: 24),
 
           // Primary Fully-Localized Languages (EN, HI, ML)
-          const Text(
-            'Fully Supported Languages',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+          Text(
+            NivaraStrings.tr('fully_supported_langs', currentLang),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
           ),
           const SizedBox(height: 10),
 
@@ -189,13 +189,13 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
           const SizedBox(height: 28),
 
           // 22 Official Scheduled Languages of India
-          const Text(
-            'Official Languages of India',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+          Text(
+            NivaraStrings.tr('official_langs_india', currentLang),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
           ),
           const SizedBox(height: 4),
           Text(
-            'Search from all 22 official Eighth Schedule languages of India:',
+            NivaraStrings.tr('official_langs_sub', currentLang),
             style: TextStyle(
               color: isDark ? Colors.white54 : const Color(0xFF64748B),
               fontSize: 12,
@@ -208,7 +208,7 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
             onChanged: (v) => setState(() => _searchQuery = v),
             style: const TextStyle(fontSize: 13.5),
             decoration: InputDecoration(
-              hintText: 'Search language (e.g. Tamil, Kannada, Marathi)...',
+              hintText: NivaraStrings.tr('search_lang_hint', currentLang),
               prefixIcon: const Icon(Icons.search_rounded, size: 20),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
@@ -264,9 +264,9 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
                               color: NivaraColors.success.withValues(alpha: 0.4),
                             ),
                           ),
-                          child: const Text(
-                            'Active',
-                            style: TextStyle(
+                          child: Text(
+                            NivaraStrings.tr('active', currentLang),
+                            style: const TextStyle(
                               color: NivaraColors.success,
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
