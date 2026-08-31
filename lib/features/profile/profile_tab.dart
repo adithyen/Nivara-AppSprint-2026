@@ -197,10 +197,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           const SizedBox(height: 20),
 
           // Role-Specific Metrics (No points for Admin!)
-          if (isAdmin) ...[
-            _AdminCommandMetricsCard(profile: profile),
-            const SizedBox(height: 20),
-          ] else if (isWorker) ...[
+          if (isWorker) ...[
             _WorkStatusCard(
               onLeave: _onLeave,
               working: _leaveWorking,
@@ -746,189 +743,7 @@ class _CitizenImpactCard extends ConsumerWidget {
   }
 }
 
-class _AdminCommandMetricsCard extends StatelessWidget {
-  const _AdminCommandMetricsCard({required this.profile});
-  final UserProfile? profile;
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dept = profile?.department?.label ?? 'Municipal Oversight';
-    final ward = profile?.jurisdictionWard?.trim().isNotEmpty == true
-        ? profile!.jurisdictionWard!.trim()
-        : 'Central Command Ward';
-    final city = profile?.jurisdictionCity?.trim().isNotEmpty == true
-        ? profile!.jurisdictionCity!.trim()
-        : 'Bengaluru Urban';
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF10161E) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: NivaraColors.accent.withValues(alpha: isDark ? 0.35 : 0.4),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: NivaraColors.accent.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.shield_rounded,
-                  color: NivaraColors.accent,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Command Authority & Oversight',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      'Municipal Official Standing & Dispatch Metrics',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF080D14) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.location_city_rounded, size: 18, color: NivaraColors.accent),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '$ward • $city',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _AdminStatPill(
-                  label: 'Department',
-                  value: dept,
-                  icon: Icons.account_balance_rounded,
-                  color: const Color(0xFF00B0FF),
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: _AdminStatPill(
-                  label: 'Resolution SLA',
-                  value: '98.6% On-Time',
-                  icon: Icons.bolt_rounded,
-                  color: Color(0xFF00E676),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AdminStatPill extends StatelessWidget {
-  const _AdminStatPill({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: isDark ? 0.25 : 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _WorkerServiceCard extends StatelessWidget {
   const _WorkerServiceCard({
@@ -1004,7 +819,7 @@ class _WorkerServiceCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _AdminStatPill(
+                child: _DutyPill(
                   label: 'Department',
                   value: dept,
                   icon: Icons.badge_outlined,
@@ -1013,7 +828,7 @@ class _WorkerServiceCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _AdminStatPill(
+                child: _DutyPill(
                   label: 'Verified Proofs',
                   value: '$resolvedCount Completed',
                   icon: Icons.verified_rounded,
@@ -1021,6 +836,63 @@ class _WorkerServiceCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DutyPill extends StatelessWidget {
+  const _DutyPill({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.25 : 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
           ),
         ],
       ),

@@ -263,6 +263,47 @@ class WorkerRepo {
     return WorkerApplication.fromMap(row as Map<String, dynamic>);
   }
 
+  /// Admin approves an application and immediately assigns the user's role & department,
+  /// adding them directly to the active workforce list.
+  static Future<void> approveWorkerWithAssignment({
+    required String applicationId,
+    required String applicantId,
+    required UserRole role,
+    required AdminDepartment department,
+  }) async {
+    // 1. Mark application as APPROVED
+    try {
+      await reviewApplication(applicationId: applicationId, status: 'APPROVED');
+    } catch (_) {
+      // Fallback direct table update
+      await supabase
+          .from('worker_applications')
+          .update({
+            'status': 'APPROVED',
+            'reviewed_by': supabase.auth.currentUser?.id,
+            'reviewed_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', applicationId);
+    }
+
+    // 2. Update user profile to the assigned role and department, clearing resigned_at
+    try {
+      await supabase.from(kTableProfiles).update({
+        'role': role.wire,
+        'department': department.wire,
+        'resigned_at': null,
+        'on_leave': false,
+      }).eq('id', applicantId);
+    } catch (_) {
+      // Try set_user_role RPC if superadmin policy requires RPC
+      await setUserRole(
+        userId: applicantId,
+        role: role,
+        department: department,
+      );
+    }
+  }
+
   /// Admin deletes a community post.
   static Future<void> deleteCommunityPost(String postId) async {
     await supabase.rpc(

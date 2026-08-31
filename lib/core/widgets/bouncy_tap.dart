@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app.dart';
+
 /// Emil Kowalski-inspired physical spring touch wrapper with full accessibility support.
 ///
 /// Gives any interactive widget a tactile scale dip (`0.96`) with subtle
 /// haptic feedback on press down, and snaps back with an organic spring bounce on release.
-/// Automatically respects system & app-level `reduceMotion` preferences and applies button semantics.
+/// Automatically respects system & app-level `removeAnimations` preferences and applies button semantics.
+/// Supports tap debounce via [NivaraA11yData.ignoreRepeatedTaps].
 class BouncyTap extends StatefulWidget {
   const BouncyTap({
     super.key,
@@ -34,10 +37,20 @@ class BouncyTap extends StatefulWidget {
 
 class _BouncyTapState extends State<BouncyTap> {
   bool _pressed = false;
+  DateTime? _lastTapTime;
+
+  bool _shouldDebounce(NivaraA11yData? a11yData) {
+    if (a11yData == null || !a11yData.ignoreRepeatedTaps) return false;
+    if (_lastTapTime == null) return false;
+    final elapsed = DateTime.now().difference(_lastTapTime!);
+    return elapsed < a11yData.ignoreRepeatDuration;
+  }
 
   void _handleTapDown(TapDownDetails _) {
     if (widget.onTap == null && widget.onLongPress == null) return;
-    if (widget.enableHaptics) {
+    final a11yData = NivaraA11yData.maybeOf(context);
+    final haptics = a11yData?.hapticsEnabled ?? false;
+    if (widget.enableHaptics && haptics) {
       HapticFeedback.selectionClick();
     }
     setState(() => _pressed = true);
@@ -55,6 +68,13 @@ class _BouncyTapState extends State<BouncyTap> {
     }
   }
 
+  void _handleTap() {
+    final a11yData = NivaraA11yData.maybeOf(context);
+    if (_shouldDebounce(a11yData)) return;
+    _lastTapTime = DateTime.now();
+    widget.onTap?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
@@ -65,7 +85,7 @@ class _BouncyTapState extends State<BouncyTap> {
       onTapDown: _handleTapDown,
       onTapUp: _handleTapUp,
       onTapCancel: _handleTapCancel,
-      onTap: widget.onTap,
+      onTap: widget.onTap != null ? _handleTap : null,
       onLongPress: widget.onLongPress,
       child: disableAnimations
           ? Opacity(

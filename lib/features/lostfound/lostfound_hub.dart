@@ -203,7 +203,7 @@ class _LostFoundHubState extends State<LostFoundHub> {
         final item = items[i];
         return LFItemCard(
           item: item,
-          onTap: () => context.push(Routes.lostFoundMatch, extra: item),
+          onTap: () => context.push(Routes.lostFoundDetail, extra: item),
         );
       },
     );

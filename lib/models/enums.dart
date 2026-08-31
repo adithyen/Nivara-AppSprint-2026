@@ -346,3 +346,22 @@ enum CommunityPostStatus {
     orElse: () => CommunityPostStatus.open,
   );
 }
+
+// ── Accessibility ───────────────────────────────────────────────────────────
+/// Colour correction modes for colour vision deficiency assistance.
+enum ColorCorrectionMode {
+  none('NONE', 'Off'),
+  deuteranomaly('DEUTERANOMALY', 'Red-green (green weak)'),
+  protanomaly('PROTANOMALY', 'Red-green (red weak)'),
+  tritanomaly('TRITANOMALY', 'Blue-yellow'),
+  greyscale('GREYSCALE', 'Greyscale');
+
+  final String wire;
+  final String label;
+  const ColorCorrectionMode(this.wire, this.label);
+
+  static ColorCorrectionMode fromWire(String? w) => values.firstWhere(
+    (e) => e.wire == w,
+    orElse: () => ColorCorrectionMode.none,
+  );
+}

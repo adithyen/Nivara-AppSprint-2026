@@ -52,7 +52,7 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
       if (ref.read(accessibilityControllerProvider).hapticsEnabled) {
         HapticFeedback.heavyImpact();
       }
-      if (ref.read(accessibilityControllerProvider).screenReaderAnnouncements) {
+      if (ref.read(accessibilityControllerProvider).voiceAlertsEnabled) {
         AccessibleWidgets.announce(
           'Road impact recorded: ${d.type.label}, magnitude ${d.gAboveBaseline.toStringAsFixed(1)} G force.',
         );
@@ -90,7 +90,7 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
     final a11y = ref.read(accessibilityControllerProvider);
     if (svc.isMonitoring) {
       if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
-      if (a11y.screenReaderAnnouncements) {
+      if (a11y.voiceAlertsEnabled) {
         AccessibleWidgets.announce('SensorWatch passive road monitoring paused.');
       }
       await svc.stop();
@@ -103,12 +103,12 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
     setState(() => _busy = false);
     if (result == StartResult.startedWithoutLocation) {
       _snack('Monitoring active without GPS fix — desk testing mode enabled.');
-      if (a11y.screenReaderAnnouncements) {
+      if (a11y.voiceAlertsEnabled) {
         AccessibleWidgets.announce('SensorWatch monitoring active in desk test mode.');
       }
     } else if (result == StartResult.started) {
       _snack('SensorWatch active. All highway & road impacts will be logged.');
-      if (a11y.screenReaderAnnouncements) {
+      if (a11y.voiceAlertsEnabled) {
         AccessibleWidgets.announce('SensorWatch monitoring active for road impacts.');
       }
     }

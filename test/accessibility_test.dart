@@ -9,31 +9,37 @@ void main() {
   group('AccessibilityState', () {
     test('default state has expected initial values', () {
       const state = AccessibilityState();
-      expect(state.reduceMotion, isFalse);
       expect(state.textScaleFactor, 1.0);
       expect(state.highContrast, isFalse);
-      expect(state.colorBlindAssistance, isFalse);
+      expect(state.removeAnimations, isFalse);
+      expect(state.colorCorrectionMode, ColorCorrectionMode.none);
       expect(state.hapticsEnabled, isFalse);
-      expect(state.screenReaderAnnouncements, isFalse);
+      expect(state.ignoreRepeatedTaps, isFalse);
+      expect(state.ignoreRepeatDuration, 0.30);
+      expect(state.voiceAlertsEnabled, isFalse);
     });
 
     test('copyWith updates state immutably', () {
       const state = AccessibilityState();
       final updated = state.copyWith(
-        reduceMotion: true,
         textScaleFactor: 1.3,
         highContrast: true,
-        colorBlindAssistance: true,
-        hapticsEnabled: false,
-        screenReaderAnnouncements: false,
+        removeAnimations: true,
+        colorCorrectionMode: ColorCorrectionMode.deuteranomaly,
+        hapticsEnabled: true,
+        ignoreRepeatedTaps: true,
+        ignoreRepeatDuration: 0.75,
+        voiceAlertsEnabled: true,
       );
 
-      expect(updated.reduceMotion, isTrue);
       expect(updated.textScaleFactor, 1.3);
       expect(updated.highContrast, isTrue);
-      expect(updated.colorBlindAssistance, isTrue);
-      expect(updated.hapticsEnabled, isFalse);
-      expect(updated.screenReaderAnnouncements, isFalse);
+      expect(updated.removeAnimations, isTrue);
+      expect(updated.colorCorrectionMode, ColorCorrectionMode.deuteranomaly);
+      expect(updated.hapticsEnabled, isTrue);
+      expect(updated.ignoreRepeatedTaps, isTrue);
+      expect(updated.ignoreRepeatDuration, 0.75);
+      expect(updated.voiceAlertsEnabled, isTrue);
     });
   });
 
@@ -67,7 +73,11 @@ void main() {
       expect(NivaraStrings.tr('role_admin', AppLanguage.ml), 'നഗരസഭാ ഉദ്യോഗസ്ഥൻ');
 
       expect(NivaraStrings.tr('settings_accessibility', AppLanguage.en), 'Accessibility');
-      expect(NivaraStrings.tr('settings_language', AppLanguage.hi), 'भाषा (Language)');
+      expect(NivaraStrings.tr('settings_accessibility', AppLanguage.hi), 'सुलभता');
+      expect(NivaraStrings.tr('settings_accessibility', AppLanguage.ml), 'പ്രവേശനക്ഷമത');
+      expect(NivaraStrings.tr('a11y_high_contrast', AppLanguage.en), 'High contrast colours');
+      expect(NivaraStrings.tr('a11y_remove_animations', AppLanguage.en), 'Remove animations');
+      expect(NivaraStrings.tr('a11y_ignore_repeated', AppLanguage.en), 'Ignore repeated taps');
     });
 
     test('Indian official languages list contains all 22 Eighth Schedule languages', () {

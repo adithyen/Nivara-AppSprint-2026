@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
+import '../../models/enums.dart';
 import '../../models/user_profile.dart';
 import '../../models/worker_application.dart';
 import '../worker/worker_repo.dart';
@@ -118,9 +120,231 @@ class _ManageWorkersScreenState extends ConsumerState<ManageWorkersScreen>
       _snack(
         status == 'APPROVED' ? 'Application approved.' : 'Application rejected.',
       );
-      await _loadApplications();
+      await Future.wait([_loadApplications(), _loadWorkers()]);
     } catch (e) {
       _snack('Could not update: $e');
+    }
+  }
+
+  Future<void> _approveApplicationWithAssignment(WorkerApplication app) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    UserRole selectedRole = UserRole.worker;
+    AdminDepartment selectedDept = AdminDepartment.roads;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              16,
+              20,
+              MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF10161E) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(
+                color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Approve & Assign Workforce',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Assign role and department to add ${app.applicantName} directly to active workforce.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'ASSIGN ROLE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: BouncyTap(
+                        onTap: () => setModalState(() => selectedRole = UserRole.worker),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: selectedRole == UserRole.worker
+                                ? NivaraColors.primary.withValues(alpha: isDark ? 0.2 : 0.12)
+                                : (isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selectedRole == UserRole.worker
+                                  ? NivaraColors.primary
+                                  : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                              width: selectedRole == UserRole.worker ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Field Worker',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: selectedRole == UserRole.worker
+                                    ? NivaraColors.primary
+                                    : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: BouncyTap(
+                        onTap: () => setModalState(() => selectedRole = UserRole.admin),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: selectedRole == UserRole.admin
+                                ? NivaraColors.accent.withValues(alpha: isDark ? 0.2 : 0.12)
+                                : (isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selectedRole == UserRole.admin
+                                  ? NivaraColors.accent
+                                  : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                              width: selectedRole == UserRole.admin ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Municipal Officer',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: selectedRole == UserRole.admin
+                                    ? NivaraColors.accent
+                                    : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'ASSIGN DEPARTMENT',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: AdminDepartment.values.map((dept) {
+                    final isSel = selectedDept == dept;
+                    return BouncyTap(
+                      onTap: () => setModalState(() => selectedDept = dept),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: isSel
+                              ? const Color(0xFF00B0FF).withValues(alpha: isDark ? 0.22 : 0.14)
+                              : (isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSel
+                                ? const Color(0xFF00B0FF)
+                                : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                            width: isSel ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Text(
+                          dept.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                            color: isSel
+                                ? const Color(0xFF00B0FF)
+                                : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NivaraColors.success,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () => Navigator.pop(sheetCtx, true),
+                    icon: const Icon(Icons.check_circle_rounded, size: 18),
+                    label: const Text(
+                      'Approve & Add to Workforce',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await WorkerRepo.approveWorkerWithAssignment(
+        applicationId: app.id,
+        applicantId: app.applicantId,
+        role: selectedRole,
+        department: selectedDept,
+      );
+      _snack('${app.applicantName} approved and added as ${selectedRole.label} in ${selectedDept.label}.');
+      await Future.wait([_loadApplications(), _loadWorkers()]);
+    } catch (e) {
+      _snack('Approval failed: $e');
     }
   }
 
@@ -204,7 +428,8 @@ class _ManageWorkersScreenState extends ConsumerState<ManageWorkersScreen>
                 loading: _loadingApps,
                 error: _appError,
                 onRefresh: _loadApplications,
-                onReview: _reviewApplication,
+                onApprove: _approveApplicationWithAssignment,
+                onReject: (app) => _reviewApplication(app, 'REJECTED'),
               ),
             ],
           ),
@@ -458,14 +683,16 @@ class _ApplicationList extends StatelessWidget {
     required this.loading,
     required this.error,
     required this.onRefresh,
-    required this.onReview,
+    required this.onApprove,
+    required this.onReject,
   });
 
   final List<WorkerApplication> applications;
   final bool loading;
   final String? error;
   final VoidCallback onRefresh;
-  final void Function(WorkerApplication, String) onReview;
+  final ValueChanged<WorkerApplication> onApprove;
+  final ValueChanged<WorkerApplication> onReject;
 
   @override
   Widget build(BuildContext context) {
@@ -502,12 +729,8 @@ class _ApplicationList extends StatelessWidget {
           final app = applications[i];
           return _ApplicationCard(
             application: app,
-            onApprove: app.isPending
-                ? () => onReview(app, 'APPROVED')
-                : null,
-            onReject: app.isPending
-                ? () => onReview(app, 'REJECTED')
-                : null,
+            onApprove: app.isPending ? () => onApprove(app) : null,
+            onReject: app.isPending ? () => onReject(app) : null,
           );
         },
       ),

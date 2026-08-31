@@ -176,13 +176,13 @@ abstract final class NivaraStrings {
     },
     'settings_accessibility': {
       AppLanguage.en: 'Accessibility',
-      AppLanguage.hi: 'सुलभता एवं सहायक सुविधाएं',
-      AppLanguage.ml: 'സഹായ സൗകര്യങ്ങൾ (Accessibility)',
+      AppLanguage.hi: 'सुलभता',
+      AppLanguage.ml: 'പ്രവേശനക്ഷമത',
     },
     'sub_accessibility': {
-      AppLanguage.en: 'High contrast, reduce motion, text scaling, haptics & CVD support',
-      AppLanguage.hi: 'उच्च कंट्रास्ट, टेक्स्ट स्केलिंग, कंपन एवं CVD सहायता',
-      AppLanguage.ml: 'ഹൈ കോൺട്രാസ്റ്റ്, ടെക്സ്റ്റ് സ്കെയിലിംഗ്, വൈബ്രേഷൻ',
+      AppLanguage.en: 'Text scaling, high contrast, colour correction, remove animations & haptics',
+      AppLanguage.hi: 'टेक्स्ट स्केलिंग, उच्च कंट्रास्ट, रंग सुधार, एनिमेशन एवं कंपन',
+      AppLanguage.ml: 'ടെക്സ്റ്റ് വലുപ്പം, ഹൈ കോൺട്രാസ്റ്റ്, കളർ കറക്ഷൻ, വൈബ്രേഷൻ',
     },
     'settings_language': {
       AppLanguage.en: 'App Language',
@@ -730,6 +730,143 @@ abstract final class NivaraStrings {
       AppLanguage.en: 'Other',
       AppLanguage.hi: 'अन्य',
       AppLanguage.ml: 'മറ്റുള്ളവ',
+    },
+
+    // Accessibility
+    'a11y_vision_title': {
+      AppLanguage.en: 'Vision & Display',
+      AppLanguage.hi: 'दृष्टि एवं प्रदर्शन',
+      AppLanguage.ml: 'കാഴ്ചയും പ്രദർശനവും',
+    },
+    'a11y_vision_sub': {
+      AppLanguage.en: 'Text scaling, high contrast colours, and colour correction',
+      AppLanguage.hi: 'टेक्स्ट स्केलिंग, उच्च कंट्रास्ट रंग एवं रंग सुधार',
+      AppLanguage.ml: 'ടെക്സ്റ്റ് വലുപ്പം, ഉയർന്ന ദൃശ്യതീവ്രത, കളർ കറക്ഷൻ',
+    },
+    'a11y_text_size': {
+      AppLanguage.en: 'Text size',
+      AppLanguage.hi: 'अक्षर आकार',
+      AppLanguage.ml: 'അക്ഷര വലിപ്പം',
+    },
+    'a11y_high_contrast': {
+      AppLanguage.en: 'High contrast colours',
+      AppLanguage.hi: 'उच्च कंट्रास्ट रंग',
+      AppLanguage.ml: 'ഉയർന്ന ദൃശ്യതീവ്രതയുള്ള നിറങ്ങൾ',
+    },
+    'a11y_high_contrast_sub': {
+      AppLanguage.en: 'Enforces solid backgrounds and high-visibility borders for maximum readability',
+      AppLanguage.hi: 'अधिक स्पष्टता के लिए ठोस पृष्ठभूमि और स्पष्ट बॉर्डर लागू करता है',
+      AppLanguage.ml: 'മെച്ചപ്പെട്ട വായനാസുഖത്തിനായി തെളിഞ്ഞ അരികുകളും കട്ടിയുള്ള പശ്ചാത്തലവും നൽകുന്നു',
+    },
+    'a11y_color_correction': {
+      AppLanguage.en: 'Colour correction',
+      AppLanguage.hi: 'रंग सुधार',
+      AppLanguage.ml: 'കളർ കറക്ഷൻ',
+    },
+    'a11y_color_correction_sub': {
+      AppLanguage.en: 'Adjust colours for colour vision deficiency assistance',
+      AppLanguage.hi: 'वर्णान्धता सहायता के लिए रंग समायोजित करें',
+      AppLanguage.ml: 'വർണ്ണാന്ധതയുള്ളവർക്ക് അനുയോജ്യമായ നിറങ്ങൾ ക്രമീകരിക്കുക',
+    },
+    'a11y_color_off': {
+      AppLanguage.en: 'Off',
+      AppLanguage.hi: 'बंद',
+      AppLanguage.ml: 'ഓഫ്',
+    },
+    'a11y_color_deuteranomaly': {
+      AppLanguage.en: 'Red-green (green weak)',
+      AppLanguage.hi: 'लाल-हरा (हरा कमजोर)',
+      AppLanguage.ml: 'ചുവപ്പ്-പച്ച (പച്ച കുറവ്)',
+    },
+    'a11y_color_protanomaly': {
+      AppLanguage.en: 'Red-green (red weak)',
+      AppLanguage.hi: 'लाल-हरा (लाल कमजोर)',
+      AppLanguage.ml: 'ചുവപ്പ്-പച്ച (ചുവപ്പ് കുറവ്)',
+    },
+    'a11y_color_tritanomaly': {
+      AppLanguage.en: 'Blue-yellow (tritanomaly)',
+      AppLanguage.hi: 'नीला-पीला (ट्राइटनॉमली)',
+      AppLanguage.ml: 'നീല-മഞ്ഞ (ട്രിറ്റനോമലി)',
+    },
+    'a11y_color_greyscale': {
+      AppLanguage.en: 'Greyscale',
+      AppLanguage.hi: 'ग्रेस्केल',
+      AppLanguage.ml: 'ഗ്രേസ്കെയിൽ',
+    },
+    'a11y_motion_title': {
+      AppLanguage.en: 'Motion & Animations',
+      AppLanguage.hi: 'गति एवं एनिमेशन',
+      AppLanguage.ml: 'ചലനവും ആനിമേഷനുകളും',
+    },
+    'a11y_motion_sub': {
+      AppLanguage.en: 'Control dynamic transforms and spring physics',
+      AppLanguage.hi: 'डायनामिक ट्रांसफॉर्म और स्प्रिंग फिजिक्स नियंत्रित करें',
+      AppLanguage.ml: 'ആനിമേഷനുകളും സ്പ്രിംഗ് ഇഫക്റ്റുകളും നിയന്ത്രിക്കുക',
+    },
+    'a11y_remove_animations': {
+      AppLanguage.en: 'Remove animations',
+      AppLanguage.hi: 'एनिमेशन हटाएं',
+      AppLanguage.ml: 'ആനിമേഷനുകൾ ഒഴിവാക്കുക',
+    },
+    'a11y_remove_animations_sub': {
+      AppLanguage.en: 'Remove user interface animations and transitions',
+      AppLanguage.hi: 'यूज़र इंटरफ़ेस एनिमेशन और ट्रांज़िशन हटाएं',
+      AppLanguage.ml: 'യൂസർ ഇന്റർഫേസ് ആനിമേഷനുകൾ പൂർണ്ണമായി ഒഴിവാക്കുക',
+    },
+    'a11y_interaction_title': {
+      AppLanguage.en: 'Interaction & Touch',
+      AppLanguage.hi: 'संवाद एवं स्पर्श',
+      AppLanguage.ml: 'ടച്ച് ക്രമീകരണങ്ങൾ',
+    },
+    'a11y_interaction_sub': {
+      AppLanguage.en: 'Haptic feedback and tap debounce timings',
+      AppLanguage.hi: 'हैप्टिक फीडबैक एवं टैप टाइमिंग',
+      AppLanguage.ml: 'ഹാപ്റ്റിക് ഫീഡ്‌ബാക്കും ടച്ച് സമയക്രമീകരണങ്ങളും',
+    },
+    'a11y_haptics': {
+      AppLanguage.en: 'Haptic feedback',
+      AppLanguage.hi: 'हैप्टिक फीडबैक',
+      AppLanguage.ml: 'ഹാപ്റ്റിക് ഫീഡ്‌ബാക്ക്',
+    },
+    'a11y_haptics_sub': {
+      AppLanguage.en: 'Vibrate on button presses, navigation, and impact detections',
+      AppLanguage.hi: 'बटन दबाने, नेविगेशन और प्रभाव पहचान पर कंपन करें',
+      AppLanguage.ml: 'ബട്ടൺ അമർത്തുമ്പോഴും വഴികാട്ടുമ്പോഴും വൈബ്രേഷൻ നൽകുക',
+    },
+    'a11y_ignore_repeated': {
+      AppLanguage.en: 'Ignore repeated taps',
+      AppLanguage.hi: 'बार-बार टैप अनदेखा करें',
+      AppLanguage.ml: 'ആവർത്തിച്ചുള്ള ടച്ചുകൾ അവഗണിക്കുക',
+    },
+    'a11y_ignore_repeated_sub': {
+      AppLanguage.en: 'Treat multiple rapid taps as a single tap to prevent accidental triggers',
+      AppLanguage.hi: 'गलती से होने वाले टैप से बचने के लिए लगातार कई टैप को एक मानें',
+      AppLanguage.ml: 'വേഗത്തിൽ ഒന്നിലധികം തവണ അമർത്തുന്നത് ഒറ്റ ടച്ചായി കണക്കാക്കുക',
+    },
+    'a11y_tap_duration': {
+      AppLanguage.en: 'Tap debounce duration',
+      AppLanguage.hi: 'टैप अंतराल अवधि',
+      AppLanguage.ml: 'ടച്ച് കാലതാമസ സമയം',
+    },
+    'a11y_voice_title': {
+      AppLanguage.en: 'Voice Alerts',
+      AppLanguage.hi: 'ध्वनि सूचनाएं',
+      AppLanguage.ml: 'വോയ്സ് അലേർട്ടുകൾ',
+    },
+    'a11y_voice_sub': {
+      AppLanguage.en: 'Internal speech alerts via device speaker',
+      AppLanguage.hi: 'डिवाइस स्पीकर के माध्यम से आंतरिक ध्वनि सूचनाएं',
+      AppLanguage.ml: 'ഫോൺ സ്പീക്കറിലൂടെയുള്ള ശബ്ദ അറിയിപ്പുകൾ',
+    },
+    'a11y_voice_alerts': {
+      AppLanguage.en: 'Speak alerts',
+      AppLanguage.hi: 'अलर्ट बोलें',
+      AppLanguage.ml: 'ശബ്ദത്തിൽ അറിയിക്കുക',
+    },
+    'a11y_voice_alerts_sub': {
+      AppLanguage.en: 'Announce road events and status updates through device speaker',
+      AppLanguage.hi: 'डिवाइस स्पीकर के माध्यम से सड़क की घटनाओं और स्थिति अपडेट की घोषणा करें',
+      AppLanguage.ml: 'റോഡ് വിവരങ്ങളും സ്റ്റാറ്റസ് മാറ്റങ്ങളും സ്പീക്കറിലൂടെ വിളിച്ചുപറയുക',
     },
   };
 

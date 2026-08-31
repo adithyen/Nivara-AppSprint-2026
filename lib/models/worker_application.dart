@@ -25,6 +25,8 @@ class WorkerApplication {
   bool get isPending => status == 'PENDING';
   bool get isApproved => status == 'APPROVED';
   bool get isRejected => status == 'REJECTED';
+  String get applicantId => userId;
+  String get applicantName => 'Applicant';
 
   factory WorkerApplication.fromMap(Map<String, dynamic> map) =>
       WorkerApplication(

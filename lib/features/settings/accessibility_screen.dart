@@ -4,13 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/accessible_widgets.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import 'accessibility_controller.dart';
 import 'language_controller.dart';
 
-/// Dedicated 2026-Level Accessibility Configuration Hub with live interactive previews.
+/// Dedicated Accessibility Configuration Hub.
+/// Provides global controls for vision, colour correction, animation removal,
+/// haptic feedback, tap debounce, and spoken alerts across the entire application.
 class AccessibilityScreen extends ConsumerWidget {
   const AccessibilityScreen({super.key});
 
@@ -22,6 +23,7 @@ class AccessibilityScreen extends ConsumerWidget {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
+
     final cardBg = a11y.highContrast
         ? (isDark ? Colors.black : Colors.white)
         : (isDark ? const Color(0xFF10161E) : Colors.white);
@@ -38,12 +40,12 @@ class AccessibilityScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
         children: [
-          // ── SECTION 1: VISION & TYPOGRAPHY ──────────────────────────────
+          // ── SECTION 1: VISION & DISPLAY ──────────────────────────────────
           _SectionHeader(
-            icon: Icons.text_fields_rounded,
+            icon: Icons.visibility_rounded,
             color: const Color(0xFF00B0FF),
-            title: 'Vision & Typography',
-            subtitle: 'Dynamic text scaling, contrast, and color blindness assistance',
+            title: NivaraStrings.tr('a11y_vision_title', currentLang),
+            subtitle: NivaraStrings.tr('a11y_vision_sub', currentLang),
           ),
           const SizedBox(height: 12),
           Container(
@@ -51,7 +53,10 @@ class AccessibilityScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: a11y.highContrast ? 2.5 : 1.0),
+              border: Border.all(
+                color: borderColor,
+                width: a11y.highContrast ? 2.5 : 1.0,
+              ),
               boxShadow: a11y.highContrast
                   ? null
                   : [
@@ -65,15 +70,19 @@ class AccessibilityScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Text scaling
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      NivaraStrings.tr('a11y_text_scale', currentLang),
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                      NivaraStrings.tr('a11y_text_size', currentLang),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: primary.withValues(alpha: isDark ? 0.2 : 0.12),
                         borderRadius: BorderRadius.circular(10),
@@ -83,34 +92,36 @@ class AccessibilityScreen extends ConsumerWidget {
                         style: TextStyle(
                           color: primary,
                           fontWeight: FontWeight.w800,
-                          fontSize: 11.5,
+                          fontSize: 12,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     for (final scale in [1.0, 1.15, 1.30, 1.50]) ...[
                       Expanded(
                         child: BouncyTap(
                           onTap: () {
-                            if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
+                            if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
                             a11yCtrl.setTextScaleFactor(scale);
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: a11y.textScaleFactor == scale
                                   ? primary.withValues(alpha: isDark ? 0.22 : 0.15)
-                                  : (isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9)),
-                              borderRadius: BorderRadius.circular(10),
+                                  : (isDark
+                                      ? const Color(0xFF141C26)
+                                      : const Color(0xFFF1F5F9)),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: a11y.textScaleFactor == scale
                                     ? primary
                                     : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-                                width: a11y.textScaleFactor == scale ? 1.5 : 1.0,
+                                width: a11y.textScaleFactor == scale ? 2.0 : 1.0,
                               ),
                             ),
                             child: Text(
@@ -128,7 +139,7 @@ class AccessibilityScreen extends ConsumerWidget {
                                 fontWeight: a11y.textScaleFactor == scale
                                     ? FontWeight.w800
                                     : FontWeight.w600,
-                                fontSize: 11,
+                                fontSize: 11.5,
                                 height: 1.2,
                               ),
                             ),
@@ -141,158 +152,83 @@ class AccessibilityScreen extends ConsumerWidget {
                 ),
                 const Divider(height: 28),
 
-                // High Contrast Switch
+                // High Contrast Colours Switch
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: a11y.highContrast,
                   onChanged: (v) {
-                    if (a11y.hapticsEnabled) {
-                      HapticFeedback.vibrate();
-                      HapticFeedback.heavyImpact();
-                    }
+                    if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
                     a11yCtrl.setHighContrast(v);
                   },
                   title: Text(
                     NivaraStrings.tr('a11y_high_contrast', currentLang),
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
-                  subtitle: Text(
-                    'Enforces solid opaque backgrounds, 2.5px solid neon borders, and 7:1 AAA contrast for maximum readability.',
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                      fontSize: 11.5,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-
-                // High Contrast Live Visual Box
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(top: 8, bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: a11y.highContrast
-                        ? (isDark ? Colors.black : Colors.white)
-                        : (isDark ? const Color(0xFF0C131D) : const Color(0xFFF8FAFC)),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: a11y.highContrast
-                          ? primary
-                          : (isDark ? Colors.white12 : const Color(0xFFCBD5E1)),
-                      width: a11y.highContrast ? 2.5 : 1.0,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        a11y.highContrast ? Icons.contrast_rounded : Icons.palette_outlined,
-                        color: primary,
-                        size: 24,
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      NivaraStrings.tr('a11y_high_contrast_sub', currentLang),
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                        fontSize: 12,
+                        height: 1.3,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              a11y.highContrast
-                                  ? 'High Contrast 7:1 AAA Mode: ACTIVE'
-                                  : 'High Contrast Mode: Standard',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
-                                color: a11y.highContrast ? primary : (isDark ? Colors.white : Colors.black),
-                              ),
-                            ),
-                            Text(
-                              a11y.highContrast
-                                  ? 'Cards & buttons use 100% solid surfaces and high-visibility borders.'
-                                  : 'Standard cyber-civic frosted glass and subtle alpha borders.',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? Colors.white70 : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Divider(height: 20),
-
-                // Color Blindness Assistance Switch
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: a11y.colorBlindAssistance,
-                  onChanged: (v) {
-                    if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
-                    a11yCtrl.setColorBlindAssistance(v);
-                  },
-                  title: Text(
-                    NivaraStrings.tr('a11y_color_blind', currentLang),
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-                  ),
-                  subtitle: Text(
-                    'Adds geometric shape cues alongside color badges to distinguish statuses without color perception.',
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                      fontSize: 11.5,
-                      height: 1.3,
                     ),
                   ),
                 ),
+                const Divider(height: 28),
 
-                // CVD Live Shape Samples
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                // Colour Correction
+                Row(
                   children: [
-                    _SeveritySampleChip(
-                      severity: Severity.emergency,
-                      label: 'Emergency',
-                      color: NivaraColors.danger,
-                      showShape: a11y.colorBlindAssistance,
-                      isDark: isDark,
-                    ),
-                    _SeveritySampleChip(
-                      severity: Severity.high,
-                      label: 'High',
-                      color: NivaraColors.warning,
-                      showShape: a11y.colorBlindAssistance,
-                      isDark: isDark,
-                    ),
-                    _SeveritySampleChip(
-                      severity: Severity.medium,
-                      label: 'Medium',
-                      color: NivaraColors.accent,
-                      showShape: a11y.colorBlindAssistance,
-                      isDark: isDark,
-                    ),
-                    _SeveritySampleChip(
-                      severity: Severity.low,
-                      label: 'Low',
-                      color: NivaraColors.primary,
-                      showShape: a11y.colorBlindAssistance,
-                      isDark: isDark,
+                    Icon(Icons.palette_outlined, size: 20, color: primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      NivaraStrings.tr('a11y_color_correction', currentLang),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                     ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  NivaraStrings.tr('a11y_color_correction_sub', currentLang),
+                  style: TextStyle(
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Spectrum color bar preview
+                _ColorSpectrumPreview(isDark: isDark),
+                const SizedBox(height: 12),
+
+                // Mode radio options
+                for (final mode in ColorCorrectionMode.values)
+                  _CorrectionRadioOption(
+                    mode: mode,
+                    selected: a11y.colorCorrectionMode == mode,
+                    currentLang: currentLang,
+                    isDark: isDark,
+                    primary: primary,
+                    onTap: () {
+                      if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
+                      a11yCtrl.setColorCorrectionMode(mode);
+                    },
+                  ),
               ],
             ),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           // ── SECTION 2: MOTION & ANIMATIONS ──────────────────────────────
           _SectionHeader(
             icon: Icons.motion_photos_off_rounded,
             color: const Color(0xFFFFB300),
-            title: 'Motion & Animations',
-            subtitle: 'Vestibular comfort and dynamic transform controls',
+            title: NivaraStrings.tr('a11y_motion_title', currentLang),
+            subtitle: NivaraStrings.tr('a11y_motion_sub', currentLang),
           ),
           const SizedBox(height: 12),
           Container(
@@ -300,7 +236,10 @@ class AccessibilityScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: a11y.highContrast ? 2.5 : 1.0),
+              border: Border.all(
+                color: borderColor,
+                width: a11y.highContrast ? 2.5 : 1.0,
+              ),
               boxShadow: a11y.highContrast
                   ? null
                   : [
@@ -311,99 +250,39 @@ class AccessibilityScreen extends ConsumerWidget {
                       ),
                     ],
             ),
-            child: Column(
-              children: [
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: a11y.reduceMotion,
-                  onChanged: (v) {
-                    if (a11y.hapticsEnabled) {
-                      HapticFeedback.vibrate();
-                      HapticFeedback.selectionClick();
-                    }
-                    a11yCtrl.setReduceMotion(v);
-                  },
-                  title: Text(
-                    NivaraStrings.tr('a11y_reduce_motion', currentLang),
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-                  ),
-                  subtitle: Text(
-                    'Disables spring bounces, continuous radar pulses, and moving transforms for vestibular comfort.',
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                      fontSize: 11.5,
-                      height: 1.3,
-                    ),
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: a11y.removeAnimations,
+              onChanged: (v) {
+                if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
+                a11yCtrl.setRemoveAnimations(v);
+              },
+              title: Text(
+                NivaraStrings.tr('a11y_remove_animations', currentLang),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  NivaraStrings.tr('a11y_remove_animations_sub', currentLang),
+                  style: TextStyle(
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                    fontSize: 12,
+                    height: 1.3,
                   ),
                 ),
-                const SizedBox(height: 12),
-
-                // Live Dynamic Motion Visualizer
-                _LiveMotionPreview(reduceMotion: a11y.reduceMotion, isDark: isDark, primary: primary),
-                const SizedBox(height: 12),
-
-                // Interactive Motion Tester Button
-                BouncyTap(
-                  onTap: () {
-                    if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        SnackBar(
-                          duration: const Duration(seconds: 1),
-                          content: Text(
-                            a11y.reduceMotion
-                                ? 'Reduce Motion is ON: Touch uses flat static opacity.'
-                                : 'Reduce Motion is OFF: Touch uses dynamic physical spring bounce.',
-                          ),
-                        ),
-                      );
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isDark ? Colors.white12 : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          a11y.reduceMotion ? Icons.touch_app_outlined : Icons.animation_rounded,
-                          size: 18,
-                          color: primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          a11y.reduceMotion
-                              ? 'Tap to Test Instant Touch (Static)'
-                              : 'Tap to Test Spring Bounce (Dynamic)',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-          // ── SECTION 3: TACTILE HAPTICS & SCREEN READERS ─────────────────
+          // ── SECTION 3: INTERACTION & TOUCH ──────────────────────────────
           _SectionHeader(
-            icon: Icons.vibration_rounded,
+            icon: Icons.touch_app_rounded,
             color: const Color(0xFF00E676),
-            title: 'Tactile & Assistive Feedback',
-            subtitle: 'Physical vibration haptics and TalkBack voice feedback',
+            title: NivaraStrings.tr('a11y_interaction_title', currentLang),
+            subtitle: NivaraStrings.tr('a11y_interaction_sub', currentLang),
           ),
           const SizedBox(height: 12),
           Container(
@@ -411,7 +290,10 @@ class AccessibilityScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: a11y.highContrast ? 2.5 : 1.0),
+              border: Border.all(
+                color: borderColor,
+                width: a11y.highContrast ? 2.5 : 1.0,
+              ),
               boxShadow: a11y.highContrast
                   ? null
                   : [
@@ -425,245 +307,243 @@ class AccessibilityScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Single Haptic Feedback Toggle
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: a11y.hapticsEnabled,
                   onChanged: (v) {
                     a11yCtrl.setHapticsEnabled(v);
-                    if (v) {
-                      HapticFeedback.vibrate();
-                      HapticFeedback.heavyImpact();
-                    }
                   },
                   title: Text(
                     NivaraStrings.tr('a11y_haptics', currentLang),
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
-                  subtitle: Text(
-                    'Emits physical vibrator motor pulses on pothole impacts, navigation tabs, and button taps.',
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                      fontSize: 11.5,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 3 Distinct Haptic Intensity Test Buttons
-                Text(
-                  'TEST PHYSICAL VIBRATION PROFILES',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: BouncyTap(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              const SnackBar(
-                                duration: Duration(milliseconds: 900),
-                                content: Text('Light Click triggered.'),
-                              ),
-                            );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark ? Colors.white12 : const Color(0xFFCBD5E1),
-                            ),
-                          ),
-                          child: const Column(
-                            children: [
-                              Icon(Icons.touch_app_rounded, size: 18, color: NivaraColors.primaryBlue),
-                              SizedBox(height: 4),
-                              Text('Light Click', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                            ],
-                          ),
-                        ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      NivaraStrings.tr('a11y_haptics_sub', currentLang),
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                        fontSize: 12,
+                        height: 1.3,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: BouncyTap(
-                        onTap: () {
-                          HapticFeedback.mediumImpact();
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              const SnackBar(
-                                duration: Duration(milliseconds: 900),
-                                content: Text('Medium Pulse triggered.'),
-                              ),
-                            );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark ? Colors.white12 : const Color(0xFFCBD5E1),
-                            ),
-                          ),
-                          child: const Column(
-                            children: [
-                              Icon(Icons.vibration_rounded, size: 18, color: NivaraColors.accent),
-                              SizedBox(height: 4),
-                              Text('Medium Pulse', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: BouncyTap(
-                        onTap: () {
-                          HapticFeedback.vibrate();
-                          HapticFeedback.heavyImpact();
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              const SnackBar(
-                                duration: Duration(milliseconds: 900),
-                                content: Text('Heavy Vibration Motor Buzz triggered!'),
-                              ),
-                            );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark ? Colors.white12 : const Color(0xFFCBD5E1),
-                            ),
-                          ),
-                          child: const Column(
-                            children: [
-                              Icon(Icons.bolt_rounded, size: 18, color: NivaraColors.danger),
-                              SizedBox(height: 4),
-                              Text('Heavy Buzz', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+                const Divider(height: 28),
 
-                const Divider(height: 24),
-
+                // Ignore Repeated Taps Switch
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
-                  value: a11y.screenReaderAnnouncements,
+                  value: a11y.ignoreRepeatedTaps,
                   onChanged: (v) {
-                    if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
-                    a11yCtrl.setScreenReaderAnnouncements(v);
+                    if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
+                    a11yCtrl.setIgnoreRepeatedTaps(v);
                   },
                   title: Text(
-                    NivaraStrings.tr('a11y_voice_alerts', currentLang),
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    NivaraStrings.tr('a11y_ignore_repeated', currentLang),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
-                  subtitle: Text(
-                    'Announces background road events and status updates to Android TalkBack & iOS VoiceOver screen readers.',
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                      fontSize: 11.5,
-                      height: 1.3,
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      NivaraStrings.tr('a11y_ignore_repeated_sub', currentLang),
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
 
-                // Live Screen Reader Announcement Test Trigger
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      AccessibleWidgets.announce('Nivara civic accessibility speech channel is active.');
-                      if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Spoken alert dispatched to Android TalkBack / iOS VoiceOver.',
+                // Duration Stepper (only shown when Ignore Repeated Taps is ON)
+                if (a11y.ignoreRepeatedTaps) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              NivaraStrings.tr('a11y_tap_duration', currentLang),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primary.withValues(alpha: isDark ? 0.2 : 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${a11y.ignoreRepeatDuration.toStringAsFixed(2)}s',
+                                style: TextStyle(
+                                  color: primary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            // Decrement Button
+                            Expanded(
+                              child: BouncyTap(
+                                onTap: a11y.ignoreRepeatDuration > 0.10
+                                    ? () {
+                                        if (a11y.hapticsEnabled) {
+                                          HapticFeedback.selectionClick();
+                                        }
+                                        final next = a11y.ignoreRepeatDuration - 0.05;
+                                        a11yCtrl.setIgnoreRepeatDuration(next);
+                                      }
+                                    : null,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: a11y.ignoreRepeatDuration > 0.10
+                                        ? (isDark
+                                            ? const Color(0xFF1E293B)
+                                            : const Color(0xFFE2E8F0))
+                                        : (isDark
+                                            ? Colors.white.withValues(alpha: 0.04)
+                                            : const Color(0xFFF1F5F9)),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.remove_rounded,
+                                    size: 20,
+                                    color: a11y.ignoreRepeatDuration > 0.10
+                                        ? (isDark ? Colors.white : Colors.black87)
+                                        : (isDark ? Colors.white24 : Colors.black26),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Increment Button
+                            Expanded(
+                              child: BouncyTap(
+                                onTap: a11y.ignoreRepeatDuration < 4.00
+                                    ? () {
+                                        if (a11y.hapticsEnabled) {
+                                          HapticFeedback.selectionClick();
+                                        }
+                                        final next = a11y.ignoreRepeatDuration + 0.05;
+                                        a11yCtrl.setIgnoreRepeatDuration(next);
+                                      }
+                                    : null,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: a11y.ignoreRepeatDuration < 4.00
+                                        ? (isDark
+                                            ? const Color(0xFF1E293B)
+                                            : const Color(0xFFE2E8F0))
+                                        : (isDark
+                                            ? Colors.white.withValues(alpha: 0.04)
+                                            : const Color(0xFFF1F5F9)),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.add_rounded,
+                                    size: 20,
+                                    color: a11y.ignoreRepeatDuration < 4.00
+                                        ? (isDark ? Colors.white : Colors.black87)
+                                        : (isDark ? Colors.white24 : Colors.black26),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Range: 0.10s – 4.00s (0.05s increments)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
                           ),
-                        );
-                    },
-                    icon: const Icon(Icons.record_voice_over_rounded, size: 18),
-                    label: const Text('Test Screen Reader Voice Dispatch'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
 
-class _SeveritySampleChip extends StatelessWidget {
-  const _SeveritySampleChip({
-    required this.severity,
-    required this.label,
-    required this.color,
-    required this.showShape,
-    required this.isDark,
-  });
+          const SizedBox(height: 24),
 
-  final Severity severity;
-  final String label;
-  final Color color;
-  final bool showShape;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final symbol = AccessibleWidgets.severitySymbol(severity);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.2 : 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showShape) ...[
-            Text(
-              symbol,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
+          // ── SECTION 4: VOICE ALERTS ─────────────────────────────────────
+          _SectionHeader(
+            icon: Icons.record_voice_over_rounded,
+            color: const Color(0xFFFF5252),
+            title: NivaraStrings.tr('a11y_voice_title', currentLang),
+            subtitle: NivaraStrings.tr('a11y_voice_sub', currentLang),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: borderColor,
+                width: a11y.highContrast ? 2.5 : 1.0,
               ),
+              boxShadow: a11y.highContrast
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
-            const SizedBox(width: 5),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: a11y.voiceAlertsEnabled,
+              onChanged: (v) {
+                if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
+                a11yCtrl.setVoiceAlertsEnabled(v);
+              },
+              title: Text(
+                NivaraStrings.tr('a11y_voice_alerts', currentLang),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  NivaraStrings.tr('a11y_voice_alerts_sub', currentLang),
+                  style: TextStyle(
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -671,6 +551,8 @@ class _SeveritySampleChip extends StatelessWidget {
     );
   }
 }
+
+// ── SUBWIDGETS ──────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
@@ -689,11 +571,12 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: isDark ? 0.2 : 0.12),
+            color: color.withValues(alpha: isDark ? 0.18 : 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 20),
@@ -705,17 +588,18 @@ class _SectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: TextStyle(
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  fontWeight: FontWeight.w800,
+                style: const TextStyle(
                   fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
                   fontSize: 11.5,
+                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
                 ),
               ),
             ],
@@ -726,127 +610,112 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _LiveMotionPreview extends StatefulWidget {
-  const _LiveMotionPreview({
-    required this.reduceMotion,
-    required this.isDark,
-    required this.primary,
-  });
+class _ColorSpectrumPreview extends StatelessWidget {
+  const _ColorSpectrumPreview({required this.isDark});
 
-  final bool reduceMotion;
   final bool isDark;
-  final Color primary;
 
-  @override
-  State<_LiveMotionPreview> createState() => _LiveMotionPreviewState();
-}
-
-class _LiveMotionPreviewState extends State<_LiveMotionPreview>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    );
-    if (!widget.reduceMotion) _ctrl.repeat(reverse: true);
-  }
-
-  @override
-  void didUpdateWidget(covariant _LiveMotionPreview oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.reduceMotion != oldWidget.reduceMotion) {
-      if (widget.reduceMotion) {
-        _ctrl.stop();
-        _ctrl.value = 0.5;
-      } else {
-        _ctrl.repeat(reverse: true);
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  static const List<Color> _spectrum = [
+    Color(0xFFE53935), // Red
+    Color(0xFFFB8C00), // Orange
+    Color(0xFFFDD835), // Yellow
+    Color(0xFF43A047), // Green
+    Color(0xFF00ACC1), // Cyan
+    Color(0xFF1E88E5), // Blue
+    Color(0xFF8E24AA), // Purple
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      height: 28,
       decoration: BoxDecoration(
-        color: widget.isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: widget.isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(
-                widget.reduceMotion ? Icons.pause_circle_rounded : Icons.motion_photos_on_rounded,
-                size: 16,
-                color: widget.reduceMotion ? Colors.grey : widget.primary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                widget.reduceMotion
-                    ? 'Motion Preview: FROZEN (Reduced Motion Active)'
-                    : 'Motion Preview: ANIMATING (Full Motion Active)',
+          for (final color in _spectrum)
+            Expanded(
+              child: Container(color: color),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CorrectionRadioOption extends StatelessWidget {
+  const _CorrectionRadioOption({
+    required this.mode,
+    required this.selected,
+    required this.currentLang,
+    required this.isDark,
+    required this.primary,
+    required this.onTap,
+  });
+
+  final ColorCorrectionMode mode;
+  final bool selected;
+  final AppLanguage currentLang;
+  final bool isDark;
+  final Color primary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleKey = switch (mode) {
+      ColorCorrectionMode.none => 'a11y_color_off',
+      ColorCorrectionMode.deuteranomaly => 'a11y_color_deuteranomaly',
+      ColorCorrectionMode.protanomaly => 'a11y_color_protanomaly',
+      ColorCorrectionMode.tritanomaly => 'a11y_color_tritanomaly',
+      ColorCorrectionMode.greyscale => 'a11y_color_greyscale',
+    };
+
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? primary.withValues(alpha: isDark ? 0.16 : 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? primary
+                : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9)),
+            width: selected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 18,
+              color: selected
+                  ? primary
+                  : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                NivaraStrings.tr(titleKey, currentLang),
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: widget.reduceMotion ? Colors.grey : widget.primary,
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? (isDark ? Colors.white : Colors.black87)
+                      : (isDark ? Colors.white70 : const Color(0xFF475569)),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          AnimatedBuilder(
-            animation: _ctrl,
-            builder: (context, _) {
-              final pos = widget.reduceMotion ? 0.5 : _ctrl.value;
-              return Stack(
-                children: [
-                  Container(
-                    height: 8,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: widget.isDark ? Colors.white10 : Colors.black12,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment(pos * 2 - 1, 0),
-                    child: Container(
-                      width: 24,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: widget.reduceMotion ? Colors.grey : widget.primary,
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: widget.reduceMotion
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: widget.primary.withValues(alpha: 0.5),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Camera for QR code scanning in Lost & Found handover verification -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Best-effort public Download/ access for the on-device debug log on
          Android ≤10. On 11+ the logger falls back to the app external-files
          dir (no permission needed) and shows the resolved path on-screen. -->

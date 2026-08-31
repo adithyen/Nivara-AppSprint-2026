@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
@@ -13,11 +14,17 @@ import 'lf_claims_repo.dart';
 
 /// 2026-Level Lost & Found Physical Handover Verification Dialog.
 ///
-/// Dual-Mode verification:
-/// 1. Dynamic Encrypted QR Code Pass with cyber-civic reticle and live session timer.
-/// 2. 6-Digit Proximity Handshake PIN with 1-tap near-device verification.
+/// **Asymmetric roles** — each party sees exactly one side of the handover:
 ///
-/// Listens to real-time status updates and provides celebratory feedback upon verification.
+/// • **Claimant (finder, `isOwner = false`)**: Generates a dynamic OTP + QR pass
+///   to display to the owner. Role title: "Show Your Handover Pass".
+///
+/// • **Owner (lost poster, `isOwner = true`)**: Sees a camera QR scanner and a
+///   manual PIN entry field to verify the claimant's pass. Role title: "Verify
+///   Handover Pass".
+///
+/// Listens to real-time status updates and shows a celebratory view upon verified
+/// completion on both sides.
 class LFHandoverDialog extends StatefulWidget {
   const LFHandoverDialog({
     super.key,
@@ -28,6 +35,9 @@ class LFHandoverDialog extends StatefulWidget {
 
   final LFClaim claim;
   final LFItem item;
+
+  /// True when the current user is the listing owner (lost poster).
+  /// They verify/scan — they do NOT generate the pass.
   final bool isOwner;
 
   static Future<bool?> show(
@@ -57,33 +67,38 @@ class LFHandoverDialog extends StatefulWidget {
   State<LFHandoverDialog> createState() => _LFHandoverDialogState();
 }
 
-class _LFHandoverDialogState extends State<LFHandoverDialog>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _LFHandoverDialogState extends State<LFHandoverDialog> {
   StreamSubscription<LFClaim?>? _claimSub;
 
   bool _loading = true;
   bool _verifying = false;
   bool _completed = false;
-  String? _otp;
+  bool _scanning = false; // owner's camera scanner active
+  String? _otp; // claimant's generated OTP
   String? _token;
   String? _error;
 
   final TextEditingController _pinController = TextEditingController();
+  MobileScannerController? _scannerController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _initPass();
     _listenRealtime();
+    if (!widget.isOwner) {
+      // Claimant generates the pass
+      _initPass();
+    } else {
+      // Owner does not generate; just wait in verify mode
+      setState(() => _loading = false);
+    }
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _claimSub?.cancel();
     _pinController.dispose();
+    _scannerController?.dispose();
     super.dispose();
   }
 
@@ -94,7 +109,9 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
         setState(() {
           _completed = true;
           _verifying = false;
+          _scanning = false;
         });
+        _scannerController?.stop();
       }
     });
   }
@@ -128,6 +145,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
       _error = null;
     });
     HapticFeedback.mediumImpact();
+    _scannerController?.stop();
     try {
       await LFClaimsRepo.verifyHandover(
         claimId: widget.claim.id,
@@ -138,6 +156,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
       setState(() {
         _completed = true;
         _verifying = false;
+        _scanning = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -146,6 +165,40 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
         _verifying = false;
       });
       HapticFeedback.vibrate();
+      // Re-start scanner if it was active
+      if (_scanning) _scannerController?.start();
+    }
+  }
+
+  void _startScanner() {
+    _scannerController ??= MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
+    setState(() => _scanning = true);
+  }
+
+  void _stopScanner() {
+    _scannerController?.stop();
+    setState(() => _scanning = false);
+  }
+
+  void _onQrDetected(BarcodeCapture capture) {
+    if (_verifying) return;
+    final raw = capture.barcodes.firstOrNull?.rawValue;
+    if (raw == null) return;
+    try {
+      final payload = jsonDecode(raw) as Map<String, dynamic>;
+      if (payload['type'] == 'NIVARA_LF_HANDOVER') {
+        final otp = payload['otp'] as String?;
+        if (otp != null && otp.length == 6) {
+          _pinController.text = otp;
+          _verifyOtp(otp);
+        }
+      }
+    } catch (_) {
+      // Not a valid Nivara QR — ignore
     }
   }
 
@@ -172,7 +225,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header
+              // ── Header ──────────────────────────────────────────────────
               Row(
                 children: [
                   Container(
@@ -181,9 +234,11 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
                       color: const Color(0xFF00E676).withValues(alpha: 0.16),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.verified_user_rounded,
-                      color: Color(0xFF00E676),
+                    child: Icon(
+                      widget.isOwner
+                          ? Icons.qr_code_scanner_rounded
+                          : Icons.verified_user_rounded,
+                      color: const Color(0xFF00E676),
                       size: 22,
                     ),
                   ),
@@ -193,7 +248,9 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Item Handover Verification',
+                          widget.isOwner
+                              ? 'Verify Handover Pass'
+                              : 'Your Handover Pass',
                           style: TextStyle(
                             color: primaryText,
                             fontSize: 18,
@@ -204,10 +261,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
                           '${widget.item.isLost ? "Lost" : "Found"}: ${widget.item.title}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: secondaryText,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: secondaryText, fontSize: 12),
                         ),
                       ],
                     ),
@@ -220,40 +274,15 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
               ),
               const SizedBox(height: 12),
 
-              // Chalo-Style Dynamic Anti-Screenshot Live Security Ribbon
+              // ── Security Ribbon ─────────────────────────────────────────
               _ChaloSecurityRibbon(isDark: isDark),
-              const SizedBox(height: 14),
-
-              // Tab Bar (Show Pass / Verify Code)
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF141C26) : const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                padding: const EdgeInsets.all(4),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  labelColor: isDark ? Colors.white : const Color(0xFF0F172A),
-                  unselectedLabelColor: isDark ? Colors.white54 : const Color(0xFF64748B),
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                  tabs: const [
-                    Tab(text: 'Show Pass (QR / PIN)'),
-                    Tab(text: 'Scan / Enter Code'),
-                  ],
-                ),
-              ),
               const SizedBox(height: 16),
 
+              // ── Role badge ──────────────────────────────────────────────
+              _RoleBadge(isOwner: widget.isOwner, isDark: isDark),
+              const SizedBox(height: 16),
+
+              // ── Error ───────────────────────────────────────────────────
               if (_error != null)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -265,7 +294,8 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline_rounded, color: NivaraColors.danger, size: 18),
+                      const Icon(Icons.error_outline_rounded,
+                          color: NivaraColors.danger, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -281,16 +311,10 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
                   ),
                 ),
 
-              SizedBox(
-                height: 380,
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildShowPassTab(isDark, primaryText, secondaryText),
-                    _buildScanEnterTab(isDark, primaryText, secondaryText),
-                  ],
-                ),
-              ),
+              // ── Main content (role-specific) ────────────────────────────
+              widget.isOwner
+                  ? _buildOwnerVerifyView(isDark, primaryText, secondaryText)
+                  : _buildClaimantPassView(isDark, primaryText, secondaryText),
             ],
           ),
         ),
@@ -298,10 +322,15 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
     );
   }
 
-  Widget _buildShowPassTab(bool isDark, Color primaryText, Color secondaryText) {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CLAIMANT VIEW: Shows their QR + OTP pass for the owner to scan/enter
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildClaimantPassView(bool isDark, Color primaryText, Color secondaryText) {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: NivaraColors.primary),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator(color: NivaraColors.primary)),
       );
     }
 
@@ -315,9 +344,15 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
     });
 
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // QR Code Container with Glowing Frame
+        Text(
+          'Show this to the item owner to verify the handover',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: secondaryText, fontSize: 13),
+        ),
+        const SizedBox(height: 18),
+
+        // QR Code with glowing frame
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -326,19 +361,19 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF00E676).withValues(alpha: 0.25),
-                blurRadius: 18,
+                blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
           child: CustomPaint(
-            size: const Size(160, 160),
+            size: const Size(170, 170),
             painter: _CyberQRPainter(data: qrPayload),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
 
-        // 6-Digit Proximity OTP
+        // 6-Digit OTP
         Text(
           'PROXIMITY HANDSHAKE PIN',
           style: TextStyle(
@@ -348,7 +383,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
             letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         BouncyTap(
           onTap: () {
             Clipboard.setData(ClipboardData(text: otp));
@@ -357,12 +392,12 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
               ..showSnackBar(const SnackBar(content: Text('Handshake PIN copied.')));
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFCBD5E1),
+                color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFCBD5E1),
               ),
             ),
             child: Row(
@@ -372,7 +407,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
                   '${otp.substring(0, 3)}  •  ${otp.substring(3, 6)}',
                   style: TextStyle(
                     color: primaryText,
-                    fontSize: 22,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                     fontFamily: 'monospace',
                     letterSpacing: 2,
@@ -384,14 +419,16 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
+
+        // Waiting indicator
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.sync_rounded, size: 14, color: Color(0xFF00E676)),
             const SizedBox(width: 6),
             Text(
-              'Awaiting counterpart scan / PIN entry...',
+              'Waiting for owner to verify…',
               style: TextStyle(
                 color: isDark ? Colors.white70 : const Color(0xFF475569),
                 fontSize: 12,
@@ -400,34 +437,138 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
             ),
           ],
         ),
+        const SizedBox(height: 6),
+
+        // Refresh pass
+        TextButton.icon(
+          onPressed: _loading ? null : _initPass,
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('Refresh pass'),
+        ),
       ],
     );
   }
 
-  Widget _buildScanEnterTab(bool isDark, Color primaryText, Color secondaryText) {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // OWNER VIEW: Camera scanner + PIN entry to verify the claimant's pass
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildOwnerVerifyView(bool isDark, Color primaryText, Color secondaryText) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Enter Counterpart\'s 6-Digit PIN',
-          style: TextStyle(
-            color: primaryText,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Ask the person delivering or receiving the item for their PIN or QR Pass.',
+          'Scan the finder\'s QR code or enter their 6-digit PIN',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: secondaryText,
-            fontSize: 12,
-          ),
+          style: TextStyle(color: secondaryText, fontSize: 13),
         ),
         const SizedBox(height: 18),
 
-        // PIN Input Field
+        // ── Camera QR Scanner ─────────────────────────────────────────
+        if (_scanning)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              height: 220,
+              child: Stack(
+                children: [
+                  MobileScanner(
+                    controller: _scannerController!,
+                    onDetect: _onQrDetected,
+                  ),
+                  // Scan reticle overlay
+                  Positioned.fill(
+                    child: CustomPaint(painter: _ScanReticlePainter()),
+                  ),
+                  // Close scanner button
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: BouncyTap(
+                      onTap: _stopScanner,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.close_rounded,
+                            color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                  if (_verifying)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black54,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF00E676),
+                            strokeWidth: 2.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          )
+        else
+          BouncyTap(
+            onTap: _startScanner,
+            child: Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: NivaraColors.primary.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.qr_code_scanner_rounded,
+                      size: 34,
+                      color: NivaraColors.primary.withValues(alpha: 0.7)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tap to Scan QR Code',
+                    style: TextStyle(
+                      color: NivaraColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 18),
+
+        // ── Divider ────────────────────────────────────────────────────
+        Row(
+          children: [
+            const Expanded(child: Divider()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                'OR ENTER PIN MANUALLY',
+                style: TextStyle(
+                  color: secondaryText,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+            const Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // ── PIN Input ──────────────────────────────────────────────────
         Container(
           width: 220,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -464,32 +605,38 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
             },
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
-        // Confirm Button
+        // ── Verify Button ──────────────────────────────────────────────
         SizedBox(
           width: double.infinity,
-          height: 48,
+          height: 50,
           child: FilledButton(
-            onPressed: _verifying ? null : () => _verifyOtp(_pinController.text.trim()),
+            onPressed: _verifying
+                ? null
+                : () => _verifyOtp(_pinController.text.trim()),
             style: FilledButton.styleFrom(
               backgroundColor: NivaraColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             child: _verifying
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.black),
                   )
                 : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle_outline_rounded, color: Colors.black, size: 20),
+                      Icon(Icons.check_circle_outline_rounded,
+                          color: Colors.black, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Verify & Complete Handover',
-                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900),
+                        style: TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.w900),
                       ),
                     ],
                   ),
@@ -497,40 +644,85 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
         ),
         const SizedBox(height: 12),
 
-        // Proximity Auto-Verify Tap Shortcut
+        // ── 1-Tap Proximity Verify ─────────────────────────────────────
         BouncyTap(
-          onTap: () {
-            if (_otp != null) {
-              _verifyOtp(_otp!);
-            }
-          },
+          onTap: _verifying
+              ? null
+              : () async {
+                  final data = await Clipboard.getData('text/plain');
+                  final text = (data?.text ?? '').trim();
+                  // Accept raw 6-digit PIN or space/bullet-separated formats
+                  final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+                  if (digits.length == 6) {
+                    _pinController.text = digits;
+                    _verifyOtp(digits);
+                  } else {
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Ask the finder to copy their PIN first, then tap this.'),
+                        ),
+                      );
+                  }
+                },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF00B0FF).withValues(alpha: isDark ? 0.15 : 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF00B0FF).withValues(alpha: 0.3)),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: const Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.nfc_rounded, size: 16, color: Color(0xFF00B0FF)),
-                SizedBox(width: 6),
-                Text(
-                  '1-Tap Near-Device Handshake',
-                  style: TextStyle(
-                    color: Color(0xFF00B0FF),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                  ),
+                Icon(Icons.nfc_rounded, color: Colors.black, size: 22),
+                SizedBox(width: 10),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '1-Tap Proximity Verify',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Ask finder to copy PIN → tap here',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
+        const SizedBox(height: 10),
       ],
     );
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUCCESS VIEW (both parties)
+  // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildSuccessView(bool isDark, Color primaryText) {
     return SafeArea(
@@ -590,8 +782,111 @@ class _LFHandoverDialogState extends State<LFHandoverDialog>
   }
 }
 
-/// Custom Cyber-Civic QR Painter that generates a stylish 2D matrix barcode with
-/// corner positioning markers and center shield icon.
+// ─────────────────────────────────────────────────────────────────────────────
+// Role badge shown to each party so they know their role
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.isOwner, required this.isDark});
+  final bool isOwner;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isOwner ? const Color(0xFF00B0FF) : const Color(0xFF00E676);
+    final icon = isOwner ? Icons.search_rounded : Icons.qr_code_rounded;
+    final label = isOwner ? 'Your role: Verify the finder\'s pass' : 'Your role: Show your pass to the owner';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scan Reticle Overlay Painter
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ScanReticlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF00E676)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    final w = size.width;
+    final h = size.height;
+    const cornerSize = 22.0;
+    final cx = w / 2;
+    final cy = h / 2;
+    const boxW = 140.0;
+    const boxH = 140.0;
+
+    final left = cx - boxW / 2;
+    final top = cy - boxH / 2;
+    final right = cx + boxW / 2;
+    final bottom = cy + boxH / 2;
+
+    // Dim overlay
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, w, h),
+      Paint()..color = Colors.black.withValues(alpha: 0.45),
+    );
+    // Clear the scan box
+    canvas.drawRect(
+      Rect.fromLTRB(left, top, right, bottom),
+      Paint()
+        ..blendMode = BlendMode.clear
+        ..style = PaintingStyle.fill,
+    );
+
+    // Corner markers
+    void corner(double x, double y, double dx, double dy) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(x, y + dy * cornerSize)
+          ..lineTo(x, y)
+          ..lineTo(x + dx * cornerSize, y),
+        paint,
+      );
+    }
+
+    corner(left, top, 1, 1);
+    corner(right, top, -1, 1);
+    corner(left, bottom, 1, -1);
+    corner(right, bottom, -1, -1);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom Cyber-Civic QR Painter
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _CyberQRPainter extends CustomPainter {
   _CyberQRPainter({required this.data});
 
@@ -677,7 +972,10 @@ class _CyberQRPainter extends CustomPainter {
   bool shouldRepaint(covariant _CyberQRPainter oldDelegate) => oldDelegate.data != data;
 }
 
-/// Chalo-Style Dynamic Anti-Screenshot Live Security Ribbon with real-time milliseconds ticker.
+// ─────────────────────────────────────────────────────────────────────────────
+// Chalo-Style Dynamic Anti-Screenshot Live Security Ribbon
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _ChaloSecurityRibbon extends StatefulWidget {
   const _ChaloSecurityRibbon({required this.isDark});
   final bool isDark;

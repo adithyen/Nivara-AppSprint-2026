@@ -66,7 +66,10 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
           /* skip malformed row */
         }
       }
-      if (mounted) setState(() => _loaded = true);
+      if (mounted) {
+        _autoSelectActiveTab();
+        setState(() => _loaded = true);
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -76,6 +79,20 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
       }
     }
     _subscribe(uid);
+  }
+
+  void _autoSelectActiveTab() {
+    if (_filterKey == 'todo') {
+      final todoCount = _tasks.values
+          .where((r) => r.isOpen && r.status != ReportStatus.inProgress)
+          .length;
+      final progressCount = _tasks.values
+          .where((r) => r.status == ReportStatus.inProgress)
+          .length;
+      if (todoCount == 0 && progressCount > 0) {
+        _filterKey = 'progress';
+      }
+    }
   }
 
   void _subscribe(String uid) {
@@ -100,6 +117,7 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
                   ..clear()
                   ..addAll(next);
                 _error = null;
+                _autoSelectActiveTab();
               });
             }
           },
@@ -132,7 +150,6 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -159,6 +176,121 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
     }
     final items = _visible;
     if (items.isEmpty) {
+      final inProgressCount = _tasks.values
+          .where((r) => r.status == ReportStatus.inProgress)
+          .length;
+      final todoCount = _tasks.values
+          .where((r) => r.isOpen && r.status != ReportStatus.inProgress)
+          .length;
+
+      if (_filterKey == 'todo' && inProgressCount > 0) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: NivaraColors.primary.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.engineering_rounded, size: 40, color: NivaraColors.primary),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No New Tasks In Queue',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'You have $inProgressCount active task${inProgressCount > 1 ? 's' : ''} currently in progress.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                const SizedBox(height: 18),
+                BouncyTap(
+                  onTap: () => setState(() => _filterKey = 'progress'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: NivaraColors.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          'View In Progress ($inProgressCount)',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (_filterKey == 'progress' && todoCount > 0) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: NivaraColors.accent.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.assignment_outlined, size: 40, color: NivaraColors.accent),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Nothing In Progress',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'You have $todoCount unstarted task${todoCount > 1 ? 's' : ''} waiting in To Do.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                const SizedBox(height: 18),
+                BouncyTap(
+                  onTap: () => setState(() => _filterKey = 'todo'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: NivaraColors.accent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.arrow_forward_rounded, color: Colors.black, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          'View To Do ($todoCount)',
+                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
       return _Empty(
         icon: Icons.task_alt,
         title: _filterKey == 'todo' ? 'Nothing to do' : 'Nothing here',

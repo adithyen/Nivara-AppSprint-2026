@@ -561,13 +561,13 @@ class _WorkerDemoBox extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF080D14) : const Color(0xFFF1F5F9),
+              color: isDark ? const Color(0xFF080D14) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isDark ? Colors.white10 : const Color(0xFFCBD5E1),
+                color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
               ),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -576,26 +576,29 @@ class _WorkerDemoBox extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     fontFamily: 'monospace',
+                    color: isDark ? Colors.white70 : const Color(0xFF334155),
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   'Default Password: worker123',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     fontFamily: 'monospace',
+                    color: isDark ? Colors.white70 : const Color(0xFF334155),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Tap any example below to 1-tap prefill and test:',
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white60 : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 8),
@@ -609,7 +612,7 @@ class _WorkerDemoBox extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: currentEmail == ex.email
                         ? ex.color.withValues(alpha: isDark ? 0.2 : 0.14)
-                        : (isDark ? const Color(0xFF141C26) : Colors.white),
+                        : (isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC)),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: currentEmail == ex.email
@@ -631,7 +634,9 @@ class _WorkerDemoBox extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 11.5,
-                                color: currentEmail == ex.email ? ex.color : null,
+                                color: currentEmail == ex.email
+                                    ? ex.color
+                                    : (isDark ? Colors.white : const Color(0xFF0F172A)),
                               ),
                             ),
                             Text(
@@ -664,19 +669,20 @@ class _OfficialDemoBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GlassCard(
       padding: const EdgeInsets.all(14),
       borderRadius: 16,
       borderColor: NivaraColors.accent.withValues(alpha: 0.35),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.shield_rounded, color: NivaraColors.accent, size: 20),
-          SizedBox(width: 10),
+          const Icon(Icons.shield_rounded, color: NivaraColors.accent, size: 20),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Municipal Official Pre-filled (admin@nivara.app)',
                   style: TextStyle(
                     color: NivaraColors.accent,
@@ -684,12 +690,13 @@ class _OfficialDemoBox extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   'Password: admin123 • Full command & dispatch authority',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
                   ),
                 ),
               ],

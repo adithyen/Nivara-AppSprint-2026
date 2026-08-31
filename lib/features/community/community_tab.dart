@@ -10,6 +10,7 @@ import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/nivara_image.dart';
 import '../../models/community_poll.dart';
 import '../../models/community_post.dart';
 import '../../models/enums.dart';
@@ -146,11 +147,19 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
       return;
     }
     try {
-      await supabase.from(kTableCommunityPollVotes).insert({
-        'post_id': post.id,
-        'option_id': option.id,
-        'user_id': uid,
-      });
+      try {
+        await supabase.rpc('community_vote', params: {
+          'p_post_id': post.id,
+          'p_option_id': option.id,
+        });
+      } catch (_) {
+        // Fallback to table insert
+        await supabase.from(kTableCommunityPollVotes).upsert({
+          'post_id': post.id,
+          'option_id': option.id,
+          'user_id': uid,
+        });
+      }
       setState(() {
         final current = Map<String, String>.from(_myVotes);
         current[post.id] = option.id;
@@ -178,21 +187,45 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
   }
 
   Future<void> _delete(CommunityPost post) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF131A24),
-        title: const Text('Delete post?'),
-        content: const Text('This will permanently delete this post and its poll data.'),
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF131A24) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          'Delete post?',
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          'This will permanently delete this post and its poll data.',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : const Color(0xFF475569),
+            fontSize: 14,
+          ),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: NivaraColors.danger),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            style: FilledButton.styleFrom(
+              backgroundColor: NivaraColors.danger,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -620,15 +653,12 @@ class _PostCard extends StatelessWidget {
                 ],
                 if (photo != null) ...[
                   const SizedBox(height: 12),
-                  ClipRRect(
+                  NivaraImage(
+                    source: photo,
+                    height: 190,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.network(
-                      photo,
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                    ),
                   ),
                 ],
                 if (post.isPoll && options.isNotEmpty) ...[

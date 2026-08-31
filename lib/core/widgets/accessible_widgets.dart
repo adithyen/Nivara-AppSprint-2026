@@ -1,27 +1,16 @@
-import 'package:flutter/semantics.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../models/enums.dart';
+import '../services/voice_alert_service.dart';
 
 /// Central helper for accessibility semantics, spoken announcements,
 /// and Color Vision Deficiency (CVD) geometric symbol markers.
 abstract final class AccessibleWidgets {
-  /// Spoken voice announcement for TalkBack / VoiceOver screen readers.
-  static void announce(String message, [BuildContext? context]) {
+  /// Speak a voice alert through the device speaker using flutter_tts.
+  /// This works independently of Android TalkBack / iOS VoiceOver.
+  static Future<void> announce(String message, [BuildContext? context]) async {
     if (message.trim().isEmpty) return;
-    try {
-      if (context != null) {
-        final view = View.of(context);
-        SemanticsService.sendAnnouncement(view, message, TextDirection.ltr);
-      } else {
-        final view = WidgetsBinding.instance.platformDispatcher.views.firstOrNull;
-        if (view != null) {
-          SemanticsService.sendAnnouncement(view, message, TextDirection.ltr);
-        }
-      }
-    } catch (_) {
-      // Graceful fallback if semantics binding not available
-    }
+    await VoiceAlertService.speak(message);
   }
 
   /// Geometric symbol marker for severity to assist users with color blindness.

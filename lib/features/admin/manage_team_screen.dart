@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import '../../models/user_profile.dart';
 import '../../models/worker_application.dart';
@@ -1023,15 +1024,26 @@ class _ApplicationSheet extends ConsumerStatefulWidget {
 
 class _ApplicationSheetState extends ConsumerState<_ApplicationSheet> {
   bool _busy = false;
+  UserRole _selectedRole = UserRole.worker;
+  AdminDepartment _selectedDept = AdminDepartment.roads;
 
   Future<void> _review(String status) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await WorkerRepo.reviewApplication(
-        applicationId: widget.app.id,
-        status: status,
-      );
+      if (status == 'APPROVED') {
+        await WorkerRepo.approveWorkerWithAssignment(
+          applicationId: widget.app.id,
+          applicantId: widget.app.applicantId,
+          role: _selectedRole,
+          department: _selectedDept,
+        );
+      } else {
+        await WorkerRepo.reviewApplication(
+          applicationId: widget.app.id,
+          status: status,
+        );
+      }
       if (mounted) {
         Navigator.pop(context);
         widget.onReviewed();
@@ -1236,8 +1248,135 @@ class _ApplicationSheetState extends ConsumerState<_ApplicationSheet> {
                 style: const TextStyle(fontSize: 13, height: 1.3),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
           ],
+
+          Text(
+            'ASSIGN ROLE',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: BouncyTap(
+                  onTap: () => setState(() => _selectedRole = UserRole.worker),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _selectedRole == UserRole.worker
+                          ? NivaraColors.primary.withValues(alpha: 0.15)
+                          : scheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedRole == UserRole.worker
+                            ? NivaraColors.primary
+                            : scheme.outlineVariant,
+                        width: _selectedRole == UserRole.worker ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Field Worker',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: _selectedRole == UserRole.worker
+                              ? NivaraColors.primary
+                              : scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: BouncyTap(
+                  onTap: () => setState(() => _selectedRole = UserRole.admin),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _selectedRole == UserRole.admin
+                          ? NivaraColors.accent.withValues(alpha: 0.15)
+                          : scheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedRole == UserRole.admin
+                            ? NivaraColors.accent
+                            : scheme.outlineVariant,
+                        width: _selectedRole == UserRole.admin ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Municipal Officer',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: _selectedRole == UserRole.admin
+                              ? NivaraColors.accent
+                              : scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'ASSIGN DEPARTMENT',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: AdminDepartment.values.map<Widget>((dept) {
+              final isSel = _selectedDept == dept;
+              return BouncyTap(
+                onTap: () => setState(() => _selectedDept = dept),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isSel
+                        ? const Color(0xFF00B0FF).withValues(alpha: 0.15)
+                        : scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSel
+                          ? const Color(0xFF00B0FF)
+                          : scheme.outlineVariant,
+                      width: isSel ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Text(
+                    dept.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                      color: isSel
+                          ? const Color(0xFF00B0FF)
+                          : scheme.onSurface,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
 
           Row(
             children: [
@@ -1257,10 +1396,10 @@ class _ApplicationSheetState extends ConsumerState<_ApplicationSheet> {
               Expanded(
                 child: FilledButton.icon(
                   icon: const Icon(Icons.check, size: 18),
-                  label: const Text('Approve Worker'),
+                  label: const Text('Approve & Add'),
                   style: FilledButton.styleFrom(
                     backgroundColor: NivaraColors.success,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: _busy ? null : () => _review('APPROVED'),

@@ -45,7 +45,7 @@ class StatusChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final a11y = ref.watch(accessibilityControllerProvider);
     final c = statusColor(status);
-    final symbol = a11y.colorBlindAssistance ? '${AccessibleWidgets.statusSymbol(status)} ' : '';
+    final symbol = a11y.colorCorrectionMode != ColorCorrectionMode.none ? '${AccessibleWidgets.statusSymbol(status)} ' : '';
 
     return Semantics(
       label: 'Status: ${status.label}',

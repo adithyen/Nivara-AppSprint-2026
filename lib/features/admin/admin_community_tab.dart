@@ -9,6 +9,7 @@ import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/nivara_image.dart';
 import '../../models/community_poll.dart';
 import '../../models/community_post.dart';
 import '../../models/enums.dart';
@@ -125,25 +126,92 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
     if (changed == true) await _load();
   }
 
+  Future<void> _vote(CommunityPost post, CommunityPollOption option) async {
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Sign in to vote in polls.')));
+      return;
+    }
+    if (_myVotes.containsKey(post.id)) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('You have already voted in this poll.')));
+      return;
+    }
+    try {
+      try {
+        await supabase.rpc('community_vote', params: {
+          'p_post_id': post.id,
+          'p_option_id': option.id,
+        });
+      } catch (_) {
+        await supabase.from(kTableCommunityPollVotes).upsert({
+          'post_id': post.id,
+          'option_id': option.id,
+          'user_id': uid,
+        });
+      }
+      setState(() {
+        _myVotes[post.id] = option.id;
+        final opts = _pollOptions[post.id];
+        if (opts != null) {
+          _pollOptions[post.id] = opts
+              .map((o) => o.id == option.id ? o.copyWith(voteCount: o.voteCount + 1) : o)
+              .toList();
+        }
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Vote recorded.')));
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Could not vote: $e')));
+    }
+  }
+
   Future<void> _adminDelete(CommunityPost post) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete post?'),
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF131A24) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          'Delete post?',
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
         content: Text(
           'Remove "${post.title.length > 60 ? '${post.title.substring(0, 60)}…' : post.title}" from the civic feed? This cannot be undone.',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : const Color(0xFF475569),
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: NivaraColors.danger,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -263,6 +331,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
                   distanceMeters: dist,
                   options: _pollOptions[p.id] ?? const [],
                   myVoteOptionId: _myVotes[p.id],
+                  onVote: (opt) => _vote(p, opt),
                   onDelete: () => _adminDelete(p),
                 ),
               );
@@ -415,6 +484,7 @@ class _AdminPostCard extends StatelessWidget {
     this.distanceMeters,
     required this.options,
     this.myVoteOptionId,
+    this.onVote,
     required this.onDelete,
   });
 
@@ -422,6 +492,7 @@ class _AdminPostCard extends StatelessWidget {
   final double? distanceMeters;
   final List<CommunityPollOption> options;
   final String? myVoteOptionId;
+  final ValueChanged<CommunityPollOption>? onVote;
   final VoidCallback onDelete;
 
   @override
@@ -432,6 +503,7 @@ class _AdminPostCard extends StatelessWidget {
 
     final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
     final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
+    final photo = (post.photoUrls?.isNotEmpty ?? false) ? post.photoUrls!.first : null;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -550,62 +622,85 @@ class _AdminPostCard extends StatelessWidget {
             ),
           ],
 
+          // Photo if present
+          if (photo != null) ...[
+            const SizedBox(height: 12),
+            NivaraImage(
+              source: photo,
+              height: 190,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ],
+
           // Poll Section (if poll)
           if (post.isPoll && options.isNotEmpty) ...[
             const SizedBox(height: 12),
             ...options.map((opt) {
               final pct = totalVotes > 0 ? (opt.voteCount / totalVotes * 100).round() : 0;
               final isMyVote = myVoteOptionId == opt.id;
+              final canVote = onVote != null && myVoteOptionId == null;
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
+                child: BouncyTap(
+                  onTap: canVote ? () => onVote!(opt) : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
                       color: isMyVote
-                          ? color
-                          : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+                          ? color.withValues(alpha: isDark ? 0.18 : 0.10)
+                          : (isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC)),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isMyVote
+                            ? color
+                            : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+                        width: isMyVote ? 1.6 : 1.0,
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              opt.label,
-                              style: TextStyle(
-                                color: primaryText,
-                                fontWeight: isMyVote ? FontWeight.w700 : FontWeight.w500,
-                                fontSize: 13,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (isMyVote) ...[
+                              Icon(Icons.check_circle_rounded, size: 14, color: color),
+                              const SizedBox(width: 6),
+                            ],
+                            Expanded(
+                              child: Text(
+                                opt.label,
+                                style: TextStyle(
+                                  color: primaryText,
+                                  fontWeight: isMyVote ? FontWeight.w700 : FontWeight.w500,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
-                          ),
-                          Text(
-                            '${opt.voteCount} ($pct%)',
-                            style: TextStyle(
-                              color: isMyVote ? color : secondaryText,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
+                            Text(
+                              '${opt.voteCount} ($pct%)',
+                              style: TextStyle(
+                                color: isMyVote ? color : secondaryText,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: totalVotes > 0 ? opt.voteCount / totalVotes : 0,
-                          minHeight: 5,
-                          backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-                          valueColor: AlwaysStoppedAnimation(color),
+                          ],
                         ),
-                      ),
-                    ],
+                      const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: totalVotes > 0 ? opt.voteCount / totalVotes : 0,
+                            minHeight: 5,
+                            backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                            valueColor: AlwaysStoppedAnimation(color),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
