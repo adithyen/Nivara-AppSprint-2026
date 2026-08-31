@@ -43,3 +43,9 @@ android/app/upload-keystore.jks
 
 # Stray local scratch files
 .write_test
+
+# Binary releases and application packages — keep repo lean
+*.apk
+*.aab
+*.ipa
+*.ap_
