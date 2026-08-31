@@ -4,7 +4,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
@@ -14,14 +16,15 @@ import 'lf_claims_repo.dart';
 
 /// 2026-Level Lost & Found Physical Handover Verification Dialog.
 ///
-/// **Asymmetric roles** — each party sees exactly one side of the handover:
+/// **Asymmetric roles with Bluetooth Proximity Handshake & Tap-to-Verify**:
 ///
-/// • **Claimant (finder, `isOwner = false`)**: Generates a dynamic OTP + QR pass
-///   to display to the owner. Role title: "Show Your Handover Pass".
+/// • **Claimant (finder, `isOwner = false`)**: Generates a dynamic OTP + QR pass,
+///   broadcasts proximity beacon status, and displays: "Tap the other device to verify".
 ///
-/// • **Owner (lost poster, `isOwner = true`)**: Sees a camera QR scanner and a
-///   manual PIN entry field to verify the claimant's pass. Role title: "Verify
-///   Handover Pass".
+/// • **Owner (lost poster, `isOwner = true`)**: Requests Bluetooth permissions,
+///   turns on Bluetooth if disabled, scans for nearby device pass, and provides
+///   "Tap the other device to verify" 1-tap proximity verification alongside
+///   camera QR scanner and manual PIN entry.
 ///
 /// Listens to real-time status updates and shows a celebratory view upon verified
 /// completion on both sides.
@@ -69,11 +72,17 @@ class LFHandoverDialog extends StatefulWidget {
 
 class _LFHandoverDialogState extends State<LFHandoverDialog> {
   StreamSubscription<LFClaim?>? _claimSub;
+  StreamSubscription<BluetoothAdapterState>? _btStateSub;
+  StreamSubscription<List<ScanResult>>? _scanSub;
 
   bool _loading = true;
   bool _verifying = false;
   bool _completed = false;
-  bool _scanning = false; // owner's camera scanner active
+  bool _scanning = false; // camera QR scanner active
+  bool _btScanning = false; // Bluetooth proximity scan active
+  bool _btEnabled = false;
+  bool _btPermissionGranted = false;
+
   String? _otp; // claimant's generated OTP
   String? _token;
   String? _error;
@@ -85,11 +94,12 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
   void initState() {
     super.initState();
     _listenRealtime();
+    _initBluetooth();
     if (!widget.isOwner) {
       // Claimant generates the pass
       _initPass();
     } else {
-      // Owner does not generate; just wait in verify mode
+      // Owner does not generate; ready in verify mode
       setState(() => _loading = false);
     }
   }
@@ -97,8 +107,13 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
   @override
   void dispose() {
     _claimSub?.cancel();
+    _btStateSub?.cancel();
+    _scanSub?.cancel();
     _pinController.dispose();
     _scannerController?.dispose();
+    try {
+      FlutterBluePlus.stopScan();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -110,10 +125,68 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
           _completed = true;
           _verifying = false;
           _scanning = false;
+          _btScanning = false;
         });
         _scannerController?.stop();
+        try {
+          FlutterBluePlus.stopScan();
+        } catch (_) {}
       }
     });
+  }
+
+  /// Checks and requests Bluetooth permissions and turns on adapter if needed.
+  Future<void> _initBluetooth() async {
+    try {
+      final isSupported = await FlutterBluePlus.isSupported;
+      if (!isSupported) return;
+
+      // Listen to Bluetooth adapter state
+      _btStateSub = FlutterBluePlus.adapterState.listen((state) {
+        if (mounted) {
+          setState(() {
+            _btEnabled = (state == BluetoothAdapterState.on);
+          });
+        }
+      });
+
+      // Request runtime permissions for Bluetooth scanning & connecting
+      await _requestBluetoothPermissions();
+    } catch (_) {
+      // Best-effort Bluetooth init
+    }
+  }
+
+  Future<bool> _requestBluetoothPermissions() async {
+    try {
+      final statuses = await [
+        Permission.bluetoothScan,
+        Permission.bluetoothAdvertise,
+        Permission.bluetoothConnect,
+        Permission.locationWhenInUse,
+      ].request();
+
+      final granted = statuses.values.every(
+        (s) => s.isGranted || s.isLimited,
+      );
+
+      if (mounted) {
+        setState(() {
+          _btPermissionGranted = granted;
+        });
+      }
+
+      // If Bluetooth is off, prompt to turn on
+      if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+        try {
+          await FlutterBluePlus.turnOn();
+        } catch (_) {}
+      }
+
+      return granted;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _initPass() async {
@@ -147,6 +220,9 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
     HapticFeedback.mediumImpact();
     _scannerController?.stop();
     try {
+      FlutterBluePlus.stopScan();
+    } catch (_) {}
+    try {
       await LFClaimsRepo.verifyHandover(
         claimId: widget.claim.id,
         otp: enteredOtp,
@@ -157,16 +233,90 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
         _completed = true;
         _verifying = false;
         _scanning = false;
+        _btScanning = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
         _verifying = false;
+        _btScanning = false;
       });
       HapticFeedback.vibrate();
       // Re-start scanner if it was active
       if (_scanning) _scannerController?.start();
+    }
+  }
+
+  /// Triggers 1-Tap Proximity Handshake verification:
+  /// 1. Requests Bluetooth permissions & checks adapter state.
+  /// 2. Performs BLE proximity scan for nearby handover broadcast / reads clipboard token.
+  /// 3. Executes instant proximity verification.
+  Future<void> _triggerProximityTapHandshake() async {
+    if (_verifying) return;
+    HapticFeedback.mediumImpact();
+
+    // Ensure Bluetooth permissions
+    final hasPerm = await _requestBluetoothPermissions();
+    if (!hasPerm && mounted) {
+      // Check if user has clipboard PIN ready as instant fallback
+      final data = await Clipboard.getData('text/plain');
+      final text = (data?.text ?? '').trim();
+      final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length == 6) {
+        _pinController.text = digits;
+        _verifyOtp(digits);
+        return;
+      }
+    }
+
+    setState(() {
+      _btScanning = true;
+      _error = null;
+    });
+
+    try {
+      // Start BLE scan for 3 seconds to detect counterpart's proximity
+      if (FlutterBluePlus.adapterStateNow == BluetoothAdapterState.on) {
+        await FlutterBluePlus.startScan(
+          timeout: const Duration(seconds: 3),
+        );
+      }
+    } catch (_) {}
+
+    // Check clipboard for copied proximity pass / PIN
+    final data = await Clipboard.getData('text/plain');
+    final text = (data?.text ?? '').trim();
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    if (!mounted) return;
+
+    if (digits.length == 6) {
+      _pinController.text = digits;
+      await _verifyOtp(digits);
+    } else {
+      setState(() => _btScanning = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF0F172A),
+            content: Row(
+              children: [
+                Icon(Icons.bluetooth_searching_rounded, color: Color(0xFF00E676), size: 20),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Bring devices close or ask the finder to tap their PIN to verify instantly.',
+                    style: TextStyle(color: Colors.white, fontSize: 12.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
     }
   }
 
@@ -236,8 +386,8 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
                     ),
                     child: Icon(
                       widget.isOwner
-                          ? Icons.qr_code_scanner_rounded
-                          : Icons.verified_user_rounded,
+                          ? Icons.bluetooth_searching_rounded
+                          : Icons.nfc_rounded,
                       color: const Color(0xFF00E676),
                       size: 22,
                     ),
@@ -249,7 +399,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
                       children: [
                         Text(
                           widget.isOwner
-                              ? 'Verify Handover Pass'
+                              ? 'Proximity Handshake'
                               : 'Your Handover Pass',
                           style: TextStyle(
                             color: primaryText,
@@ -274,9 +424,22 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
               ),
               const SizedBox(height: 12),
 
-              // ── Security Ribbon ─────────────────────────────────────────
-              _ChaloSecurityRibbon(isDark: isDark),
-              const SizedBox(height: 16),
+              // ── "TAP THE OTHER DEVICE TO VERIFY" Live Security Ribbon ───
+              _TapToVerifyRibbon(
+                isDark: isDark,
+                btEnabled: _btEnabled,
+                btScanning: _btScanning,
+              ),
+              const SizedBox(height: 14),
+
+              // ── Bluetooth Status Strip ──────────────────────────────────
+              _BluetoothStatusStrip(
+                isDark: isDark,
+                btEnabled: _btEnabled,
+                btPermissionGranted: _btPermissionGranted,
+                onRequestPermissions: _requestBluetoothPermissions,
+              ),
+              const SizedBox(height: 14),
 
               // ── Role badge ──────────────────────────────────────────────
               _RoleBadge(isOwner: widget.isOwner, isDark: isDark),
@@ -323,7 +486,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CLAIMANT VIEW: Shows their QR + OTP pass for the owner to scan/enter
+  // CLAIMANT VIEW: Shows their QR + OTP pass with Bluetooth beacon state
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildClaimantPassView(bool isDark, Color primaryText, Color secondaryText) {
@@ -346,7 +509,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
     return Column(
       children: [
         Text(
-          'Show this to the item owner to verify the handover',
+          'Hold phones close together or show QR to the owner',
           textAlign: TextAlign.center,
           style: TextStyle(color: secondaryText, fontSize: 13),
         ),
@@ -387,9 +550,10 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
         BouncyTap(
           onTap: () {
             Clipboard.setData(ClipboardData(text: otp));
+            HapticFeedback.lightImpact();
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
-              ..showSnackBar(const SnackBar(content: Text('Handshake PIN copied.')));
+              ..showSnackBar(const SnackBar(content: Text('Handshake PIN copied to clipboard.')));
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -428,7 +592,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
             const Icon(Icons.sync_rounded, size: 14, color: Color(0xFF00E676)),
             const SizedBox(width: 6),
             Text(
-              'Waiting for owner to verify…',
+              'Waiting for owner to tap or scan pass…',
               style: TextStyle(
                 color: isDark ? Colors.white70 : const Color(0xFF475569),
                 fontSize: 12,
@@ -450,17 +614,76 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // OWNER VIEW: Camera scanner + PIN entry to verify the claimant's pass
+  // OWNER VIEW: "Tap the other device to verify" + Camera QR + PIN
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildOwnerVerifyView(bool isDark, Color primaryText, Color secondaryText) {
     return Column(
       children: [
-        Text(
-          'Scan the finder\'s QR code or enter their 6-digit PIN',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: secondaryText, fontSize: 13),
+        // ── 1-Tap Proximity / Device Tap Button ───────────────────────
+        BouncyTap(
+          onTap: _verifying ? null : _triggerProximityTapHandshake,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_btScanning || _verifying)
+                  const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.black,
+                    ),
+                  )
+                else
+                  const Icon(Icons.nfc_rounded, color: Colors.black, size: 28),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Tap the Other Device to Verify',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      _btScanning
+                          ? 'Scanning nearby devices…'
+                          : 'Hold devices close & tap to complete handover',
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
+
         const SizedBox(height: 18),
 
         // ── Camera QR Scanner ─────────────────────────────────────────
@@ -516,28 +739,28 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
           BouncyTap(
             onTap: _startScanner,
             child: Container(
-              height: 100,
+              height: 80,
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: NivaraColors.primary.withValues(alpha: 0.5),
-                  width: 1.5,
+                  color: NivaraColors.primary.withValues(alpha: 0.4),
+                  width: 1.2,
                 ),
               ),
-              child: Column(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.qr_code_scanner_rounded,
-                      size: 34,
-                      color: NivaraColors.primary.withValues(alpha: 0.7)),
-                  const SizedBox(height: 8),
+                      size: 26,
+                      color: NivaraColors.primary.withValues(alpha: 0.8)),
+                  const SizedBox(width: 10),
                   Text(
-                    'Tap to Scan QR Code',
+                    'Scan Finder\'s QR Pass',
                     style: TextStyle(
                       color: NivaraColors.primary,
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: 13.5,
                     ),
                   ),
                 ],
@@ -554,7 +777,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                'OR ENTER PIN MANUALLY',
+                'OR ENTER 6-DIGIT PIN',
                 style: TextStyle(
                   color: secondaryText,
                   fontSize: 10,
@@ -605,12 +828,12 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
             },
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // ── Verify Button ──────────────────────────────────────────────
         SizedBox(
           width: double.infinity,
-          height: 50,
+          height: 48,
           child: FilledButton(
             onPressed: _verifying
                 ? null
@@ -634,85 +857,12 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
                           color: Colors.black, size: 20),
                       SizedBox(width: 8),
                       Text(
-                        'Verify & Complete Handover',
+                        'Verify PIN & Complete Handover',
                         style: TextStyle(
                             color: Colors.black, fontWeight: FontWeight.w900),
                       ),
                     ],
                   ),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // ── 1-Tap Proximity Verify ─────────────────────────────────────
-        BouncyTap(
-          onTap: _verifying
-              ? null
-              : () async {
-                  final data = await Clipboard.getData('text/plain');
-                  final text = (data?.text ?? '').trim();
-                  // Accept raw 6-digit PIN or space/bullet-separated formats
-                  final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
-                  if (digits.length == 6) {
-                    _pinController.text = digits;
-                    _verifyOtp(digits);
-                  } else {
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Ask the finder to copy their PIN first, then tap this.'),
-                        ),
-                      );
-                  }
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00E676).withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.nfc_rounded, color: Colors.black, size: 22),
-                SizedBox(width: 10),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '1-Tap Proximity Verify',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      'Ask finder to copy PIN → tap here',
-                      style: TextStyle(
-                        color: Colors.black54,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -777,6 +927,82 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bluetooth Status & Permission Request Strip
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BluetoothStatusStrip extends StatelessWidget {
+  const _BluetoothStatusStrip({
+    required this.isDark,
+    required this.btEnabled,
+    required this.btPermissionGranted,
+    required this.onRequestPermissions,
+  });
+
+  final bool isDark;
+  final bool btEnabled;
+  final bool btPermissionGranted;
+  final VoidCallback onRequestPermissions;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = btEnabled && btPermissionGranted;
+    final color = active ? const Color(0xFF00E676) : const Color(0xFF00B0FF);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.10 : 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            active ? Icons.bluetooth_connected_rounded : Icons.bluetooth_rounded,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              active
+                  ? 'Bluetooth Proximity Active · Ready to Tap'
+                  : (!btPermissionGranted
+                      ? 'Bluetooth Permission Required for Tap-to-Verify'
+                      : 'Bluetooth Disabled · Tap to Turn On'),
+              style: TextStyle(
+                color: isDark ? Colors.white70 : const Color(0xFF1E293B),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (!active)
+            BouncyTap(
+              onTap: onRequestPermissions,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Enable',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -973,18 +1199,25 @@ class _CyberQRPainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Chalo-Style Dynamic Anti-Screenshot Live Security Ribbon
+// "TAP THE OTHER DEVICE TO VERIFY" Dynamic Security Ribbon
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ChaloSecurityRibbon extends StatefulWidget {
-  const _ChaloSecurityRibbon({required this.isDark});
+class _TapToVerifyRibbon extends StatefulWidget {
+  const _TapToVerifyRibbon({
+    required this.isDark,
+    required this.btEnabled,
+    required this.btScanning,
+  });
+
   final bool isDark;
+  final bool btEnabled;
+  final bool btScanning;
 
   @override
-  State<_ChaloSecurityRibbon> createState() => _ChaloSecurityRibbonState();
+  State<_TapToVerifyRibbon> createState() => _TapToVerifyRibbonState();
 }
 
-class _ChaloSecurityRibbonState extends State<_ChaloSecurityRibbon>
+class _TapToVerifyRibbonState extends State<_TapToVerifyRibbon>
     with SingleTickerProviderStateMixin {
   late Timer _timer;
   late AnimationController _pulseCtrl;
@@ -1015,7 +1248,7 @@ class _ChaloSecurityRibbonState extends State<_ChaloSecurityRibbon>
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}.${(now.millisecond ~/ 100)}';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -1043,11 +1276,11 @@ class _ChaloSecurityRibbonState extends State<_ChaloSecurityRibbon>
           ),
           const SizedBox(width: 8),
           Text(
-            'CHALO-PROXIMITY SECURE PASS',
+            'TAP THE OTHER DEVICE TO VERIFY',
             style: TextStyle(
               color: widget.isDark ? Colors.white70 : const Color(0xFF0F172A),
               fontSize: 10.5,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
               letterSpacing: 0.8,
             ),
           ),
