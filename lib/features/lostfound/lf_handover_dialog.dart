@@ -17,22 +17,27 @@ import '../../models/lf_item.dart';
 import 'lf_claims_repo.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// How the proximity "Tap to Verify" works:
+// How proximity "Tap to Verify" works (no clipboard, no BLE advertising):
 //
-//  CLAIMANT side (isOwner = false):
-//   • Generates OTP + token via Supabase RPC
-//   • Shows a REAL QrImageView (not fake painter) with JSON payload
-//   • Publishes the OTP to a Supabase Realtime broadcast channel named
-//     "handover:{claimId}" every 5 seconds as long as the dialog is open.
+//  Channel name: "handover:{claimId}" (private per-claim Supabase Realtime channel)
 //
-//  OWNER side (isOwner = true):
-//   • Subscribes to "handover:{claimId}" channel.
-//   • When the claimant's broadcast arrives, OTP is auto-filled and verified
-//     instantly — zero user clipboard interaction required.
-//   • Also exposes a full-screen QR scanner page and manual PIN entry.
+//  CLAIMANT (isOwner=false):
+//   1. Generates OTP via RPC → shows real QrImageView + PIN
+//   2. Subscribes to channel + listens for 'request_otp' event from owner
+//   3. On receiving request → immediately responds with 'otp' broadcast
+//   4. Also proactively broadcasts 'otp' every 4 seconds automatically
+//
+//  OWNER (isOwner=true):
+//   1. Subscribes to channel → listens for 'otp' event from claimant
+//   2. On receiving OTP → auto-fills PIN field + calls _verifyOtp instantly
+//   3. Owner can also tap "Tap to Receive" to send a 'request_otp' event, prompting
+//      the claimant's phone to respond immediately even if claimant is between broadcasts
+//   4. Can also scan QR (full-screen page) or type PIN manually
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Lost & Found Physical Handover Verification Dialog — Asymmetric Roles.
+const String _kEvtOtp = 'otp';
+const String _kEvtRequest = 'request_otp';
+
 class LFHandoverDialog extends StatefulWidget {
   const LFHandoverDialog({
     super.key,
@@ -69,12 +74,12 @@ class LFHandoverDialog extends StatefulWidget {
 }
 
 class _LFHandoverDialogState extends State<LFHandoverDialog> {
-  // Supabase listeners
+  // Supabase
   StreamSubscription<LFClaim?>? _claimSub;
-  RealtimeChannel? _proximityChannel;
+  RealtimeChannel? _channel; // single shared channel per dialog
   Timer? _broadcastTimer;
 
-  // BLE
+  // BLE (display-only)
   StreamSubscription<BluetoothAdapterState>? _btStateSub;
   bool _btEnabled = false;
   bool _btPermGranted = false;
@@ -83,8 +88,8 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
   bool _loading = true;
   bool _verifying = false;
   bool _completed = false;
-  bool _proximityListening = false; // owner is listening for OTP broadcast
-  bool _proximityBroadcasting = false; // claimant is broadcasting OTP
+  bool _channelReady = false;    // channel has subscribed successfully
+  bool _ownerRequesting = false; // owner tapped "Tap to Receive" and is waiting
 
   String? _otp;
   String? _token;
@@ -101,10 +106,10 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
     super.initState();
     _listenClaimRealtime();
     _initBluetooth();
+    _setupChannel(); // both roles share one channel
     if (!widget.isOwner) {
       _initPass();
     } else {
-      _subscribeProximityChannel();
       setState(() => _loading = false);
     }
   }
@@ -114,13 +119,17 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
     _claimSub?.cancel();
     _btStateSub?.cancel();
     _broadcastTimer?.cancel();
-    _proximityChannel?.unsubscribe();
-    supabase.removeChannel(_proximityChannel!);
     _pinCtrl.dispose();
+    // Safe channel cleanup
+    final ch = _channel;
+    if (ch != null) {
+      ch.unsubscribe();
+      try { supabase.removeChannel(ch); } catch (_) {}
+    }
     super.dispose();
   }
 
-  // ── Supabase Realtime — claim status ──────────────────────────────────────
+  // ── Supabase: claim status stream ─────────────────────────────────────────
 
   void _listenClaimRealtime() {
     _claimSub = LFClaimsRepo.streamClaim(widget.claim.id).listen((c) {
@@ -133,70 +142,125 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
 
   void _markComplete() {
     _broadcastTimer?.cancel();
-    _proximityChannel?.unsubscribe();
-    setState(() {
-      _completed = true;
-      _verifying = false;
-      _proximityListening = false;
-      _proximityBroadcasting = false;
-    });
+    if (mounted) {
+      setState(() {
+        _completed = true;
+        _verifying = false;
+        _ownerRequesting = false;
+      });
+    }
   }
 
-  // ── Supabase Realtime — proximity OTP channel ─────────────────────────────
+  // ── Supabase: shared realtime channel ─────────────────────────────────────
 
-  /// OWNER subscribes to the private handover channel to auto-receive OTP.
-  void _subscribeProximityChannel() {
-    _proximityChannel = supabase.channel(_channelName);
-    _proximityChannel!
+  /// Both owner and claimant subscribe to the SAME channel.
+  /// Events:
+  ///   'otp'          → claimant → owner (OTP value)
+  ///   'request_otp'  → owner → claimant (ask for OTP)
+  void _setupChannel() {
+    _channel = supabase.channel(
+      _channelName,
+      opts: const RealtimeChannelConfig(
+        ack: false,
+        key: '',
+      ),
+    );
+
+    _channel!
         .onBroadcast(
-          event: 'otp',
+          event: _kEvtOtp,
           callback: (payload) {
+            // Only owner handles incoming OTP
+            if (!widget.isOwner) return;
             if (!mounted || _verifying || _completed) return;
             final otp = payload['otp'] as String?;
             if (otp != null && RegExp(r'^\d{6}$').hasMatch(otp)) {
               HapticFeedback.mediumImpact();
               _pinCtrl.text = otp;
-              setState(() => _proximityListening = false);
+              if (mounted) setState(() => _ownerRequesting = false);
               _verifyOtp(otp);
             }
           },
         )
-        .subscribe();
-    if (mounted) setState(() => _proximityListening = true);
+        .onBroadcast(
+          event: _kEvtRequest,
+          callback: (payload) {
+            // Only claimant handles OTP requests
+            if (widget.isOwner) return;
+            if (!mounted || _completed) return;
+            _broadcastOtpNow(); // Immediately respond with OTP
+          },
+        )
+        .subscribe((status, _) async {
+          if (status == RealtimeSubscribeStatus.subscribed) {
+            if (mounted) setState(() => _channelReady = true);
+            if (!widget.isOwner) {
+              // Claimant: if OTP is already generated, broadcast immediately
+              if (_otp != null) {
+                await _broadcastOtpNow();
+                _startPeriodicBroadcast();
+              }
+              // If OTP not yet generated, _initPass will trigger broadcast when ready
+            } else {
+              // Owner: immediately request OTP from claimant — no need to wait for
+              // the next periodic broadcast or for the user to tap the button.
+              // This covers the case where finder opened their pass before the owner.
+              await _requestOtpFromFinder(silent: true);
+            }
+          }
+        });
   }
 
-  /// CLAIMANT broadcasts OTP every 5 seconds on the private channel.
-  void _startProximityBroadcast(String otp) {
+  // ── OTP broadcast helpers ─────────────────────────────────────────────────
+
+  Future<void> _broadcastOtpNow() async {
+    final otp = _otp;
+    if (otp == null || !_channelReady) return;
+    try {
+      await _channel?.sendBroadcastMessage(
+        event: _kEvtOtp,
+        payload: {'otp': otp},
+      );
+    } catch (_) {}
+  }
+
+  void _startPeriodicBroadcast() {
     _broadcastTimer?.cancel();
-    _broadcastTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _broadcastTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || _completed) return;
-      try {
-        await _proximityChannel?.sendBroadcastMessage(
-          event: 'otp',
-          payload: {'otp': otp},
-        );
-      } catch (_) {}
+      _broadcastOtpNow();
     });
-
-    // Set up the channel for the claimant too (sender)
-    _proximityChannel = supabase.channel(_channelName);
-    _proximityChannel!.subscribe(
-      (status, _) async {
-        if (status == RealtimeSubscribeStatus.subscribed) {
-          if (mounted) setState(() => _proximityBroadcasting = true);
-          // Send immediately after subscribe
-          try {
-            await _proximityChannel?.sendBroadcastMessage(
-              event: 'otp',
-              payload: {'otp': otp},
-            );
-          } catch (_) {}
-        }
-      },
-    );
   }
 
-  // ── Bluetooth — best-effort for turn-on prompt ────────────────────────────
+  // ── Owner: tap to request OTP ─────────────────────────────────────────────
+
+  Future<void> _requestOtpFromFinder({bool silent = false}) async {
+    if (_verifying || _completed) return;
+    if (!silent) {
+      HapticFeedback.mediumImpact();
+      if (mounted) setState(() => _ownerRequesting = true);
+    }
+
+    // Send request_otp event — claimant's phone responds immediately
+    try {
+      await _channel?.sendBroadcastMessage(
+        event: _kEvtRequest,
+        payload: {'ts': DateTime.now().millisecondsSinceEpoch},
+      );
+    } catch (_) {}
+
+    if (!silent) {
+      // Auto-reset requesting state after 15s if no OTP arrives
+      Future.delayed(const Duration(seconds: 15), () {
+        if (mounted && _ownerRequesting && !_completed && !_verifying) {
+          setState(() => _ownerRequesting = false);
+          _snack("No response. Make sure the finder's Handover Pass is open, then tap again.");
+        }
+      });
+    }
+  }
+
+  // ── Bluetooth — display only (permission + on/off badge) ──────────────────
 
   Future<void> _initBluetooth() async {
     try {
@@ -204,12 +268,6 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
       _btStateSub = FlutterBluePlus.adapterState.listen((s) {
         if (mounted) setState(() => _btEnabled = s == BluetoothAdapterState.on);
       });
-      await _requestBtPermissions();
-    } catch (_) {}
-  }
-
-  Future<bool> _requestBtPermissions() async {
-    try {
       final statuses = await [
         Permission.bluetooth,
         Permission.bluetoothScan,
@@ -218,10 +276,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
       ].request();
       final ok = statuses.values.every((s) => s.isGranted || s.isLimited);
       if (mounted) setState(() => _btPermGranted = ok);
-      return ok;
-    } catch (_) {
-      return false;
-    }
+    } catch (_) {}
   }
 
   // ── Claimant: generate pass ────────────────────────────────────────────────
@@ -232,14 +287,17 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
       final res = await LFClaimsRepo.generateHandoverPass(widget.claim.id);
       if (!mounted) return;
       final otp = res['otp'] as String?;
-      final token = res['token'] as String?;
       setState(() {
         _otp = otp;
-        _token = token;
+        _token = res['token'] as String?;
         _loading = false;
       });
-      // Auto-start broadcasting OTP to owner's phone
-      if (otp != null) _startProximityBroadcast(otp);
+      // If channel is already subscribed, start broadcasting immediately
+      if (_channelReady && otp != null) {
+        _broadcastOtpNow();
+        _startPeriodicBroadcast();
+      }
+      // If channel is not yet subscribed, the subscribe callback will start broadcasting
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -249,14 +307,15 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
     }
   }
 
-  // ── Verification ───────────────────────────────────────────────────────────
+  // ── Verify OTP ─────────────────────────────────────────────────────────────
 
   Future<void> _verifyOtp(String pin) async {
-    if (pin.length < 6 || _verifying) return;
+    final trimmed = pin.trim();
+    if (trimmed.length < 6 || _verifying) return;
     setState(() { _verifying = true; _error = null; });
     HapticFeedback.mediumImpact();
     try {
-      await LFClaimsRepo.verifyHandover(claimId: widget.claim.id, otp: pin);
+      await LFClaimsRepo.verifyHandover(claimId: widget.claim.id, otp: trimmed);
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       _markComplete();
@@ -270,24 +329,25 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
     }
   }
 
-  // ── QR Scanner — full-screen page to fix black-box issue ──────────────────
+  // ── QR Scanner (full-screen page) ─────────────────────────────────────────
 
   Future<void> _openQrScanner() async {
-    final otp = await Navigator.of(context).push<String>(
+    final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => const _QRScanPage(),
       ),
     );
-    if (otp != null && otp.isNotEmpty && mounted) {
-      _pinCtrl.text = otp;
-      _verifyOtp(otp);
+    if (result != null && result.isNotEmpty && mounted) {
+      _pinCtrl.text = result;
+      _verifyOtp(result);
     }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   void _snack(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(msg)));
@@ -298,8 +358,8 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
-    final secondaryText = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final fg = isDark ? Colors.white : const Color(0xFF0F172A);
+    final sub = isDark ? Colors.white60 : const Color(0xFF64748B);
 
     if (_completed) {
       return _SuccessView(onDone: () => Navigator.pop(context, true));
@@ -323,54 +383,43 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
                 onClose: () => Navigator.pop(context, false),
               ),
               const SizedBox(height: 10),
-
-              // Live ribbon
               _LiveRibbon(
                 isDark: isDark,
                 isOwner: widget.isOwner,
-                broadcasting: _proximityBroadcasting,
-                listening: _proximityListening,
+                channelReady: _channelReady,
+                broadcasting: !widget.isOwner && _channelReady && _otp != null,
+                requesting: _ownerRequesting,
               ),
-              const SizedBox(height: 10),
-
-              // Bluetooth status (best-effort prompt to enable BT)
+              const SizedBox(height: 8),
               _BtStrip(
                 isDark: isDark,
                 btEnabled: _btEnabled,
                 permGranted: _btPermGranted,
-                onEnable: _requestBtPermissions,
               ),
               const SizedBox(height: 12),
-
-              // Role badge
               _RoleBadge(isOwner: widget.isOwner, isDark: isDark),
               const SizedBox(height: 14),
-
-              // Error banner
               if (_error != null) _ErrorBanner(error: _error!),
-
-              // Role-specific content
               if (widget.isOwner)
                 _OwnerSection(
                   isDark: isDark,
-                  primaryText: primaryText,
-                  secondaryText: secondaryText,
+                  fg: fg, sub: sub,
                   verifying: _verifying,
-                  listening: _proximityListening,
+                  requesting: _ownerRequesting,
                   pinCtrl: _pinCtrl,
                   onScanQr: _openQrScanner,
-                  onVerify: () => _verifyOtp(_pinCtrl.text.trim()),
+                  onTapReceive: _requestOtpFromFinder,
+                  onVerify: () => _verifyOtp(_pinCtrl.text),
                 )
               else
                 _ClaimantSection(
                   isDark: isDark,
-                  primaryText: primaryText,
-                  secondaryText: secondaryText,
+                  fg: fg, sub: sub,
                   loading: _loading,
                   otp: _otp,
                   token: _token,
                   claimId: widget.claim.id,
-                  broadcasting: _proximityBroadcasting,
+                  channelReady: _channelReady,
                   onRefresh: _initPass,
                   onSnack: _snack,
                 ),
@@ -383,7 +432,7 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Full-screen QR Scanner page — fixes the BottomSheet black-box issue
+// Full-screen QR Scanner — fixes BottomSheet black-box issue
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _QRScanPage extends StatefulWidget {
@@ -400,6 +449,7 @@ class _QRScanPageState extends State<_QRScanPage> {
     torchEnabled: false,
   );
   bool _done = false;
+  String? _debugLast; // last detected raw value (shown briefly for debugging)
 
   @override
   void dispose() {
@@ -409,25 +459,35 @@ class _QRScanPageState extends State<_QRScanPage> {
 
   void _onDetect(BarcodeCapture cap) {
     if (_done) return;
-    final raw = cap.barcodes.firstOrNull?.rawValue;
-    if (raw == null) return;
+    for (final barcode in cap.barcodes) {
+      final raw = barcode.rawValue;
+      if (raw == null || raw.isEmpty) continue;
 
-    String? otp;
-    try {
-      final p = jsonDecode(raw) as Map<String, dynamic>;
-      if (p['type'] == 'NIVARA_LF_HANDOVER') {
-        otp = p['otp'] as String?;
+      // Show debug info for 2 seconds so user can see what was detected
+      if (mounted) setState(() => _debugLast = 'Detected: ${raw.length > 40 ? '${raw.substring(0, 40)}…' : raw}');
+
+      String? otp;
+
+      // Try JSON payload (new format)
+      try {
+        final p = jsonDecode(raw) as Map<String, dynamic>;
+        if (p['type'] == 'NIVARA_LF_HANDOVER') {
+          otp = p['otp']?.toString();
+        }
+      } catch (_) {}
+
+      // Fallback: raw 6-digit OTP
+      if (otp == null || otp.isEmpty) {
+        final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+        if (digits.length == 6) otp = digits;
       }
-    } catch (_) {
-      // Raw 6-digit OTP
-      final d = raw.replaceAll(RegExp(r'[^0-9]'), '');
-      if (d.length == 6) otp = d;
-    }
 
-    if (otp != null && RegExp(r'^\d{6}$').hasMatch(otp)) {
-      _done = true;
-      HapticFeedback.heavyImpact();
-      Navigator.of(context).pop(otp);
+      if (otp != null && RegExp(r'^\d{6}$').hasMatch(otp)) {
+        _done = true;
+        HapticFeedback.heavyImpact();
+        Navigator.of(context).pop(otp);
+        return;
+      }
     }
   }
 
@@ -439,7 +499,7 @@ class _QRScanPageState extends State<_QRScanPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: const Text(
-          'Scan Finder\'s QR Code',
+          "Scan Finder's QR Code",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
         ),
         actions: [
@@ -454,18 +514,35 @@ class _QRScanPageState extends State<_QRScanPage> {
         children: [
           MobileScanner(controller: _ctrl, onDetect: _onDetect),
           Positioned.fill(child: _ReticleOverlay()),
+          // Instructions
           Positioned(
-            bottom: 48, left: 24, right: 24,
+            bottom: 56, left: 24, right: 24,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.65),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Text(
-                'Point the camera at the QR code on the finder\'s screen',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 13.5),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Point camera at the QR code on the finder's screen",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 13.5),
+                  ),
+                  if (_debugLast != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _debugLast!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF00E676), fontSize: 11,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -477,31 +554,27 @@ class _QRScanPageState extends State<_QRScanPage> {
 
 class _ReticleOverlay extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return CustomPaint(painter: _ReticlePainter());
-  }
+  Widget build(BuildContext context) => CustomPaint(painter: _ReticlePainter());
 }
 
 class _ReticlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    const box = 220.0;
+    const box = 240.0;
     final cx = size.width / 2, cy = size.height / 2;
     final l = cx - box / 2, t = cy - box / 2;
     final r = cx + box / 2, b = cy + box / 2;
-
     final dim = Paint()..color = Colors.black.withValues(alpha: 0.55);
     canvas.drawRect(Rect.fromLTRB(0, 0, size.width, t), dim);
     canvas.drawRect(Rect.fromLTRB(0, b, size.width, size.height), dim);
     canvas.drawRect(Rect.fromLTRB(0, t, l, b), dim);
     canvas.drawRect(Rect.fromLTRB(r, t, size.width, b), dim);
-
     final p = Paint()
       ..color = const Color(0xFF00E676)
-      ..strokeWidth = 3.5
+      ..strokeWidth = 4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
-    const cs = 28.0;
+    const cs = 32.0;
     canvas.drawPath(Path()..moveTo(l, t + cs)..lineTo(l, t)..lineTo(l + cs, t), p);
     canvas.drawPath(Path()..moveTo(r - cs, t)..lineTo(r, t)..lineTo(r, t + cs), p);
     canvas.drawPath(Path()..moveTo(l, b - cs)..lineTo(l, b)..lineTo(l + cs, b), p);
@@ -513,25 +586,25 @@ class _ReticlePainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Claimant section — real QR + OTP + broadcast status
+// Claimant section
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ClaimantSection extends StatelessWidget {
   const _ClaimantSection({
     required this.isDark,
-    required this.primaryText,
-    required this.secondaryText,
+    required this.fg,
+    required this.sub,
     required this.loading,
     required this.otp,
     required this.token,
     required this.claimId,
-    required this.broadcasting,
+    required this.channelReady,
     required this.onRefresh,
     required this.onSnack,
   });
 
-  final bool isDark, loading, broadcasting;
-  final Color primaryText, secondaryText;
+  final bool isDark, loading, channelReady;
+  final Color fg, sub;
   final String? otp, token, claimId;
   final VoidCallback onRefresh;
   final void Function(String) onSnack;
@@ -548,7 +621,7 @@ class _ClaimantSection extends StatelessWidget {
     final pin = otp ?? '------';
     final qrPayload = jsonEncode({
       'type': 'NIVARA_LF_HANDOVER',
-      'claim_id': claimId,
+      'claim_id': claimId ?? '',
       'token': token ?? '',
       'otp': pin,
     });
@@ -556,41 +629,40 @@ class _ClaimantSection extends StatelessWidget {
     return Column(
       children: [
         Text(
-          'Show this QR code or PIN to the owner standing next to you',
+          'Show this QR or PIN to the owner. Your OTP is sent automatically to their device.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: secondaryText, fontSize: 13),
+          style: TextStyle(color: sub, fontSize: 13),
         ),
         const SizedBox(height: 16),
 
-        // ── Real QR code via qr_flutter ──────────────────────────────────
+        // Real scannable QR code via qr_flutter
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF00E676).withValues(alpha: 0.3),
-                blurRadius: 24,
-                offset: const Offset(0, 6),
+                blurRadius: 24, offset: const Offset(0, 6),
               ),
             ],
           ),
           child: QrImageView(
             data: qrPayload,
             version: QrVersions.auto,
-            size: 180,
+            size: 190,
             backgroundColor: Colors.white,
             errorCorrectionLevel: QrErrorCorrectLevel.M,
           ),
         ),
         const SizedBox(height: 16),
 
-        // ── 6-digit PIN (tap to copy as fallback) ────────────────────────
+        // PIN display (tap to copy)
         Text(
           'HANDSHAKE PIN',
           style: TextStyle(
-            color: secondaryText, fontSize: 11,
+            color: sub, fontSize: 11,
             fontWeight: FontWeight.w800, letterSpacing: 1.4,
           ),
         ),
@@ -599,7 +671,7 @@ class _ClaimantSection extends StatelessWidget {
           onTap: () {
             Clipboard.setData(ClipboardData(text: pin));
             HapticFeedback.lightImpact();
-            onSnack('PIN copied — share with the owner if automatic receive fails');
+            onSnack('PIN copied');
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -618,44 +690,53 @@ class _ClaimantSection extends StatelessWidget {
                 Text(
                   '${pin.substring(0, 3)}  ·  ${pin.substring(3, 6)}',
                   style: TextStyle(
-                    color: primaryText, fontSize: 26,
+                    color: fg, fontSize: 28,
                     fontWeight: FontWeight.w900,
                     fontFamily: 'monospace', letterSpacing: 3,
                   ),
                 ),
                 const SizedBox(width: 10),
-                Icon(Icons.copy_rounded, size: 16, color: secondaryText),
+                Icon(Icons.copy_rounded, size: 16, color: sub),
               ],
             ),
           ),
         ),
         const SizedBox(height: 14),
 
-        // ── Broadcast status ─────────────────────────────────────────────
+        // Channel status
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: (broadcasting ? const Color(0xFF00E676) : const Color(0xFF94A3B8))
+            color: (channelReady
+                    ? const Color(0xFF00E676)
+                    : const Color(0xFF94A3B8))
                 .withValues(alpha: isDark ? 0.12 : 0.08),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: (broadcasting ? const Color(0xFF00E676) : const Color(0xFF94A3B8))
+              color: (channelReady
+                      ? const Color(0xFF00E676)
+                      : const Color(0xFF94A3B8))
                   .withValues(alpha: 0.3),
             ),
           ),
           child: Row(
             children: [
-              Icon(
-                broadcasting ? Icons.wifi_tethering_rounded : Icons.wifi_tethering_off_rounded,
-                color: broadcasting ? const Color(0xFF00E676) : const Color(0xFF94A3B8),
-                size: 18,
-              ),
+              if (!channelReady)
+                const SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Color(0xFF94A3B8),
+                  ),
+                )
+              else
+                const Icon(Icons.wifi_tethering_rounded,
+                    color: Color(0xFF00E676), size: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  broadcasting
-                      ? 'Sending OTP to nearby device automatically — the owner just needs to open their Verify screen'
-                      : 'Connecting… the owner will auto-receive your OTP when ready',
+                  channelReady
+                      ? 'Your OTP is broadcasting — owner will auto-receive when they open Verify'
+                      : 'Connecting to secure channel…',
                   style: TextStyle(
                     color: isDark ? Colors.white70 : const Color(0xFF475569),
                     fontSize: 11.5, fontWeight: FontWeight.w600,
@@ -665,7 +746,7 @@ class _ClaimantSection extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -674,12 +755,12 @@ class _ClaimantSection extends StatelessWidget {
             Text(
               'Waiting for owner to verify…',
               style: TextStyle(
-                color: secondaryText, fontSize: 12.5, fontWeight: FontWeight.w600,
+                color: sub, fontSize: 12, fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         TextButton.icon(
           onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded, size: 16),
@@ -697,78 +778,91 @@ class _ClaimantSection extends StatelessWidget {
 class _OwnerSection extends StatelessWidget {
   const _OwnerSection({
     required this.isDark,
-    required this.primaryText,
-    required this.secondaryText,
+    required this.fg,
+    required this.sub,
     required this.verifying,
-    required this.listening,
+    required this.requesting,
     required this.pinCtrl,
     required this.onScanQr,
+    required this.onTapReceive,
     required this.onVerify,
   });
 
-  final bool isDark, verifying, listening;
-  final Color primaryText, secondaryText;
+  final bool isDark, verifying, requesting;
+  final Color fg, sub;
   final TextEditingController pinCtrl;
-  final VoidCallback onScanQr, onVerify;
+  final VoidCallback onScanQr, onTapReceive, onVerify;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── Auto-receive status ──────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF00E676).withValues(alpha: isDark ? 0.12 : 0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.35)),
-          ),
-          child: Row(
-            children: [
-              if (listening)
-                const SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: Color(0xFF00E676),
-                  ),
-                )
-              else
-                const Icon(Icons.nfc_rounded, color: Color(0xFF00E676), size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tap to Receive OTP from Finder',
-                      style: TextStyle(
-                        color: Color(0xFF00E676),
-                        fontWeight: FontWeight.w900, fontSize: 13.5,
-                      ),
-                    ),
-                    Text(
-                      listening
-                          ? 'Waiting… as soon as the finder opens their pass, you\'ll be verified automatically'
-                          : 'Finder\'s OTP received — verifying…',
-                      style: TextStyle(
-                        color: isDark ? Colors.white60 : const Color(0xFF475569),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
+        // ── Tap to receive OTP ───────────────────────────────────────────
+        BouncyTap(
+          onTap: (verifying || requesting) ? null : onTapReceive,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
               ),
-            ],
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                  blurRadius: 18, offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                if (requesting || verifying)
+                  const SizedBox(
+                    width: 28, height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: Colors.black,
+                    ),
+                  )
+                else
+                  const Icon(Icons.nfc_rounded, color: Colors.black, size: 30),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tap to Receive OTP from Finder',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w900, fontSize: 14.5,
+                        ),
+                      ),
+                      Text(
+                        requesting
+                            ? 'Waiting for finder to respond… keep screens near'
+                            : verifying
+                                ? 'Verifying received OTP…'
+                                : 'Tap this — finder gets a ping & sends OTP automatically',
+                        style: const TextStyle(
+                          color: Colors.black87, fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
-        // ── Scan QR button ───────────────────────────────────────────────
+        // ── Scan QR ──────────────────────────────────────────────────────
         BouncyTap(
           onTap: verifying ? null : onScanQr,
           child: Container(
-            height: 64,
+            height: 60,
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(16),
@@ -779,21 +873,22 @@ class _OwnerSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.qr_code_scanner_rounded, size: 28, color: NivaraColors.primary),
+                Icon(Icons.qr_code_scanner_rounded,
+                    size: 26, color: NivaraColors.primary),
                 const SizedBox(width: 12),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Scan Finder\'s QR Code',
+                      "Scan Finder's QR Code",
                       style: TextStyle(
                         color: NivaraColors.primary,
                         fontWeight: FontWeight.w900, fontSize: 14,
                       ),
                     ),
                     Text(
-                      'Opens full-screen camera scanner',
+                      'Opens full-screen camera · works instantly',
                       style: TextStyle(
                         color: isDark ? Colors.white54 : const Color(0xFF94A3B8),
                         fontSize: 11,
@@ -807,7 +902,6 @@ class _OwnerSection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // ── Divider ──────────────────────────────────────────────────────
         Row(
           children: [
             const Expanded(child: Divider()),
@@ -816,7 +910,7 @@ class _OwnerSection extends StatelessWidget {
               child: Text(
                 'OR ENTER PIN MANUALLY',
                 style: TextStyle(
-                  color: secondaryText, fontSize: 10,
+                  color: sub, fontSize: 10,
                   fontWeight: FontWeight.w700, letterSpacing: 1,
                 ),
               ),
@@ -824,9 +918,9 @@ class _OwnerSection extends StatelessWidget {
             const Expanded(child: Divider()),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
-        // ── PIN field ────────────────────────────────────────────────────
+        // ── PIN input ────────────────────────────────────────────────────
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
@@ -842,7 +936,7 @@ class _OwnerSection extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLength: 6,
             style: TextStyle(
-              color: primaryText, fontSize: 28,
+              color: fg, fontSize: 28,
               fontWeight: FontWeight.w900,
               fontFamily: 'monospace', letterSpacing: 6,
             ),
@@ -856,24 +950,28 @@ class _OwnerSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // ── Verify button ────────────────────────────────────────────────
         SizedBox(
           height: 50,
           child: FilledButton(
             onPressed: verifying ? null : onVerify,
             style: FilledButton.styleFrom(
               backgroundColor: NivaraColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             child: verifying
                 ? const SizedBox(
                     width: 20, height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.black,
+                    ),
                   )
                 : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle_outline_rounded, color: Colors.black, size: 20),
+                      Icon(Icons.check_circle_outline_rounded,
+                          color: Colors.black, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Verify & Complete Handover',
@@ -959,7 +1057,7 @@ class _SuccessView extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Composable UI sub-widgets
+// Small composable widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
@@ -976,7 +1074,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final fg = isDark ? Colors.white : const Color(0xFF0F172A);
     return Row(
       children: [
         Container(
@@ -998,7 +1096,7 @@ class _Header extends StatelessWidget {
               Text(
                 isOwner ? 'Verify Handover Pass' : 'Your Handover Pass',
                 style: TextStyle(
-                  color: primaryText, fontSize: 18, fontWeight: FontWeight.w800,
+                  color: fg, fontSize: 18, fontWeight: FontWeight.w800,
                 ),
               ),
               Text(
@@ -1026,17 +1124,18 @@ class _LiveRibbon extends StatefulWidget {
   const _LiveRibbon({
     required this.isDark,
     required this.isOwner,
+    required this.channelReady,
     required this.broadcasting,
-    required this.listening,
+    required this.requesting,
   });
-  final bool isDark, isOwner, broadcasting, listening;
+  final bool isDark, isOwner, channelReady, broadcasting, requesting;
 
   @override
   State<_LiveRibbon> createState() => _LiveRibbonState();
 }
 
 class _LiveRibbonState extends State<_LiveRibbon> {
-  late Timer _t;
+  late final Timer _t;
 
   @override
   void initState() {
@@ -1052,19 +1151,23 @@ class _LiveRibbonState extends State<_LiveRibbon> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final ts =
-        '${now.hour.toString().padLeft(2, '0')}:'
+    final ts = '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}:'
-        '${now.second.toString().padLeft(2, '0')}'
-        '.${now.millisecond ~/ 100}';
+        '${now.second.toString().padLeft(2, '0')}.'
+        '${now.millisecond ~/ 100}';
 
-    final label = widget.isOwner
-        ? (widget.listening
-            ? "WAITING — OWNER'S DEVICE LISTENING FOR FINDER'S OTP…"
-            : 'VERIFIED — COMPLETING HANDOVER…')
-        : (widget.broadcasting
-            ? 'BROADCASTING OTP — TAP THE OTHER DEVICE TO VERIFY'
-            : 'CONNECTING TO HANDOVER CHANNEL…');
+    String label;
+    if (!widget.channelReady) {
+      label = 'CONNECTING…';
+    } else if (widget.isOwner) {
+      label = widget.requesting
+          ? 'WAITING FOR FINDER RESPONSE…'
+          : 'LISTENING — TAP RECEIVE OR SCAN QR';
+    } else {
+      label = widget.broadcasting
+          ? 'BROADCASTING OTP — OWNER WILL AUTO-RECEIVE'
+          : 'CONNECTED — SHOW QR TO OWNER';
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -1080,9 +1183,19 @@ class _LiveRibbonState extends State<_LiveRibbon> {
         children: [
           Container(
             width: 8, height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFF00E676), shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: Color(0xFF00E676), blurRadius: 6)],
+            decoration: BoxDecoration(
+              color: widget.channelReady
+                  ? const Color(0xFF00E676)
+                  : const Color(0xFFFFB74D),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: widget.channelReady
+                      ? const Color(0xFF00E676)
+                      : const Color(0xFFFFB74D),
+                  blurRadius: 6,
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
@@ -1113,17 +1226,15 @@ class _BtStrip extends StatelessWidget {
     required this.isDark,
     required this.btEnabled,
     required this.permGranted,
-    required this.onEnable,
   });
   final bool isDark, btEnabled, permGranted;
-  final VoidCallback onEnable;
 
   @override
   Widget build(BuildContext context) {
     final ok = btEnabled && permGranted;
-    final color = ok ? const Color(0xFF00E676) : const Color(0xFFFF6B6B);
+    final color = ok ? const Color(0xFF00E676) : const Color(0xFFFFB74D);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: color.withValues(alpha: isDark ? 0.10 : 0.06),
         borderRadius: BorderRadius.circular(12),
@@ -1132,37 +1243,19 @@ class _BtStrip extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            ok ? Icons.bluetooth_connected_rounded : Icons.bluetooth_disabled_rounded,
-            size: 17, color: color,
+            ok ? Icons.bluetooth_connected_rounded : Icons.bluetooth_rounded,
+            size: 16, color: color,
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              ok
-                  ? 'Bluetooth on · proximity verify enabled'
-                  : 'Bluetooth off — tap Enable to allow proximity verification',
-              style: TextStyle(
-                color: isDark ? Colors.white70 : const Color(0xFF1E293B),
-                fontSize: 11.5, fontWeight: FontWeight.w600,
-              ),
+          Text(
+            ok
+                ? 'Bluetooth on'
+                : 'Bluetooth off — OTP sharing still works via internet',
+            style: TextStyle(
+              color: isDark ? Colors.white60 : const Color(0xFF475569),
+              fontSize: 11, fontWeight: FontWeight.w600,
             ),
           ),
-          if (!ok)
-            BouncyTap(
-              onTap: onEnable,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E676), borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'Enable',
-                  style: TextStyle(
-                    color: Colors.black, fontSize: 11, fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -1176,10 +1269,6 @@ class _RoleBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isOwner ? const Color(0xFF00B0FF) : const Color(0xFF00E676);
-    final icon = isOwner ? Icons.nfc_rounded : Icons.qr_code_2_rounded;
-    final label = isOwner
-        ? 'You are the owner — scan the finder\'s QR or wait to auto-receive their OTP'
-        : 'You are the finder — show the QR to the owner or let them auto-receive your PIN';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -1189,12 +1278,19 @@ class _RoleBadge extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 18),
+          Icon(
+            isOwner ? Icons.nfc_rounded : Icons.qr_code_2_rounded,
+            color: color, size: 18,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              label,
-              style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w700),
+              isOwner
+                  ? "Owner — tap 'Receive OTP' to get finder's code, or scan their QR"
+                  : "Finder — your OTP sends to the owner automatically when they tap",
+              style: TextStyle(
+                color: color, fontSize: 11.5, fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -1219,13 +1315,15 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: NivaraColors.danger, size: 18),
+          const Icon(Icons.error_outline_rounded,
+              color: NivaraColors.danger, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               error,
               style: const TextStyle(
-                color: NivaraColors.danger, fontWeight: FontWeight.w700, fontSize: 12,
+                color: NivaraColors.danger,
+                fontWeight: FontWeight.w700, fontSize: 12,
               ),
             ),
           ),
