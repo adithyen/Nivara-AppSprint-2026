@@ -120,13 +120,6 @@ class LFItemCard extends StatelessWidget {
                         text: formatDate(item.eventDate),
                         isDark: isDark,
                       ),
-                      if (item.locationLabel != null &&
-                          item.locationLabel!.isNotEmpty)
-                        _MetaLine(
-                          icon: Icons.place_outlined,
-                          text: item.locationLabel!,
-                          isDark: isDark,
-                        ),
                       if (distanceMeters != null)
                         _MetaLine(
                           icon: Icons.near_me_rounded,
@@ -143,6 +136,36 @@ class LFItemCard extends StatelessWidget {
                         ),
                     ],
                   ),
+                  if (item.locationLabel != null &&
+                      item.locationLabel!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.place_outlined,
+                          size: 13,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.5)
+                              : const Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            item.locationLabel!.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.5)
+                                  : const Color(0xFF6B7280),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
@@ -298,12 +321,16 @@ class _MetaLine extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: c),
         const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            color: c,
-            fontWeight: FontWeight.w600,
-            fontSize: 11.5,
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: c,
+              fontWeight: FontWeight.w600,
+              fontSize: 11.5,
+            ),
           ),
         ),
       ],

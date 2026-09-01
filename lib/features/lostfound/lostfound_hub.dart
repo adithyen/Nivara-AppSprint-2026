@@ -46,13 +46,24 @@ class _LostFoundHubState extends State<LostFoundHub> {
           .select()
           .eq('status', 'ACTIVE')
           .order('created_at', ascending: false);
+      final newItems = <String, LFItem>{};
       for (final r in rows) {
         try {
           final item = LFItem.fromMap(r);
-          _items[item.id] = item;
+          if (item.status == 'ACTIVE') {
+            newItems[item.id] = item;
+          }
         } catch (_) {}
       }
-      if (mounted) setState(() => _loaded = true);
+      if (mounted) {
+        setState(() {
+          _items
+            ..clear()
+            ..addAll(newItems);
+          _loaded = true;
+          _error = null;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -65,23 +76,31 @@ class _LostFoundHubState extends State<LostFoundHub> {
   }
 
   void _subscribe() {
+    _sub?.cancel();
     _sub = supabase
         .from(kTableLfItems)
         .stream(primaryKey: ['id'])
         .order('created_at')
         .listen(
           (rows) {
+            bool changed = false;
             for (final r in rows) {
               try {
                 final item = LFItem.fromMap(r);
                 if (item.status == 'ACTIVE') {
-                  _items[item.id] = item;
+                  if (_items[item.id] != item) {
+                    _items[item.id] = item;
+                    changed = true;
+                  }
                 } else {
-                  _items.remove(item.id);
+                  if (_items.containsKey(item.id)) {
+                    _items.remove(item.id);
+                    changed = true;
+                  }
                 }
               } catch (_) {}
             }
-            if (mounted) setState(() => _error = null);
+            if (mounted && changed) setState(() => _error = null);
           },
           onError: (_) {},
         );
@@ -91,6 +110,7 @@ class _LostFoundHubState extends State<LostFoundHub> {
     final uid = currentUserId;
     final list = _items.values
         .where((i) {
+          if (i.status != 'ACTIVE') return false;
           if (_filter != null && i.itemType != _filter) return false;
           // Hide private items from public explore feed unless owned by current user
           if (i.isPrivate && (uid == null || i.userId != uid)) return false;
@@ -117,7 +137,10 @@ class _LostFoundHubState extends State<LostFoundHub> {
           IconButton(
             tooltip: 'My listings',
             icon: const Icon(Icons.inbox_outlined),
-            onPressed: () => context.push(Routes.myListings),
+            onPressed: () async {
+              await context.push(Routes.myListings);
+              if (mounted) _load();
+            },
           ),
         ],
       ),
@@ -132,7 +155,10 @@ class _LostFoundHubState extends State<LostFoundHub> {
                     icon: Icons.search_off_rounded,
                     label: 'I Lost\nSomething',
                     color: NivaraColors.danger,
-                    onTap: () => context.push(Routes.reportLost),
+                    onTap: () async {
+                      await context.push(Routes.reportLost);
+                      if (mounted) _load();
+                    },
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -141,7 +167,10 @@ class _LostFoundHubState extends State<LostFoundHub> {
                     icon: Icons.inventory_2_rounded,
                     label: 'I Found\nSomething',
                     color: primary,
-                    onTap: () => context.push(Routes.reportFound),
+                    onTap: () async {
+                      await context.push(Routes.reportFound);
+                      if (mounted) _load();
+                    },
                   ),
                 ),
               ],
@@ -181,31 +210,54 @@ class _LostFoundHubState extends State<LostFoundHub> {
       return Center(child: CircularProgressIndicator(color: primary));
     }
     if (_error != null) {
-      return _EmptyState(
-        icon: Icons.cloud_off_rounded,
-        title: 'Could not load items',
-        subtitle: 'Check network connection or retry.\n$_error',
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            _EmptyState(
+              icon: Icons.cloud_off_rounded,
+              title: 'Could not load items',
+              subtitle: 'Check network connection or pull down to retry.\n$_error',
+            ),
+          ],
+        ),
       );
     }
     final items = _visible;
     if (items.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.travel_explore_rounded,
-        title: 'No Active Listings',
-        subtitle: 'Be the first — report a lost or found item above.',
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            _EmptyState(
+              icon: Icons.travel_explore_rounded,
+              title: 'No Active Listings',
+              subtitle: 'Be the first — report a lost or found item above.\nPull down to refresh.',
+            ),
+          ],
+        ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (_, i) {
-        final item = items[i];
-        return LFItemCard(
-          item: item,
-          onTap: () => context.push(Routes.lostFoundDetail, extra: item),
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemBuilder: (_, i) {
+          final item = items[i];
+          return LFItemCard(
+            item: item,
+            onTap: () async {
+              await context.push(Routes.lostFoundDetail, extra: item);
+              if (mounted) _load();
+            },
+          );
+        },
+      ),
     );
   }
 }

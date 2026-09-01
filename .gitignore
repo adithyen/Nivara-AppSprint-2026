@@ -49,3 +49,4 @@ android/app/upload-keystore.jks
 *.aab
 *.ipa
 *.ap_
+issues/

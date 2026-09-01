@@ -134,14 +134,19 @@ class _MatchScreenState extends State<MatchScreen> {
                       child: LFItemCard(
                         item: m.item,
                         distanceMeters: m.distanceMeters,
-                        onTap: () => context.push(
-                          Routes.lostFoundDetail,
-                          extra: (
-                            item: m.item,
-                            distance: m.distanceMeters,
-                            isMatch: true,
-                          ),
-                        ),
+                        onTap: () async {
+                          await context.push(
+                            Routes.lostFoundDetail,
+                            extra: (
+                              item: m.item,
+                              distance: m.distanceMeters,
+                              isMatch: true,
+                            ),
+                          );
+                          if (context.mounted) {
+                            setState(() => _future = _findMatches());
+                          }
+                        },
                       ),
                     ),
                   ),
