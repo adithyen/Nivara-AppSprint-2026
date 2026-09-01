@@ -392,7 +392,41 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
   }
 
   Widget _viewerSection() {
+    final uid = _uid;
     final mine = _myClaim;
+
+    // ── Completed claim — show resolved banner instead of action button ──────
+    final completedClaim = uid != null
+        ? _claims.firstWhere(
+            (c) => c.claimantId == uid && c.isCompleted,
+            orElse: () => _claims.firstWhere(
+              (c) => c.ownerId == uid && c.isCompleted,
+              orElse: () => _claims.firstWhere(
+                (c) => c.isCompleted,
+                orElse: () => const LFClaim(
+                  id: '', itemId: '', ownerId: '', claimantId: '',
+                ),
+              ),
+            ),
+          )
+        : null;
+
+    final hasCompleted = completedClaim != null &&
+        completedClaim.id.isNotEmpty &&
+        completedClaim.isCompleted;
+
+    if (hasCompleted) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: const _Banner(
+          color: NivaraColors.success,
+          icon: Icons.check_circle_rounded,
+          text: '✅ Handover completed! This item has been safely transferred and resolved.',
+        ),
+      );
+    }
+
+    // ── Active pending claim — show handover pass button ─────────────────────
     if (mine != null && mine.isPending) {
       return Padding(
         padding: const EdgeInsets.only(top: 16),
@@ -403,7 +437,7 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
               icon: Icons.handshake_rounded,
               text:
                   'Handover request active! When you meet the counterpart, open the '
-                  'Handover Pass to display your QR code or enter their 6-digit PIN.',
+                  'Handover Pass to display your QR code or let them tap to receive your PIN.',
             ),
             const SizedBox(height: 10),
             BouncyTap(
@@ -455,6 +489,7 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
       );
     }
 
+    // ── No claim yet — show primary action button ─────────────────────────────
     final isLost = _item.isLost;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
