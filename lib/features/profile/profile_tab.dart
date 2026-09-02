@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/civic_level.dart';
 import '../../core/constants.dart';
@@ -59,18 +60,46 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
 
   Future<void> _load() async {
     final uid = ref.read(authControllerProvider).asData?.value?.id;
-    final reports = await _count(kTableReports, uid, {});
-    final confirms = await _count(kTableConfirmations, uid, {
-      'type': 'CONFIRM',
-    });
-    final finds = await _count(kTableLfItems, uid, {'item_type': 'FOUND'});
-    if (!mounted) return;
-    setState(() {
-      _reports = reports;
-      _confirms = confirms;
-      _finds = finds;
-      _loading = false;
-    });
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Instant offline cache load
+    if (uid != null) {
+      final cachedReports = prefs.getInt('cached_reports_$uid');
+      final cachedConfirms = prefs.getInt('cached_confirms_$uid');
+      final cachedFinds = prefs.getInt('cached_finds_$uid');
+      if (cachedReports != null && mounted) {
+        setState(() {
+          _reports = cachedReports;
+          _confirms = cachedConfirms ?? 0;
+          _finds = cachedFinds ?? 0;
+          _loading = false;
+        });
+      }
+    }
+
+    try {
+      final reports = await _count(kTableReports, uid, {});
+      final confirms = await _count(kTableConfirmations, uid, {
+        'type': 'CONFIRM',
+      });
+      final finds = await _count(kTableLfItems, uid, {'item_type': 'FOUND'});
+
+      if (uid != null) {
+        await prefs.setInt('cached_reports_$uid', reports);
+        await prefs.setInt('cached_confirms_$uid', confirms);
+        await prefs.setInt('cached_finds_$uid', finds);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _reports = reports;
+        _confirms = confirms;
+        _finds = finds;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<int> _count(String table, String? uid, Map<String, String> eq) async {
@@ -211,6 +240,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               resolvedCount: _confirms,
               profile: profile,
             ),
+            const SizedBox(height: 20),
+          ] else if (isAdmin) ...[
+            _AdminInfoCard(profile: profile),
             const SizedBox(height: 20),
           ] else ...[
             _CitizenImpactCard(
@@ -1119,6 +1151,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final email = supabase.auth.currentUser?.email ?? '';
     final scheme = Theme.of(context).colorScheme;
@@ -1130,7 +1163,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Edit Profile',
+            NivaraStrings.tr('edit_profile', currentLang),
             style: TextStyle(
               color: scheme.onSurface,
               fontSize: 18,
@@ -1144,7 +1177,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
               controller: TextEditingController(text: email),
               style: TextStyle(color: scheme.onSurfaceVariant),
               decoration: InputDecoration(
-                labelText: 'Account Email',
+                labelText: NivaraStrings.tr('account_email', currentLang),
                 prefixIcon: Icon(Icons.mail_outline, color: scheme.onSurfaceVariant),
               ),
             ),
@@ -1155,7 +1188,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
             textCapitalization: TextCapitalization.words,
             style: TextStyle(color: scheme.onSurface),
             decoration: InputDecoration(
-              labelText: 'Display Name',
+              labelText: NivaraStrings.tr('display_name', currentLang),
               prefixIcon: Icon(Icons.person_outline_rounded, color: scheme.onSurfaceVariant),
             ),
           ),
@@ -1165,7 +1198,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
             keyboardType: TextInputType.phone,
             style: TextStyle(color: scheme.onSurface),
             decoration: InputDecoration(
-              labelText: 'Phone Number',
+              labelText: NivaraStrings.tr('phone_number', currentLang),
               prefixIcon: Icon(Icons.call_outlined, color: scheme.onSurfaceVariant),
             ),
           ),
@@ -1178,7 +1211,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                   textCapitalization: TextCapitalization.words,
                   style: TextStyle(color: scheme.onSurface),
                   decoration: InputDecoration(
-                    labelText: 'City',
+                    labelText: NivaraStrings.tr('city', currentLang),
                     prefixIcon: Icon(Icons.location_city_rounded, color: scheme.onSurfaceVariant),
                   ),
                 ),
@@ -1189,7 +1222,9 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                   controller: _wardCtrl,
                   textCapitalization: TextCapitalization.words,
                   style: TextStyle(color: scheme.onSurface),
-                  decoration: const InputDecoration(labelText: 'Ward / Locality'),
+                  decoration: InputDecoration(
+                    labelText: NivaraStrings.tr('ward_locality', currentLang),
+                  ),
                 ),
               ),
             ],
@@ -1217,7 +1252,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                           : Colors.black,
                     ),
               label: Text(
-                _saving ? 'Saving…' : 'Save Changes',
+                _saving ? 'Saving…' : NivaraStrings.tr('save_changes', currentLang),
                 style: TextStyle(
                   color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
                       ? Colors.white
@@ -1267,12 +1302,6 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
     ('general', 'General Maintenance', Icons.build_outlined, Color(0xFF7C4DFF)),
   ];
 
-  static const _kAvailabilities = [
-    'Full-Time (Daily Shifts)',
-    'Part-Time (Flexible)',
-    'Emergency Quick Responder',
-  ];
-
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -1305,19 +1334,20 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
       _error = null;
     });
 
-    try {
-      final payload = jsonEncode({
-        'applicant_name': name,
-        'phone': phone,
-        'ward': ward,
-        'categories': _selectedCategories.toList(),
-        'availability': _availability,
-        'has_vehicle': _hasVehicle,
-        'has_tools': _hasTools,
-        'has_smartphone': _hasSmartphone,
-        'motivation': _motivationCtrl.text.trim(),
-      });
+    final payloadMap = {
+      'applicant_name': name,
+      'phone': phone,
+      'ward': ward,
+      'categories': _selectedCategories.toList(),
+      'availability': _availability,
+      'has_vehicle': _hasVehicle,
+      'has_tools': _hasTools,
+      'has_smartphone': _hasSmartphone,
+      'motivation': _motivationCtrl.text.trim(),
+    };
 
+    try {
+      final payload = jsonEncode(payloadMap);
       await WorkerRepo.submitApplication(message: payload);
 
       // If user provided name/phone/ward that differ, update profile in background
@@ -1336,11 +1366,22 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
 
       if (mounted) setState(() => _submitted = true);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = '$e';
-          _submitting = false;
-        });
+      // Offline fallback: queue worker application locally
+      try {
+        await OfflineQueueService.enqueueWorkerApplication(
+          payload: {
+            ...payloadMap,
+            'message': jsonEncode(payloadMap),
+          },
+        );
+        if (mounted) setState(() => _submitted = true);
+      } catch (queueErr) {
+        if (mounted) {
+          setState(() {
+            _error = '$e';
+            _submitting = false;
+          });
+        }
       }
     }
   }
@@ -1409,7 +1450,7 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                   const Icon(Icons.check_circle_rounded, color: NivaraColors.success, size: 48),
                   const SizedBox(height: 12),
                   Text(
-                    NivaraStrings.tr('app_submitted_success', currentLang),
+                    NivaraStrings.tr('application_submitted_title', currentLang),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 16,
@@ -1419,7 +1460,7 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    NivaraStrings.tr('app_dispatched_msg', currentLang),
+                    NivaraStrings.tr('application_submitted_sub', currentLang),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: scheme.onSurfaceVariant,
@@ -1435,12 +1476,12 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Done'),
+                child: Text(NivaraStrings.tr('btn_done', currentLang)),
               ),
             ),
           ] else ...[
             Text(
-              'Join verified civic field teams to resolve municipal infrastructure issues, log photo resolution proof, and receive worker stipends.',
+              NivaraStrings.tr('work_intro', currentLang),
               style: TextStyle(
                 color: scheme.onSurfaceVariant,
                 fontSize: 12.5,
@@ -1451,7 +1492,7 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
 
             // 1. Personal & Contact Details
             Text(
-              '1. APPLICANT DETAILS',
+              NivaraStrings.tr('sec_applicant_details', currentLang),
               style: TextStyle(
                 color: scheme.primary,
                 fontSize: 11,
@@ -1465,43 +1506,35 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
               textCapitalization: TextCapitalization.words,
               style: TextStyle(color: scheme.onSurface),
               decoration: InputDecoration(
-                labelText: '${NivaraStrings.tr('full_legal_name', currentLang)} *',
+                labelText: NivaraStrings.tr('full_name_star', currentLang),
                 prefixIcon: Icon(Icons.person_outline, color: scheme.onSurfaceVariant),
               ),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _phoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    style: TextStyle(color: scheme.onSurface),
-                    decoration: InputDecoration(
-                      labelText: '${NivaraStrings.tr('phone_contact', currentLang)} *',
-                      prefixIcon: Icon(Icons.phone_outlined, color: scheme.onSurfaceVariant),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _wardCtrl,
-                    textCapitalization: TextCapitalization.words,
-                    style: TextStyle(color: scheme.onSurface),
-                    decoration: InputDecoration(
-                      labelText: NivaraStrings.tr('ward_neighborhood', currentLang),
-                      prefixIcon: Icon(Icons.location_city_outlined, color: scheme.onSurfaceVariant),
-                    ),
-                  ),
-                ),
-              ],
+            TextField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              style: TextStyle(color: scheme.onSurface),
+              decoration: InputDecoration(
+                labelText: NivaraStrings.tr('phone_star', currentLang),
+                prefixIcon: Icon(Icons.phone_outlined, color: scheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _wardCtrl,
+              textCapitalization: TextCapitalization.words,
+              style: TextStyle(color: scheme.onSurface),
+              decoration: InputDecoration(
+                labelText: NivaraStrings.tr('ward_locality', currentLang),
+                prefixIcon: Icon(Icons.location_city_outlined, color: scheme.onSurfaceVariant),
+              ),
             ),
             const SizedBox(height: 20),
 
             // 2. Interested Categories
             Text(
-              '2. INTERESTED DEPARTMENTS & SKILLS *',
+              NivaraStrings.tr('sec_departments', currentLang),
               style: TextStyle(
                 color: scheme.primary,
                 fontSize: 11,
@@ -1517,7 +1550,7 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                 final isSelected = _selectedCategories.contains(cat.$1);
                 return FilterChip(
                   avatar: Icon(cat.$3, size: 16, color: isSelected ? Colors.black : cat.$4),
-                  label: Text(cat.$2),
+                  label: Text(NivaraStrings.tr('cat_${cat.$1}', currentLang)),
                   selected: isSelected,
                   selectedColor: scheme.primary,
                   checkmarkColor: Colors.black,
@@ -1548,7 +1581,7 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
 
             // 3. Shift Availability
             Text(
-              '3. SHIFT & AVAILABILITY',
+              NivaraStrings.tr('sec_shift', currentLang),
               style: TextStyle(
                 color: scheme.primary,
                 fontSize: 11,
@@ -1566,42 +1599,32 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                 ),
               ),
               child: Column(
-                children: _kAvailabilities.map((avail) {
-                  final isSelected = _availability == avail;
-                  return InkWell(
-                    onTap: () => setState(() => _availability = avail),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                            color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              avail,
-                              style: TextStyle(
-                                color: scheme.onSurface,
-                                fontSize: 13,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
+                children: [
+                  _buildShiftOption(
+                    'Full-Time (Daily Shifts)',
+                    NivaraStrings.tr('shift_full_time', currentLang),
+                    scheme,
+                  ),
+                  Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                  _buildShiftOption(
+                    'Part-Time (Flexible)',
+                    NivaraStrings.tr('shift_part_time', currentLang),
+                    scheme,
+                  ),
+                  Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                  _buildShiftOption(
+                    'Emergency Quick Responder',
+                    NivaraStrings.tr('shift_emergency', currentLang),
+                    scheme,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
 
             // 4. Equipment & Readiness
             Text(
-              '4. EQUIPMENT & READINESS',
+              NivaraStrings.tr('sec_equipment', currentLang),
               style: TextStyle(
                 color: scheme.primary,
                 fontSize: 11,
@@ -1624,7 +1647,10 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                     value: _hasVehicle,
                     activeColor: scheme.primary,
                     checkColor: Colors.black,
-                    title: const Text('Two-Wheeler / Vehicle Transport Available', style: TextStyle(fontSize: 12.5)),
+                    title: Text(
+                      NivaraStrings.tr('equip_vehicle', currentLang),
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
                     secondary: const Icon(Icons.two_wheeler_rounded, size: 20),
                     onChanged: (v) => setState(() => _hasVehicle = v ?? false),
                     controlAffinity: ListTileControlAffinity.trailing,
@@ -1635,7 +1661,10 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                     value: _hasTools,
                     activeColor: scheme.primary,
                     checkColor: Colors.black,
-                    title: const Text('Own Basic Hand Tools / Repair Equipment', style: TextStyle(fontSize: 12.5)),
+                    title: Text(
+                      NivaraStrings.tr('equip_tools', currentLang),
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
                     secondary: const Icon(Icons.handyman_rounded, size: 20),
                     onChanged: (v) => setState(() => _hasTools = v ?? false),
                     controlAffinity: ListTileControlAffinity.trailing,
@@ -1646,7 +1675,10 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                     value: _hasSmartphone,
                     activeColor: scheme.primary,
                     checkColor: Colors.black,
-                    title: const Text('Smartphone with GPS & Camera (for Proof Photos)', style: TextStyle(fontSize: 12.5)),
+                    title: Text(
+                      NivaraStrings.tr('equip_smartphone', currentLang),
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
                     secondary: const Icon(Icons.smartphone_rounded, size: 20),
                     onChanged: (v) => setState(() => _hasSmartphone = v ?? false),
                     controlAffinity: ListTileControlAffinity.trailing,
@@ -1659,7 +1691,7 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
 
             // 5. Note / Motivation
             Text(
-              '5. MOTIVATION & PAST EXPERIENCE',
+              NivaraStrings.tr('motivation_label', currentLang),
               style: TextStyle(
                 color: scheme.primary,
                 fontSize: 11,
@@ -1673,9 +1705,8 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
               maxLines: 3,
               maxLength: 400,
               style: TextStyle(color: scheme.onSurface),
-              decoration: const InputDecoration(
-                labelText: 'Brief Experience / Background (optional)',
-                hintText: 'Share trade background, past civic work, or certifications…',
+              decoration: InputDecoration(
+                hintText: NivaraStrings.tr('motivation_label', currentLang),
                 alignLabelWithHint: true,
               ),
             ),
@@ -1712,8 +1743,8 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                       ),
                 label: Text(
                   _submitting
-                      ? 'Submitting Application…'
-                      : NivaraStrings.tr('submit_application', currentLang),
+                      ? 'Submitting…'
+                      : NivaraStrings.tr('btn_submit_application', currentLang),
                   style: TextStyle(
                     color: ThemeData.estimateBrightnessForColor(scheme.primary) == Brightness.dark
                         ? Colors.white
@@ -1725,6 +1756,36 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildShiftOption(String wireVal, String label, ColorScheme scheme) {
+    final isSelected = _availability == wireVal;
+    return InkWell(
+      onTap: () => setState(() => _availability = wireVal),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2016,6 +2077,150 @@ class _ResignConfirmationDialogState extends State<_ResignConfirmationDialog>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AdminInfoCard extends StatelessWidget {
+  const _AdminInfoCard({required this.profile});
+  final UserProfile? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final isSuper = profile?.isSuperadmin == true;
+
+    final deptLabel = profile?.department?.label ?? 'Municipal Administration';
+    final jurCity = profile?.jurisdictionCity ?? profile?.city ?? 'Thiruvananthapuram';
+    final jurWard = profile?.jurisdictionWard ?? profile?.ward ?? 'All Wards';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131A24) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isSuper
+              ? const Color(0xFFFFB300).withValues(alpha: 0.5)
+              : scheme.primary.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (isSuper ? const Color(0xFFFFB300) : scheme.primary)
+                      .withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isSuper ? Icons.admin_panel_settings_rounded : Icons.shield_rounded,
+                  color: isSuper ? const Color(0xFFFFB300) : scheme.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isSuper ? 'Super Administrator' : 'Municipal Officer',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Official Municipal Console Access',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(
+            height: 1,
+            color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DEPARTMENT',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      deptLabel,
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'JURISDICTION',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$jurCity • $jurWard',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

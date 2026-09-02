@@ -10,10 +10,12 @@ import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/civic_level_view.dart';
 import '../../core/widgets/staggered_entrance.dart';
+import '../../models/user_profile.dart';
 import '../../router.dart';
 import '../auth/auth_controller.dart';
 import '../settings/accessibility_controller.dart';
 import '../settings/language_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 2026-Level Flagship Citizen Home Dashboard with dynamic localization and accessibility contrast tokens.
 class HomeTab extends ConsumerStatefulWidget {
@@ -28,8 +30,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   int _myReports = 0;
   int _myConfirms = 0;
   int _myFinds = 0;
-
-  int get _civicScore => _myReports * 10 + _myConfirms * 5 + _myFinds * 15;
+  int get _civicScore => _myReports * 25 + _myConfirms * 10 + _myFinds * 15;
 
   @override
   void initState() {
@@ -39,22 +40,48 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
   Future<void> _load() async {
     final uid = ref.read(authControllerProvider).asData?.value?.id;
+    final prefs = await SharedPreferences.getInstance();
 
-    final reportsFut = _countMyRows(kTableReports, uid);
-    final confirmsFut = _countMyConfirms(uid);
-    final findsFut = _countMyFinds(uid);
+    // 1. Instant offline cache load
+    if (uid != null) {
+      final cachedReports = prefs.getInt('cached_reports_$uid');
+      final cachedConfirms = prefs.getInt('cached_confirms_$uid');
+      final cachedFinds = prefs.getInt('cached_finds_$uid');
+      if (cachedReports != null && mounted) {
+        setState(() {
+          _myReports = cachedReports;
+          _myConfirms = cachedConfirms ?? 0;
+          _myFinds = cachedFinds ?? 0;
+          _loading = false;
+        });
+      }
+    }
 
-    final myReports = await reportsFut;
-    final myConfirms = await confirmsFut;
-    final myFinds = await findsFut;
+    try {
+      final reportsFut = _countMyRows(kTableReports, uid);
+      final confirmsFut = _countMyConfirms(uid);
+      final findsFut = _countMyFinds(uid);
 
-    if (!mounted) return;
-    setState(() {
-      _myReports = myReports;
-      _myConfirms = myConfirms;
-      _myFinds = myFinds;
-      _loading = false;
-    });
+      final myReports = await reportsFut;
+      final myConfirms = await confirmsFut;
+      final myFinds = await findsFut;
+
+      if (uid != null) {
+        await prefs.setInt('cached_reports_$uid', myReports);
+        await prefs.setInt('cached_confirms_$uid', myConfirms);
+        await prefs.setInt('cached_finds_$uid', myFinds);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _myReports = myReports;
+        _myConfirms = myConfirms;
+        _myFinds = myFinds;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<int> _countMyRows(String table, String? uid) async {
@@ -172,18 +199,20 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
           const SizedBox(height: 20),
 
-          // Hero Civic Impact Glass Card
+          // Hero Civic Impact Glass Card (or Admin Info Card for Admin roles)
           StaggeredEntrance(
             index: 1,
-            child: _ImpactCard(
-              loading: _loading,
-              score: _civicScore,
-              reports: _myReports,
-              confirms: _myConfirms,
-              finds: _myFinds,
-              currentLang: currentLang,
-              a11y: a11y,
-            ),
+            child: (profile?.isAdmin == true)
+                ? _AdminInfoCard(profile: profile)
+                : _ImpactCard(
+                    loading: _loading,
+                    score: _civicScore,
+                    reports: _myReports,
+                    confirms: _myConfirms,
+                    finds: _myFinds,
+                    currentLang: currentLang,
+                    a11y: a11y,
+                  ),
           ),
 
           const SizedBox(height: 24),
@@ -600,6 +629,150 @@ class _FeatureModuleTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AdminInfoCard extends StatelessWidget {
+  const _AdminInfoCard({required this.profile});
+  final UserProfile? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final isSuper = profile?.isSuperadmin == true;
+
+    final deptLabel = profile?.department?.label ?? 'Municipal Administration';
+    final jurCity = profile?.jurisdictionCity ?? profile?.city ?? 'Thiruvananthapuram';
+    final jurWard = profile?.jurisdictionWard ?? profile?.ward ?? 'All Wards';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131A24) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isSuper
+              ? const Color(0xFFFFB300).withValues(alpha: 0.5)
+              : scheme.primary.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (isSuper ? const Color(0xFFFFB300) : scheme.primary)
+                      .withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isSuper ? Icons.admin_panel_settings_rounded : Icons.shield_rounded,
+                  color: isSuper ? const Color(0xFFFFB300) : scheme.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isSuper ? 'Super Administrator' : 'Municipal Officer',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Official Municipal Console Access',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(
+            height: 1,
+            color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DEPARTMENT',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      deptLabel,
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'JURISDICTION',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$jurCity • $jurWard',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

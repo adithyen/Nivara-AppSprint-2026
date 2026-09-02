@@ -2,25 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/connectivity_service.dart';
+import '../services/offline_queue_service.dart';
 import '../theme.dart';
 
-/// An animated connectivity banner that slides in at the bottom of any posting
-/// screen. Shows:
+/// An animated connectivity & sync banner that slides in at the bottom of any screen.
+/// Shows:
 ///   • Amber "offline" strip when no internet is detected.
-///   • Green "back online — syncing" strip for [onlineDuration] when connectivity
-///     is restored.
-///
-/// Usage — wrap your Scaffold body or add at the bottom of a Column:
-/// ```dart
-/// Column(children: [
-///   Expanded(child: yourBody),
-///   const ConnectivityBanner(),
-/// ])
-/// ```
+///   • Blue/Green "Syncing X items..." animated progress when background queue drain is active.
+///   • Green "✓ All synced" confirmation after background sync completes.
 class ConnectivityBanner extends ConsumerStatefulWidget {
   const ConnectivityBanner({super.key, this.onlineDuration = 3});
 
-  /// How many seconds the "back online" green banner stays visible.
+  /// How many seconds the "back online / sync complete" green banner stays visible.
   final int onlineDuration;
 
   @override
@@ -44,25 +37,58 @@ class _ConnectivityBannerState extends ConsumerState<ConnectivityBanner> {
     }
     _wasOnline = isOnline;
 
-    final visible = !isOnline || _showOnlineFlash;
+    return ValueListenableBuilder<SyncEvent>(
+      valueListenable: syncNotifier,
+      builder: (context, syncEvent, child) {
+        final isSyncing = syncEvent.state == SyncStatusState.syncing;
+        final isSyncCompleted = syncEvent.state == SyncStatusState.completed;
+        final visible = !isOnline || _showOnlineFlash || isSyncing || isSyncCompleted;
 
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-      child: visible ? _buildBanner(isOnline) : const SizedBox.shrink(),
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+          child: visible
+              ? _buildBanner(isOnline, isSyncing, isSyncCompleted, syncEvent)
+              : const SizedBox.shrink(),
+        );
+      },
     );
   }
 
-  Widget _buildBanner(bool isOnline) {
-    final isFlash = isOnline && _showOnlineFlash;
+  Widget _buildBanner(
+    bool isOnline,
+    bool isSyncing,
+    bool isSyncCompleted,
+    SyncEvent syncEvent,
+  ) {
+    Color bgColor;
+    Widget leadingWidget;
+    String message;
 
-    final bgColor = isFlash
-        ? NivaraColors.success
-        : const Color(0xFFB45309); // Amber-700
-    final icon = isFlash ? Icons.wifi : Icons.wifi_off;
-    final message = isFlash
-        ? '✓ Back online — syncing your pending posts…'
-        : '⚡ You\'re offline — posts will sync when you reconnect';
+    if (isSyncing) {
+      bgColor = const Color(0xFF0284C7); // Sky-600
+      leadingWidget = const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
+      );
+      message = syncEvent.message ?? 'Syncing offline queue to cloud...';
+    } else if (isSyncCompleted) {
+      bgColor = NivaraColors.success;
+      leadingWidget = const Icon(Icons.check_circle_outline, color: Colors.white, size: 18);
+      message = syncEvent.message ?? '✓ Offline items synced to cloud';
+    } else if (isOnline && _showOnlineFlash) {
+      bgColor = NivaraColors.success;
+      leadingWidget = const Icon(Icons.wifi, color: Colors.white, size: 18);
+      message = '✓ Back online — syncing pending submissions…';
+    } else {
+      bgColor = const Color(0xFFB45309); // Amber-700
+      leadingWidget = const Icon(Icons.wifi_off, color: Colors.white, size: 18);
+      message = '⚡ You\'re offline — submissions will auto-sync when online';
+    }
 
     return Container(
       width: double.infinity,
@@ -72,7 +98,7 @@ class _ConnectivityBannerState extends ConsumerState<ConnectivityBanner> {
         top: false,
         child: Row(
           children: [
-            Icon(icon, color: Colors.white, size: 18),
+            leadingWidget,
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -80,7 +106,7 @@ class _ConnectivityBannerState extends ConsumerState<ConnectivityBanner> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),

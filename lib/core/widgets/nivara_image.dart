@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 /// Universal resilient image renderer supporting Network URLs, Base64 Data URIs,
@@ -54,7 +53,7 @@ class NivaraImage extends StatelessWidget {
           width: width,
           height: height,
           fit: fit,
-          errorBuilder: (_, __, ___) => placeholder(),
+          errorBuilder: (_, _, _) => placeholder(),
         );
       } catch (_) {
         imageWidget = placeholder();
@@ -80,7 +79,7 @@ class NivaraImage extends StatelessWidget {
             ),
           );
         },
-        errorBuilder: (_, __, ___) => placeholder(),
+        errorBuilder: (_, _, _) => placeholder(),
       );
     } else {
       imageWidget = placeholder();

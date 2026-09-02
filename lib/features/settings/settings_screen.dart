@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/app_localizations.dart';
-import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import 'accessibility_controller.dart';
 import 'language_controller.dart';
@@ -37,8 +36,8 @@ class SettingsScreen extends ConsumerWidget {
           _SectionHeader(
             icon: Icons.palette_rounded,
             color: const Color(0xFF7B4BC4),
-            title: 'Theme & Brand Palette',
-            subtitle: 'Choose your preferred dark mode styling and UI accent color',
+            title: NivaraStrings.tr('theme_palette_title', currentLang),
+            subtitle: NivaraStrings.tr('theme_palette_sub', currentLang),
           ),
           const SizedBox(height: 14),
 
@@ -59,27 +58,27 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Theme Mode',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                Text(
+                  NivaraStrings.tr('theme_mode', currentLang),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                 ),
                 const SizedBox(height: 10),
                 SegmentedButton<ThemeMode>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: ThemeMode.system,
-                      label: Text('System'),
-                      icon: Icon(Icons.brightness_auto),
+                      label: Text(NivaraStrings.tr('theme_system', currentLang)),
+                      icon: const Icon(Icons.brightness_auto),
                     ),
                     ButtonSegment(
                       value: ThemeMode.light,
-                      label: Text('Light'),
-                      icon: Icon(Icons.light_mode),
+                      label: Text(NivaraStrings.tr('theme_light', currentLang)),
+                      icon: const Icon(Icons.light_mode),
                     ),
                     ButtonSegment(
                       value: ThemeMode.dark,
-                      label: Text('Dark'),
-                      icon: Icon(Icons.dark_mode),
+                      label: Text(NivaraStrings.tr('theme_dark', currentLang)),
+                      icon: const Icon(Icons.dark_mode),
                     ),
                   ],
                   selected: {settings.themeMode},
@@ -91,7 +90,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(
                   settings.themeMode == ThemeMode.system
-                      ? 'Following your device OS dark/light setting.'
+                      ? NivaraStrings.tr('theme_system_desc', currentLang)
                       : '${themeModeLabel(settings.themeMode)} theme active.',
                   style: TextStyle(
                     color: isDark ? Colors.white54 : const Color(0xFF64748B),
@@ -99,13 +98,13 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Accent Colour',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                Text(
+                  NivaraStrings.tr('accent_colour', currentLang),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Recolours buttons, highlights, and headers across Nivara.',
+                  NivaraStrings.tr('accent_colour_sub', currentLang),
                   style: TextStyle(
                     color: isDark ? Colors.white54 : const Color(0xFF64748B),
                     fontSize: 12,

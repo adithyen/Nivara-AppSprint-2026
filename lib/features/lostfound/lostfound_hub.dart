@@ -1,26 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../../router.dart';
+import '../settings/language_controller.dart';
 import 'item_card.dart';
 
 /// 2026-Level Flagship Lost & Found Hub.
-class LostFoundHub extends StatefulWidget {
+class LostFoundHub extends ConsumerStatefulWidget {
   const LostFoundHub({super.key});
 
   @override
-  State<LostFoundHub> createState() => _LostFoundHubState();
+  ConsumerState<LostFoundHub> createState() => _LostFoundHubState();
 }
 
-class _LostFoundHubState extends State<LostFoundHub> {
+class _LostFoundHubState extends ConsumerState<LostFoundHub> {
   final _items = <String, LFItem>{};
   StreamSubscription? _sub;
   bool _loaded = false;
@@ -127,15 +131,16 @@ class _LostFoundHubState extends State<LostFoundHub> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
     final scheme = Theme.of(context).colorScheme;
     final primary = scheme.primary;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lost & Found Radar'),
+        title: Text(NivaraStrings.tr('lost_found_radar', currentLang)),
         actions: [
           IconButton(
-            tooltip: 'My listings',
+            tooltip: NivaraStrings.tr('my_listings', currentLang),
             icon: const Icon(Icons.inbox_outlined),
             onPressed: () async {
               await context.push(Routes.myListings);
@@ -144,72 +149,78 @@ class _LostFoundHubState extends State<LostFoundHub> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _ActionButton(
-                    icon: Icons.search_off_rounded,
-                    label: 'I Lost\nSomething',
-                    color: NivaraColors.danger,
-                    onTap: () async {
-                      await context.push(Routes.reportLost);
-                      if (mounted) _load();
-                    },
+      body: WithConnectivityBanner(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.search_off_rounded,
+                      label: NivaraStrings.tr('i_lost_something', currentLang),
+                      color: NivaraColors.danger,
+                      onTap: () async {
+                        await context.push(Routes.reportLost);
+                        if (mounted) _load();
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _ActionButton(
-                    icon: Icons.inventory_2_rounded,
-                    label: 'I Found\nSomething',
-                    color: primary,
-                    onTap: () async {
-                      await context.push(Routes.reportFound);
-                      if (mounted) _load();
-                    },
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.inventory_2_rounded,
+                      label: NivaraStrings.tr('i_found_something', currentLang),
+                      color: primary,
+                      onTap: () async {
+                        await context.push(Routes.reportFound);
+                        if (mounted) _load();
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-            child: Row(
-              children: [
-                Text(
-                  'Active Listings',
-                  style: TextStyle(
-                    color: scheme.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              child: Row(
+                children: [
+                  Text(
+                    NivaraStrings.tr('active_listings', currentLang),
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                _FilterChips(
-                  value: _filter,
-                  onChanged: (f) => setState(() => _filter = f),
-                ),
-              ],
+                  const Spacer(),
+                  _FilterChips(
+                    value: _filter,
+                    currentLang: currentLang,
+                    onChanged: (f) => setState(() => _filter = f),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(child: _buildFeed()),
-        ],
+            const SizedBox(height: 4),
+            Expanded(child: _buildFeed(currentLang)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildFeed() {
+  Widget _buildFeed(AppLanguage currentLang) {
     final primary = Theme.of(context).colorScheme.primary;
 
     if (!_loaded) {
       return Center(child: CircularProgressIndicator(color: primary));
     }
     if (_error != null) {
+      final isOfflineErr = _error!.contains('SocketException') ||
+          _error!.contains('ClientException') ||
+          _error!.contains('Failed host lookup');
       return RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -217,8 +228,12 @@ class _LostFoundHubState extends State<LostFoundHub> {
           children: [
             _EmptyState(
               icon: Icons.cloud_off_rounded,
-              title: 'Could not load items',
-              subtitle: 'Check network connection or pull down to retry.\n$_error',
+              title: isOfflineErr
+                  ? NivaraStrings.tr('offline_cant_load_title', currentLang)
+                  : NivaraStrings.tr('could_not_load_items', currentLang),
+              subtitle: isOfflineErr
+                  ? NivaraStrings.tr('offline_cant_load_sub', currentLang)
+                  : 'Pull down to retry.\n$_error',
             ),
           ],
         ),
@@ -230,11 +245,11 @@ class _LostFoundHubState extends State<LostFoundHub> {
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
+          children: [
             _EmptyState(
               icon: Icons.travel_explore_rounded,
-              title: 'No Active Listings',
-              subtitle: 'Be the first — report a lost or found item above.\nPull down to refresh.',
+              title: NivaraStrings.tr('no_active_listings', currentLang),
+              subtitle: NivaraStrings.tr('no_active_listings_sub', currentLang),
             ),
           ],
         ),
@@ -327,8 +342,13 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _FilterChips extends StatelessWidget {
-  const _FilterChips({required this.value, required this.onChanged});
+  const _FilterChips({
+    required this.value,
+    required this.currentLang,
+    required this.onChanged,
+  });
   final LFItemType? value;
+  final AppLanguage currentLang;
   final ValueChanged<LFItemType?> onChanged;
 
   @override
@@ -336,9 +356,9 @@ class _FilterChips extends StatelessWidget {
     return Wrap(
       spacing: 6,
       children: [
-        _chip(context, 'All', null),
-        _chip(context, 'Lost', LFItemType.lost),
-        _chip(context, 'Found', LFItemType.found),
+        _chip(context, NivaraStrings.tr('filter_all', currentLang), null),
+        _chip(context, NivaraStrings.tr('filter_lost', currentLang), LFItemType.lost),
+        _chip(context, NivaraStrings.tr('filter_found', currentLang), LFItemType.found),
       ],
     );
   }

@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../features/settings/language_controller.dart';
 import '../../models/enums.dart';
 
@@ -26,7 +25,7 @@ abstract final class NivaraStrings {
     'role_citizen': {
       AppLanguage.en: 'Citizen',
       AppLanguage.hi: 'नागरिक',
-      AppLanguage.ml: 'പൗരൻ',
+      AppLanguage.ml: 'നഗരവാസി',
     },
     'role_worker': {
       AppLanguage.en: 'Field Worker',
@@ -867,6 +866,515 @@ abstract final class NivaraStrings {
       AppLanguage.en: 'Announce road events and status updates through device speaker',
       AppLanguage.hi: 'डिवाइस स्पीकर के माध्यम से सड़क की घटनाओं और स्थिति अपडेट की घोषणा करें',
       AppLanguage.ml: 'റോഡ് വിവരങ്ങളും സ്റ്റാറ്റസ് മാറ്റങ്ങളും സ്പീക്കറിലൂടെ വിളിച്ചുപറയുക',
+    },
+
+    // ── Work With Nivara Sheet ──────────────────────────────────────────────
+    'work_intro': {
+      AppLanguage.en: 'Join verified civic field teams to resolve municipal infrastructure issues, log photo resolution proof, and receive worker stipends.',
+      AppLanguage.hi: 'नगरपालिका की बुनियादी ढांचा समस्याओं को हल करने, फोटो प्रमाण दर्ज करने और मानदेय प्राप्त करने के लिए सत्यापित फील्ड टीमों से जुड़ें।',
+      AppLanguage.ml: 'നഗരസഭാ അടിസ്ഥാന സൗകര്യ പ്രശ്നങ്ങൾ പരിഹരിക്കുന്നതിനും ഫോട്ടോ തെളിവുകൾ സമർപ്പിക്കുന്നതിനും വേതനം നേടുന്നതിനും ഫീൽഡ് ടീമിൽ ചേരുക.',
+    },
+    'sec_applicant_details': {
+      AppLanguage.en: '1. APPLICANT DETAILS',
+      AppLanguage.hi: '1. आवेदक विवरण',
+      AppLanguage.ml: '1. അപേക്ഷകന്റെ വിവരങ്ങൾ',
+    },
+    'sec_departments': {
+      AppLanguage.en: '2. INTERESTED DEPARTMENTS & SKILLS *',
+      AppLanguage.hi: '2. रुचि वाले विभाग एवं कौशल *',
+      AppLanguage.ml: '2. താൽപ്പര്യമുള്ള വിഭാഗങ്ങളും കഴിവുകളും *',
+    },
+    'sec_shift': {
+      AppLanguage.en: '3. SHIFT & AVAILABILITY',
+      AppLanguage.hi: '3. शिफ्ट और उपलब्धता',
+      AppLanguage.ml: '3. ഷിഫ്റ്റും ലഭ്യതയും',
+    },
+    'sec_equipment': {
+      AppLanguage.en: '4. EQUIPMENT & READINESS',
+      AppLanguage.hi: '4. उपकरण और तत्परता',
+      AppLanguage.ml: '4. ഉപകരണങ്ങളും സജ്ജീകരണങ്ങളും',
+    },
+    'full_name_star': {
+      AppLanguage.en: 'Full Name *',
+      AppLanguage.hi: 'पूरा नाम *',
+      AppLanguage.ml: 'പൂർണ്ണമായ പേര് *',
+    },
+    'phone_star': {
+      AppLanguage.en: 'Phone Number *',
+      AppLanguage.hi: 'फ़ोन नंबर *',
+      AppLanguage.ml: 'ഫോൺ നമ്പർ *',
+    },
+    'ward_locality': {
+      AppLanguage.en: 'Ward / Locality',
+      AppLanguage.hi: 'वार्ड / क्षेत्र',
+      AppLanguage.ml: 'വാർഡ് / പ്രദേശം',
+    },
+    'shift_full_time': {
+      AppLanguage.en: 'Full-Time (Daily Shifts)',
+      AppLanguage.hi: 'पूर्णकालिक (दैनिक शिफ्ट)',
+      AppLanguage.ml: 'മുഴുസമയ ജോലി (ദിവസേന)',
+    },
+    'shift_part_time': {
+      AppLanguage.en: 'Part-Time (Flexible)',
+      AppLanguage.hi: 'अंशकालिक (लचीला)',
+      AppLanguage.ml: 'ഭാഗിക സമയം (സൗകര്യപ്രദം)',
+    },
+    'shift_emergency': {
+      AppLanguage.en: 'Emergency Quick Responder',
+      AppLanguage.hi: 'आपातकालीन त्वरित प्रतिक्रियाकर्ता',
+      AppLanguage.ml: 'അടിയന്തര ദ്രുത പ്രതികരണ സേന',
+    },
+    'equip_vehicle': {
+      AppLanguage.en: 'Two-Wheeler / Vehicle Transport Available',
+      AppLanguage.hi: 'दोपहिया / वाहन परिवहन उपलब्ध है',
+      AppLanguage.ml: 'ഇരുചക്ര വാഹനം ലഭ്യമാണ്',
+    },
+    'equip_tools': {
+      AppLanguage.en: 'Own Basic Hand Tools / Repair Equipment',
+      AppLanguage.hi: 'बुनियादी मरम्मत उपकरण उपलब्ध हैं',
+      AppLanguage.ml: 'അടിസ്ഥാന അറ്റകുറ്റപ്പണി ഉപകരണങ്ങളുണ്ട്',
+    },
+    'equip_smartphone': {
+      AppLanguage.en: 'Active Smartphone for Geo-Photo Logging',
+      AppLanguage.hi: 'जियो-फोटो लॉगिंग के लिए स्मार्टफोन उपलब्ध है',
+      AppLanguage.ml: 'ഫോട്ടോ ലോഗിങ്ങിനായി സ്മാർട്ട്ഫോൺ ഉണ്ട്',
+    },
+    'motivation_label': {
+      AppLanguage.en: 'Why do you want to work with Nivara? (Optional)',
+      AppLanguage.hi: 'आप निवारा के साथ क्यों काम करना चाहते हैं? (वैकल्पिक)',
+      AppLanguage.ml: 'നിവാരയിൽ പ്രവർത്തിക്കാൻ എന്തുകൊണ്ട് താൽപ്പര്യപ്പെടുന്നു? (ഓപ്ഷണൽ)',
+    },
+    'btn_submit_application': {
+      AppLanguage.en: 'Submit Field Worker Application',
+      AppLanguage.hi: 'फील्ड वर्कर आवेदन जमा करें',
+      AppLanguage.ml: 'അപേക്ഷ സമർപ്പിക്കുക',
+    },
+    'application_submitted_title': {
+      AppLanguage.en: 'Application Submitted!',
+      AppLanguage.hi: 'आवेदन सफलतापूर्वक जमा!',
+      AppLanguage.ml: 'അപേക്ഷ സമർപ്പിച്ചു!',
+    },
+    'application_submitted_sub': {
+      AppLanguage.en: 'Municipal officers will review your credentials and contact you via phone.',
+      AppLanguage.hi: 'नगर निगम अधिकारी आपकी साख की समीक्षा करेंगे और फ़ोन पर संपर्क करेंगे।',
+      AppLanguage.ml: 'നഗരസഭാ ഉദ്യോഗസ്ഥർ നിങ്ങളുടെ അപേക്ഷ പരിശോധിച്ച് ഫോണിൽ ബന്ധപ്പെടും.',
+    },
+    'btn_done': {
+      AppLanguage.en: 'Done',
+      AppLanguage.hi: 'पूर्ण',
+      AppLanguage.ml: 'പൂർത്തിയായി',
+    },
+
+    // ── Edit Profile Sheet ──────────────────────────────────────────────────
+    'account_email': {
+      AppLanguage.en: 'Account Email',
+      AppLanguage.hi: 'खाता ईमेल',
+      AppLanguage.ml: 'അക്കൗണ്ട് ഇമെയിൽ',
+    },
+    'display_name': {
+      AppLanguage.en: 'Display Name',
+      AppLanguage.hi: 'प्रदर्शित नाम',
+      AppLanguage.ml: 'പ്രദർശിപ്പിക്കുന്ന പേര്',
+    },
+    'phone_number': {
+      AppLanguage.en: 'Phone Number',
+      AppLanguage.hi: 'फ़ोन नंबर',
+      AppLanguage.ml: 'ഫോൺ നമ്പർ',
+    },
+    'city': {
+      AppLanguage.en: 'City',
+      AppLanguage.hi: 'शहर',
+      AppLanguage.ml: 'നഗരം',
+    },
+    'save_changes': {
+      AppLanguage.en: 'Save Changes',
+      AppLanguage.hi: 'बदलाव सहेजें',
+      AppLanguage.ml: 'മാറ്റങ്ങൾ സൂക്ഷിക്കുക',
+    },
+
+    // ── Feedback & Contact Dev ──────────────────────────────────────────────
+    'feedback_title': {
+      AppLanguage.en: 'Feedback & Contact Dev',
+      AppLanguage.hi: 'प्रतिक्रिया एवं डेवलपर संपर्क',
+      AppLanguage.ml: 'അഭിപ്രായങ്ങളും ഡെവലപ്പർ സഹായവും',
+    },
+    'developer_hotline': {
+      AppLanguage.en: 'Direct Developer Hotline',
+      AppLanguage.hi: 'सीधी डेवलपर हेल्पलाइन',
+      AppLanguage.ml: 'ഡെവലപ്പർ ഹെൽപ്പ്‌ലൈൻ',
+    },
+    'hotline_sub': {
+      AppLanguage.en: 'Messages and attached screenshots are dispatched to adityenh@gmail.com',
+      AppLanguage.hi: 'संदेश और स्क्रीनशॉट adityenh@gmail.com पर भेजे जाते हैं',
+      AppLanguage.ml: 'സന്ദേശങ്ങളും സ്ക്രീൻഷോട്ടുകളും adityenh@gmail.com ലേക്ക് അയക്കുന്നു',
+    },
+    'select_category': {
+      AppLanguage.en: 'Select Category',
+      AppLanguage.hi: 'श्रेणी चुनें',
+      AppLanguage.ml: 'വിഭാഗം തിരഞ്ഞെടുക്കുക',
+    },
+    'report_bug': {
+      AppLanguage.en: 'Report a Bug',
+      AppLanguage.hi: 'बग रिपोर्ट करें',
+      AppLanguage.ml: 'തകരാർ അറിയിക്കുക',
+    },
+    'suggest_feature': {
+      AppLanguage.en: 'Suggest Feature',
+      AppLanguage.hi: 'सुझाव दें',
+      AppLanguage.ml: 'പുതിയ നിർദ്ദേശം',
+    },
+    'contact_dev': {
+      AppLanguage.en: 'Contact Developer',
+      AppLanguage.hi: 'डेवलपर से संपर्क',
+      AppLanguage.ml: 'ഡെവലപ്പറെ ബന്ധപ്പെടുക',
+    },
+    'summary_title': {
+      AppLanguage.en: 'Summary / Title *',
+      AppLanguage.hi: 'सारांश / शीर्षक *',
+      AppLanguage.ml: 'തലക്കെട്ട് *',
+    },
+    'summary_hint': {
+      AppLanguage.en: 'e.g. Map pin freezes when dragging quickly',
+      AppLanguage.hi: 'उदा. मानचित्र पिन तेज़ी से खींचने पर रुक जाता है',
+      AppLanguage.ml: 'ഉദാ: മാപ്പ് പിൻ വേഗത്തിൽ നീക്കുമ്പോൾ തടസ്സപ്പെടുന്നു',
+    },
+    'detailed_description': {
+      AppLanguage.en: 'Detailed Description *',
+      AppLanguage.hi: 'विस्तृत विवरण *',
+      AppLanguage.ml: 'വിശദ വിവരങ്ങൾ *',
+    },
+    'desc_hint': {
+      AppLanguage.en: 'Please describe what happened, steps to reproduce, and what you expected...',
+      AppLanguage.hi: 'कृपया बताएं कि क्या हुआ, पुनरुत्पादन के चरण, और आपकी क्या अपेक्षा थी...',
+      AppLanguage.ml: 'എന്താണ് സംഭവിച്ചതെന്നും എങ്ങനെ വീണ്ടും സംഭവിക്കുന്നുവെന്നും വിശദീകരിക്കുക...',
+    },
+    'your_contact': {
+      AppLanguage.en: 'Your Contact (Optional)',
+      AppLanguage.hi: 'आपका संपर्क (वैकल्पिक)',
+      AppLanguage.ml: 'നിങ്ങളുടെ ഫോൺ/ഇമെയിൽ (ഓപ്ഷണൽ)',
+    },
+    'contact_hint': {
+      AppLanguage.en: 'Email or phone number for replies',
+      AppLanguage.hi: 'उत्तर के लिए ईमेल या फ़ोन नंबर',
+      AppLanguage.ml: 'മറുപടിക്കായുള്ള ഇമെയിൽ അല്ലെങ്കിൽ ഫോൺ',
+    },
+    'screenshots_attachments': {
+      AppLanguage.en: 'Screenshots / Attachments',
+      AppLanguage.hi: 'स्क्रीनशॉट / अनुलग्नक',
+      AppLanguage.ml: 'സ്ക്രീൻഷോട്ടുകൾ',
+    },
+    'attach': {
+      AppLanguage.en: 'Attach',
+      AppLanguage.hi: 'संलग्न करें',
+      AppLanguage.ml: 'ചേർക്കുക',
+    },
+    'auto_diagnostics': {
+      AppLanguage.en: 'Auto-Attached Diagnostic Data',
+      AppLanguage.hi: 'स्वतः संलग्न नैदानिक डेटा',
+      AppLanguage.ml: 'ഡയഗ്നോസ്റ്റിക് വിവരങ്ങൾ',
+    },
+    'btn_send_feedback': {
+      AppLanguage.en: 'Send Feedback to Developer',
+      AppLanguage.hi: 'डेवलपर को प्रतिक्रिया भेजें',
+      AppLanguage.ml: 'അഭിപ്രായം അയക്കുക',
+    },
+
+    // ── Theme & Accent Palette ──────────────────────────────────────────────
+    'theme_brand_palette': {
+      AppLanguage.en: 'Theme & Brand Palette',
+      AppLanguage.hi: 'थीम एवं रंग पैलेट',
+      AppLanguage.ml: 'ഡിസൈനും നിറങ്ങളും',
+    },
+    'theme_sub': {
+      AppLanguage.en: 'Choose your preferred dark mode styling and UI accent color',
+      AppLanguage.hi: 'अपनी पसंदीदा डार्क मोड शैली और रंग चुनें',
+      AppLanguage.ml: 'ഇഷ്ടപ്പെട്ട ഡാർക്ക് മോഡും പ്രധാന നിറങ്ങളും തിരഞ്ഞെടുക്കുക',
+    },
+    'theme_mode': {
+      AppLanguage.en: 'Theme Mode',
+      AppLanguage.hi: 'थीम मोड',
+      AppLanguage.ml: 'തീം മോഡ്',
+    },
+    'theme_system': {
+      AppLanguage.en: 'System',
+      AppLanguage.hi: 'सिस्टम',
+      AppLanguage.ml: 'സിസ്റ്റം',
+    },
+    'theme_light': {
+      AppLanguage.en: 'Light',
+      AppLanguage.hi: 'लाइट',
+      AppLanguage.ml: 'ലൈറ്റ്',
+    },
+    'theme_dark': {
+      AppLanguage.en: 'Dark',
+      AppLanguage.hi: 'डार्क',
+      AppLanguage.ml: 'ഡാർക്ക്',
+    },
+    'theme_active_system': {
+      AppLanguage.en: 'System theme active.',
+      AppLanguage.hi: 'सिस्टम थीम सक्रिय है।',
+      AppLanguage.ml: 'സിസ്റ്റം തീം സജീവം.',
+    },
+    'theme_active_light': {
+      AppLanguage.en: 'Light theme active.',
+      AppLanguage.hi: 'लाइट थीम सक्रिय है।',
+      AppLanguage.ml: 'ലൈറ്റ് തീം സജീവം.',
+    },
+    'theme_active_dark': {
+      AppLanguage.en: 'Dark theme active.',
+      AppLanguage.hi: 'डार्क थीम सक्रिय है।',
+      AppLanguage.ml: 'ഡാർക്ക് തീം സജീവം.',
+    },
+    'accent_colour': {
+      AppLanguage.en: 'Accent Colour',
+      AppLanguage.hi: 'एक्सेंट रंग',
+      AppLanguage.ml: 'പ്രധാന നിറം',
+    },
+    'accent_sub': {
+      AppLanguage.en: 'Recolours buttons, highlights, and headers across Nivara.',
+      AppLanguage.hi: 'निवारा में बटन, हाइलाइट्स और हेडर का रंग बदलता है।',
+      AppLanguage.ml: 'ബട്ടണുകൾ, ഹൈലൈറ്റുകൾ എന്നിവയുടെ നിറം മാറ്റുന്നു.',
+    },
+    'color_civic_blue': {
+      AppLanguage.en: 'Civic Blue',
+      AppLanguage.hi: 'सिविक ब्लू',
+      AppLanguage.ml: 'സിവിക് ബ്ലൂ',
+    },
+    'color_teal': {
+      AppLanguage.en: 'Teal',
+      AppLanguage.hi: 'टील',
+      AppLanguage.ml: 'ടീൽ',
+    },
+    'color_indigo': {
+      AppLanguage.en: 'Indigo',
+      AppLanguage.hi: 'इंडिगो',
+      AppLanguage.ml: 'ഇൻഡിഗോ',
+    },
+    'color_violet': {
+      AppLanguage.en: 'Violet',
+      AppLanguage.hi: 'वायलेट',
+      AppLanguage.ml: 'വയലറ്റ്',
+    },
+    'color_magenta': {
+      AppLanguage.en: 'Magenta',
+      AppLanguage.hi: 'मैजेंटा',
+      AppLanguage.ml: 'മജന്ത',
+    },
+    'color_emerald': {
+      AppLanguage.en: 'Emerald',
+      AppLanguage.hi: 'एमराल्ड',
+      AppLanguage.ml: 'മരതകം',
+    },
+    'color_sunset': {
+      AppLanguage.en: 'Sunset',
+      AppLanguage.hi: 'सनसेट',
+      AppLanguage.ml: 'സൂര്യാസ്തമയം',
+    },
+    'color_crimson': {
+      AppLanguage.en: 'Crimson',
+      AppLanguage.hi: 'क्रिमसन',
+      AppLanguage.ml: 'ക്രിംസൺ',
+    },
+
+    // ── Sign Out Dialog ─────────────────────────────────────────────────────
+    'sign_out_title': {
+      AppLanguage.en: 'Sign out?',
+      AppLanguage.hi: 'साइन आउट करें?',
+      AppLanguage.ml: 'ലോഗ് ഔട്ട് ചെയ്യണോ?',
+    },
+    'sign_out_confirm': {
+      AppLanguage.en: 'You will need to sign in again to file and manage reports.',
+      AppLanguage.hi: 'रिपोर्ट दर्ज करने और प्रबंधित करने के लिए आपको फिर से साइन इन करना होगा।',
+      AppLanguage.ml: 'പരാതികൾ നൽകാനും കൈകാര്യം ചെയ്യാനും വീണ്ടും ലോഗിൻ ചെയ്യേണ്ടിവരും.',
+    },
+    'btn_cancel': {
+      AppLanguage.en: 'Cancel',
+      AppLanguage.hi: 'रद्द करें',
+      AppLanguage.ml: 'റദ്ദാക്കുക',
+    },
+    'btn_sign_out': {
+      AppLanguage.en: 'Sign out',
+      AppLanguage.hi: 'साइन आउट',
+      AppLanguage.ml: 'ലോഗ് ഔട്ട്',
+    },
+
+    // ── Community Compose ───────────────────────────────────────────────────
+    'new_announcement': {
+      AppLanguage.en: 'New Announcement',
+      AppLanguage.hi: 'नई घोषणा',
+      AppLanguage.ml: 'പുതിയ അറിയിപ്പ്',
+    },
+    'new_post': {
+      AppLanguage.en: 'New Post',
+      AppLanguage.hi: 'नई पोस्ट',
+      AppLanguage.ml: 'പുതിയ പോസ്റ്റ്',
+    },
+    'new_job': {
+      AppLanguage.en: 'New Job / Service',
+      AppLanguage.hi: 'नया कार्य / सेवा',
+      AppLanguage.ml: 'പുതിയ തൊഴിൽ / സേവനം',
+    },
+    'new_poll': {
+      AppLanguage.en: 'New Poll',
+      AppLanguage.hi: 'नया पोल',
+      AppLanguage.ml: 'പുതിയ അഭിപ്രായ വോട്ടെടുപ്പ്',
+    },
+    'banner_announcement': {
+      AppLanguage.en: 'Broadcast something people nearby should know.',
+      AppLanguage.hi: 'आस-पास के लोगों के लिए महत्वपूर्ण सूचना प्रसारित करें।',
+      AppLanguage.ml: 'സമീപവാസികൾ അറിയേണ്ട പ്രധാന വിവരങ്ങൾ പങ്കുവെക്കുക.',
+    },
+    'banner_post': {
+      AppLanguage.en: 'Share news, a question, or a heads-up with people around you.',
+      AppLanguage.hi: 'अपने आस-पास के लोगों के साथ समाचार, प्रश्न या सुझाव साझा करें।',
+      AppLanguage.ml: 'നാട്ടുകാരുമായി വാർത്തകളോ ചോദ്യങ്ങളോ വിശേഷങ്ങളോ പങ്കുവെക്കുക.',
+    },
+    'banner_job': {
+      AppLanguage.en: 'List work you need done. Add a contact so people can reach you.',
+      AppLanguage.hi: 'काम की सूची दें ताकि लोग आपसे संपर्क कर सकें।',
+      AppLanguage.ml: 'നിങ്ങൾക്ക് ആവശ്യമുള്ള ജോലികൾ പങ്കുവെക്കുക. ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ നൽകുക.',
+    },
+    'banner_poll': {
+      AppLanguage.en: 'Ask a question and let neighbours vote. Results update live.',
+      AppLanguage.hi: 'प्रश्न पूछें और पड़ोसियों को वोट करने दें। परिणाम लाइव अपडेट होते हैं।',
+      AppLanguage.ml: 'നാട്ടുകാരുടെ അഭിപ്രായം അറിയാൻ വോട്ടെടുപ്പ് നടത്തുക. ഫലങ്ങൾ തത്സമയം അറിയാം.',
+    },
+    'field_title': {
+      AppLanguage.en: 'Title',
+      AppLanguage.hi: 'शीर्षक',
+      AppLanguage.ml: 'തലക്കെട്ട്',
+    },
+    'field_say_more': {
+      AppLanguage.en: 'Say more (optional)',
+      AppLanguage.hi: 'और विवरण लिखें (वैकल्पिक)',
+      AppLanguage.ml: 'കൂടുതൽ വിവരങ്ങൾ (ഓപ്ഷണൽ)',
+    },
+    'reach_and_location': {
+      AppLanguage.en: 'Reach & location',
+      AppLanguage.hi: 'पहुंच और स्थान',
+      AppLanguage.ml: 'പരിധിയും സ്ഥലവും',
+    },
+    'limit_nearby': {
+      AppLanguage.en: 'Limit to a nearby area',
+      AppLanguage.hi: 'आस-पास के क्षेत्र तक सीमित करें',
+      AppLanguage.ml: 'സമീപ പ്രദേശത്തേക്ക് മാത്രമായി പരിമിതപ്പെടുത്തുക',
+    },
+    'limit_nearby_sub': {
+      AppLanguage.en: 'Only shown to people within the radius below',
+      AppLanguage.hi: 'केवल नीचे दिए गए दायरे के लोगों को दिखाया जाएगा',
+      AppLanguage.ml: 'താഴെ പറയുന്ന പരിധിക്കുള്ളിലുള്ളവർക്ക് മാത്രം കാണാം',
+    },
+    'visible_within_km': {
+      AppLanguage.en: 'Visible within',
+      AppLanguage.hi: 'के भीतर दृश्यमान',
+      AppLanguage.ml: 'ദൂരപരിധി:',
+    },
+    'landmark_area_optional': {
+      AppLanguage.en: 'Landmark / area (optional)',
+      AppLanguage.hi: 'लैंडमार्क / क्षेत्र (वैकल्पिक)',
+      AppLanguage.ml: 'പ്രദേശം / അടയാളം (ഓപ്ഷണൽ)',
+    },
+    'add_contact': {
+      AppLanguage.en: 'Add a contact',
+      AppLanguage.hi: 'संपर्क जोड़ें',
+      AppLanguage.ml: 'ബന്ധപ്പെടാനുള്ള നമ്പർ നൽകുക',
+    },
+    'add_contact_sub': {
+      AppLanguage.en: 'A one-tap way for people to reach you',
+      AppLanguage.hi: 'लोगों के लिए आपसे संपर्क करने का आसान तरीका',
+      AppLanguage.ml: 'ആളുകൾക്ക് നിങ്ങളെ എളുപ്പത്തിൽ വിളിക്കാം',
+    },
+    'photo_optional': {
+      AppLanguage.en: 'Photo (optional)',
+      AppLanguage.hi: 'फ़ोटो (वैकल्पिक)',
+      AppLanguage.ml: 'ഫോട്ടോ (ഓപ്ഷണൽ)',
+    },
+    'poll_question': {
+      AppLanguage.en: 'Poll question',
+      AppLanguage.hi: 'पोल प्रश्न',
+      AppLanguage.ml: 'വോട്ടെടുപ്പ് ചോദ്യം',
+    },
+    'poll_options': {
+      AppLanguage.en: 'Options',
+      AppLanguage.hi: 'विकल्प',
+      AppLanguage.ml: 'ഓപ്ഷനുകൾ',
+    },
+    'add_option': {
+      AppLanguage.en: 'Add option',
+      AppLanguage.hi: 'विकल्प जोड़ें',
+      AppLanguage.ml: 'ഓപ്ഷൻ ചേർക്കുക',
+    },
+    'open_until_optional': {
+      AppLanguage.en: 'Open until (optional)',
+      AppLanguage.hi: 'समाप्ति तिथि (वैकल्पिक)',
+      AppLanguage.ml: 'അവസാന തീയതി (ഓപ്ഷണൽ)',
+    },
+    'no_end_date': {
+      AppLanguage.en: 'No end date',
+      AppLanguage.hi: 'कोई अंतिम तिथि नहीं',
+      AppLanguage.ml: 'അവസാന തീയതിയില്ല',
+    },
+    'btn_post_community': {
+      AppLanguage.en: 'Post to community',
+      AppLanguage.hi: 'समुदाय में पोस्ट करें',
+      AppLanguage.ml: 'പോസ്റ്റ് ചെയ്യുക',
+    },
+
+    // ── Lost & Found Hub ────────────────────────────────────────────────────
+    'lost_found_radar': {
+      AppLanguage.en: 'Lost & Found Radar',
+      AppLanguage.hi: 'खोया और पाया रडार',
+      AppLanguage.ml: 'നഷ്ടപ്പെട്ടതും കണ്ടെത്തിയതും',
+    },
+    'i_lost_something': {
+      AppLanguage.en: 'I Lost\nSomething',
+      AppLanguage.hi: 'मेरी कोई चीज़\nखो गई',
+      AppLanguage.ml: 'എന്റെ സാധനം\nനഷ്ടപ്പെട്ടു',
+    },
+    'i_found_something': {
+      AppLanguage.en: 'I Found\nSomething',
+      AppLanguage.hi: 'मुझे कोई चीज़\nमिली है',
+      AppLanguage.ml: 'സാധനം\nകണ്ടെത്തി',
+    },
+    'active_listings': {
+      AppLanguage.en: 'Active Listings',
+      AppLanguage.hi: 'सक्रिय सूचियां',
+      AppLanguage.ml: 'സജീവ ലിസ്റ്റിംഗുകൾ',
+    },
+    'filter_all': {
+      AppLanguage.en: 'All',
+      AppLanguage.hi: 'सभी',
+      AppLanguage.ml: 'എല്ലാം',
+    },
+    'filter_lost': {
+      AppLanguage.en: 'Lost',
+      AppLanguage.hi: 'खोया',
+      AppLanguage.ml: 'നഷ്ടപ്പെട്ടത്',
+    },
+    'filter_found': {
+      AppLanguage.en: 'Found',
+      AppLanguage.hi: 'पाया',
+      AppLanguage.ml: 'കണ്ടെത്തിയത്',
+    },
+    'no_active_listings': {
+      AppLanguage.en: 'No Active Listings',
+      AppLanguage.hi: 'कोई सक्रिय सूची नहीं',
+      AppLanguage.ml: 'ലിസ്റ്റിംഗുകളൊന്നുമില്ല',
+    },
+    'no_active_listings_sub': {
+      AppLanguage.en: 'Be the first — report a lost or found item above.\nPull down to refresh.',
+      AppLanguage.hi: 'सबसे पहले रिपोर्ट करें — ऊपर खोई या पाई गई वस्तु दर्ज करें।\nरिफ्रेश करने के लिए नीचे खींचें।',
+      AppLanguage.ml: 'പുതിയ റിപ്പോർട്ട് ചേർക്കുക. പുതുക്കാൻ താഴേക്ക് വലിക്കുക.',
+    },
+    'offline_cant_load_title': {
+      AppLanguage.en: 'You\'re currently offline',
+      AppLanguage.hi: 'आप वर्तमान में ऑफ़लाइन हैं',
+      AppLanguage.ml: 'നിങ്ങൾ ഓഫ്‌ലൈനിലാണ്',
+    },
+    'offline_cant_load_sub': {
+      AppLanguage.en: 'Live listings will refresh automatically when your connection is restored.',
+      AppLanguage.hi: 'इंटरनेट कनेक्शन बहाल होने पर सूचियां स्वतः अपडेट हो जाएंगी।',
+      AppLanguage.ml: 'ഇന്റർനെറ്റ് ലഭ്യമാകുമ്പോൾ തത്സമയം ലഭ്യമാകും.',
     },
   };
 

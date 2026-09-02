@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/app_localizations.dart';
-import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import 'accessibility_controller.dart';

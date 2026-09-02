@@ -24,6 +24,15 @@ class _NivaraAppState extends ConsumerState<NivaraApp> {
   bool _prevOnline = true;
 
   @override
+  void initState() {
+    super.initState();
+    // On app startup, immediately drain any pending offline items if online
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      OfflineQueueService.drainAll();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final settings = ref.watch(settingsControllerProvider);

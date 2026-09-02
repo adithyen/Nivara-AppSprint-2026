@@ -8,12 +8,14 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../auth/auth_controller.dart';
+import '../settings/language_controller.dart';
 
 enum FeedbackCategory {
   bug('Report a Bug', Icons.bug_report_rounded, Color(0xFFFF5252)),
@@ -285,16 +287,17 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
     final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
     final cardBg = isDark ? const Color(0xFF10161E) : Colors.white;
 
+    final currentLang = ref.watch(languageControllerProvider);
     final profile = ref.watch(authControllerProvider).asData?.value;
     final roleLabel = switch (profile?.role) {
-      UserRole.worker => 'Field Worker',
-      UserRole.admin || UserRole.superadmin => 'Government Official / Admin',
-      _ => 'Citizen',
+      UserRole.worker => NivaraStrings.tr('role_worker', currentLang),
+      UserRole.admin || UserRole.superadmin => NivaraStrings.tr('role_admin', currentLang),
+      _ => NivaraStrings.tr('role_citizen', currentLang),
     };
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Feedback & Contact Dev'),
+        title: Text(NivaraStrings.tr('feedback_title', currentLang)),
       ),
       body: WithConnectivityBanner(
         child: ListView(
@@ -341,7 +344,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Direct Developer Hotline',
+                          NivaraStrings.tr('developer_hotline', currentLang),
                           style: TextStyle(
                             color: primaryText,
                             fontWeight: FontWeight.w800,
@@ -350,7 +353,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Messages and attached screenshots are dispatched to $_developerEmail',
+                          NivaraStrings.tr('hotline_sub', currentLang),
                           style: TextStyle(
                             color: secondaryText,
                             fontSize: 12,
@@ -367,7 +370,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
 
             // Category Selector
             Text(
-              'Select Category',
+              NivaraStrings.tr('select_category', currentLang),
               style: TextStyle(
                 color: primaryText,
                 fontWeight: FontWeight.w700,
@@ -404,7 +407,11 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              cat.label,
+                              switch (cat) {
+                                FeedbackCategory.bug => NivaraStrings.tr('report_bug', currentLang),
+                                FeedbackCategory.feature => NivaraStrings.tr('suggest_feature', currentLang),
+                                FeedbackCategory.contact => NivaraStrings.tr('contact_dev', currentLang),
+                              },
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: _category == cat ? cat.color : primaryText,
@@ -425,7 +432,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
 
             // Form Inputs
             Text(
-              'Summary / Title *',
+              NivaraStrings.tr('summary_title', currentLang),
               style: TextStyle(
                 color: primaryText,
                 fontWeight: FontWeight.w700,
@@ -437,11 +444,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
               controller: _titleCtrl,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: switch (_category) {
-                  FeedbackCategory.bug => 'e.g. Map pin freezes when dragging quickly',
-                  FeedbackCategory.feature => 'e.g. Add dark mode widget to home screen',
-                  FeedbackCategory.contact => 'e.g. Inquiry regarding civic partnership',
-                },
+                hintText: NivaraStrings.tr('summary_hint', currentLang),
                 prefixIcon: Icon(_category.icon, size: 18, color: _category.color),
                 filled: true,
                 border: OutlineInputBorder(
@@ -453,7 +456,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
             const SizedBox(height: 16),
 
             Text(
-              'Detailed Description *',
+              NivaraStrings.tr('detailed_description', currentLang),
               style: TextStyle(
                 color: primaryText,
                 fontWeight: FontWeight.w700,
@@ -466,14 +469,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
               maxLines: 5,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: switch (_category) {
-                  FeedbackCategory.bug =>
-                    'Please describe what happened, steps to reproduce, and what you expected...',
-                  FeedbackCategory.feature =>
-                    'Please describe your proposed feature and how it benefits citizens / workers...',
-                  FeedbackCategory.contact =>
-                    'Write your message, question, or inquiry here...',
-                },
+                hintText: NivaraStrings.tr('desc_hint', currentLang),
                 alignLabelWithHint: true,
                 filled: true,
                 border: OutlineInputBorder(
@@ -485,7 +481,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
             const SizedBox(height: 16),
 
             Text(
-              'Your Contact (Optional)',
+              NivaraStrings.tr('your_contact', currentLang),
               style: TextStyle(
                 color: primaryText,
                 fontWeight: FontWeight.w700,
@@ -496,7 +492,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
             TextField(
               controller: _contactCtrl,
               decoration: InputDecoration(
-                hintText: 'Email or phone number for replies',
+                hintText: NivaraStrings.tr('contact_hint', currentLang),
                 prefixIcon: const Icon(Icons.alternate_email_rounded, size: 18),
                 filled: true,
                 border: OutlineInputBorder(
@@ -511,7 +507,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
             Row(
               children: [
                 Text(
-                  'Screenshots / Attachments',
+                  NivaraStrings.tr('screenshots_attachments', currentLang),
                   style: TextStyle(
                     color: primaryText,
                     fontWeight: FontWeight.w700,
@@ -592,7 +588,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Attach',
+                              NivaraStrings.tr('attach', currentLang),
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.primary,
                                 fontSize: 11,
@@ -626,7 +622,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
                       const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF00B0FF)),
                       const SizedBox(width: 6),
                       Text(
-                        'Auto-Attached Diagnostic Data',
+                        NivaraStrings.tr('auto_diagnostics', currentLang),
                         style: TextStyle(
                           color: primaryText,
                           fontWeight: FontWeight.w800,
@@ -682,7 +678,7 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
                             ),
                             SizedBox(width: 10),
                             Text(
-                              'Uploading attachments & opening Gmail...',
+                              'Sending feedback...',
                               style: TextStyle(
                                 color: Colors.black,
                                 fontWeight: FontWeight.w900,
@@ -691,17 +687,17 @@ class _FeedbackContactScreenState extends ConsumerState<FeedbackContactScreen> {
                             ),
                           ],
                         )
-                      : const Row(
+                      : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.send_rounded, color: Colors.black, size: 20),
-                            SizedBox(width: 8),
+                            const Icon(Icons.send_rounded, color: Colors.black, size: 20),
+                            const SizedBox(width: 8),
                             Text(
-                              'Send via Email to adityenh@gmail.com',
-                              style: TextStyle(
+                              NivaraStrings.tr('btn_send_feedback', currentLang),
+                              style: const TextStyle(
                                 color: Colors.black,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 14.5,
+                                fontSize: 14,
                               ),
                             ),
                           ],

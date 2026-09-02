@@ -170,15 +170,17 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
         .onBroadcast(
           event: _kEvtOtp,
           callback: (payload) {
-            // Only owner handles incoming OTP
+            // Only owner handles incoming OTP and ONLY when owner explicitly initiated a verification request
             if (!widget.isOwner) return;
             if (!mounted || _verifying || _completed) return;
             final otp = payload['otp'] as String?;
             if (otp != null && RegExp(r'^\d{6}$').hasMatch(otp)) {
-              HapticFeedback.mediumImpact();
-              _pinCtrl.text = otp;
-              if (mounted) setState(() => _ownerRequesting = false);
-              _verifyOtp(otp);
+              if (_ownerRequesting) {
+                HapticFeedback.mediumImpact();
+                _pinCtrl.text = otp;
+                setState(() => _ownerRequesting = false);
+                _verifyOtp(otp);
+              }
             }
           },
         )
@@ -188,25 +190,12 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
             // Only claimant handles OTP requests
             if (widget.isOwner) return;
             if (!mounted || _completed) return;
-            _broadcastOtpNow(); // Immediately respond with OTP
+            _broadcastOtpNow(); // Respond with OTP on explicit request
           },
         )
         .subscribe((status, _) async {
           if (status == RealtimeSubscribeStatus.subscribed) {
             if (mounted) setState(() => _channelReady = true);
-            if (!widget.isOwner) {
-              // Claimant: if OTP is already generated, broadcast immediately
-              if (_otp != null) {
-                await _broadcastOtpNow();
-                _startPeriodicBroadcast();
-              }
-              // If OTP not yet generated, _initPass will trigger broadcast when ready
-            } else {
-              // Owner: immediately request OTP from claimant — no need to wait for
-              // the next periodic broadcast or for the user to tap the button.
-              // This covers the case where finder opened their pass before the owner.
-              await _requestOtpFromFinder(silent: true);
-            }
           }
         });
   }
@@ -222,14 +211,6 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
         payload: {'otp': otp},
       );
     } catch (_) {}
-  }
-
-  void _startPeriodicBroadcast() {
-    _broadcastTimer?.cancel();
-    _broadcastTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted || _completed) return;
-      _broadcastOtpNow();
-    });
   }
 
   // ── Owner: tap to request OTP ─────────────────────────────────────────────
@@ -292,10 +273,9 @@ class _LFHandoverDialogState extends State<LFHandoverDialog> {
         _token = res['token'] as String?;
         _loading = false;
       });
-      // If channel is already subscribed, start broadcasting immediately
+      // If channel is already subscribed, broadcast initial status
       if (_channelReady && otp != null) {
         _broadcastOtpNow();
-        _startPeriodicBroadcast();
       }
       // If channel is not yet subscribed, the subscribe callback will start broadcasting
     } catch (e) {

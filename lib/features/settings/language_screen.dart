@@ -230,7 +230,7 @@ class _LanguageScreenState extends ConsumerState<LanguageScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: filteredIndianLangs.length,
-              separatorBuilder: (_, __) => Divider(
+              separatorBuilder: (_, _) => Divider(
                 height: 1,
                 color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
               ),

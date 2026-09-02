@@ -320,9 +320,15 @@ class _CommunityComposeScreenState
       _snack('${_isEdit ? 'Post updated' : 'Posted'}${photoNote ?? ''}.');
       context.pop(true);
     } catch (e) {
-      // Offline fallback
+      // Offline fallback: save to offline queue with poll options and photos
       try {
-        await OfflineQueueService.enqueueCommunity(payload: payload);
+        if (_isPoll) {
+          payload['poll_options'] = _pollLabels();
+        }
+        await OfflineQueueService.enqueueCommunity(
+          payload: payload,
+          photos: _newPhotos.map((p) => File(p.path)).toList(),
+        );
         if (!mounted) return;
         _snack('Saved to Offline Queue (Pending Sync) — will sync when back online.');
         context.pop(true);

@@ -162,10 +162,12 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
               .toList();
         }
       });
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(content: Text('Vote recorded.')));
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Could not vote: $e')));
