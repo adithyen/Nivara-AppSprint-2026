@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants.dart';
 import '../../core/localization/app_localizations.dart';
@@ -34,6 +36,7 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
   @override
   void initState() {
     super.initState();
+    _loadCache();
     _load();
   }
 
@@ -43,13 +46,39 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
     super.dispose();
   }
 
+  Future<void> _loadCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString('cached_lf_items');
+      if (cachedJson != null && mounted) {
+        final rows = jsonDecode(cachedJson) as List;
+        final cachedItems = <String, LFItem>{};
+        for (final r in rows) {
+          try {
+            final item = LFItem.fromMap(r as Map<String, dynamic>);
+            if (item.status == 'ACTIVE') {
+              cachedItems[item.id] = item;
+            }
+          } catch (_) {}
+        }
+        if (cachedItems.isNotEmpty && mounted) {
+          setState(() {
+            _items.addAll(cachedItems);
+            _loaded = true;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> _load() async {
     try {
       final rows = await supabase
           .from(kTableLfItems)
           .select()
           .eq('status', 'ACTIVE')
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 5));
       final newItems = <String, LFItem>{};
       for (final r in rows) {
         try {
@@ -59,6 +88,10 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
           }
         } catch (_) {}
       }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_lf_items', jsonEncode(rows));
+
       if (mounted) {
         setState(() {
           _items
@@ -72,7 +105,9 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
       if (mounted) {
         setState(() {
           _loaded = true;
-          _error = '$e';
+          if (_items.isEmpty) {
+            _error = '$e';
+          }
         });
       }
     }
@@ -137,7 +172,12 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(NivaraStrings.tr('lost_found_radar', currentLang)),
+        title: Text(
+          NivaraStrings.tr('lost_found_radar', currentLang),
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           IconButton(
             tooltip: NivaraStrings.tr('my_listings', currentLang),
@@ -183,22 +223,28 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
               child: Row(
                 children: [
                   Text(
                     NivaraStrings.tr('active_listings', currentLang),
                     style: TextStyle(
                       color: scheme.onSurface,
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const Spacer(),
-                  _FilterChips(
-                    value: _filter,
-                    currentLang: currentLang,
-                    onChanged: (f) => setState(() => _filter = f),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true,
+                      child: _FilterChips(
+                        value: _filter,
+                        currentLang: currentLang,
+                        onChanged: (f) => setState(() => _filter = f),
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -30,7 +30,11 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   int _myReports = 0;
   int _myConfirms = 0;
   int _myFinds = 0;
-  int get _civicScore => _myReports * 25 + _myConfirms * 10 + _myFinds * 15;
+  int get _civicScore => calculateCivicScore(
+        reports: _myReports,
+        confirms: _myConfirms,
+        finds: _myFinds,
+      );
 
   @override
   void initState() {
@@ -58,13 +62,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     }
 
     try {
-      final reportsFut = _countMyRows(kTableReports, uid);
-      final confirmsFut = _countMyConfirms(uid);
-      final findsFut = _countMyFinds(uid);
-
-      final myReports = await reportsFut;
-      final myConfirms = await confirmsFut;
-      final myFinds = await findsFut;
+      final myReports = await _countMyRows(kTableReports, uid).timeout(const Duration(seconds: 5));
+      final myConfirms = await _countMyConfirms(uid).timeout(const Duration(seconds: 5));
+      final myFinds = await _countMyFinds(uid).timeout(const Duration(seconds: 5));
 
       if (uid != null) {
         await prefs.setInt('cached_reports_$uid', myReports);
@@ -80,46 +80,35 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         _loading = false;
       });
     } catch (_) {
+      // Network/offline error: preserve cached counts, do not wipe to 0
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<int> _countMyRows(String table, String? uid) async {
     if (uid == null) return 0;
-    try {
-      final rows = await supabase.from(table).select('id').eq('user_id', uid);
-      return (rows as List).length;
-    } catch (_) {
-      return 0;
-    }
+    final rows = await supabase.from(table).select('id').eq('user_id', uid);
+    return (rows as List).length;
   }
 
   Future<int> _countMyConfirms(String? uid) async {
     if (uid == null) return 0;
-    try {
-      final rows = await supabase
-          .from(kTableConfirmations)
-          .select('id')
-          .eq('user_id', uid)
-          .eq('type', 'CONFIRM');
-      return (rows as List).length;
-    } catch (_) {
-      return 0;
-    }
+    final rows = await supabase
+        .from(kTableConfirmations)
+        .select('id')
+        .eq('user_id', uid)
+        .eq('type', 'CONFIRM');
+    return (rows as List).length;
   }
 
   Future<int> _countMyFinds(String? uid) async {
     if (uid == null) return 0;
-    try {
-      final rows = await supabase
-          .from(kTableLfItems)
-          .select('id')
-          .eq('user_id', uid)
-          .eq('item_type', 'FOUND');
-      return (rows as List).length;
-    } catch (_) {
-      return 0;
-    }
+    final rows = await supabase
+        .from(kTableLfItems)
+        .select('id')
+        .eq('user_id', uid)
+        .eq('item_type', 'FOUND');
+    return (rows as List).length;
   }
 
   @override
@@ -234,7 +223,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 14,
               mainAxisSpacing: 14,
-              childAspectRatio: 1.15,
+              childAspectRatio: 0.94,
               children: [
                 _FeatureModuleTile(
                   icon: Icons.sensors_rounded,
@@ -600,16 +589,18 @@ class _FeatureModuleTile extends StatelessWidget {
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isDark ? Colors.white : const Color(0xFF111827),
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.2,
+                    height: 1.15,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -621,7 +612,7 @@ class _FeatureModuleTile extends StatelessWidget {
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.6)
                         : const Color(0xFF6B7280),
-                    fontSize: 11.5,
+                    fontSize: 11,
                     height: 1.2,
                   ),
                 ),

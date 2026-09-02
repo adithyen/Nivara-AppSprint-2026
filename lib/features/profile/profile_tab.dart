@@ -38,7 +38,11 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   bool _leaveWorking = false;
   int _pendingCount = 0;
 
-  int get _civicScore => _reports * 10 + _confirms * 5 + _finds * 15;
+  int get _civicScore => calculateCivicScore(
+        reports: _reports,
+        confirms: _confirms,
+        finds: _finds,
+      );
 
   @override
   void initState() {
@@ -78,11 +82,11 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     }
 
     try {
-      final reports = await _count(kTableReports, uid, {});
+      final reports = await _count(kTableReports, uid, {}).timeout(const Duration(seconds: 5));
       final confirms = await _count(kTableConfirmations, uid, {
         'type': 'CONFIRM',
-      });
-      final finds = await _count(kTableLfItems, uid, {'item_type': 'FOUND'});
+      }).timeout(const Duration(seconds: 5));
+      final finds = await _count(kTableLfItems, uid, {'item_type': 'FOUND'}).timeout(const Duration(seconds: 5));
 
       if (uid != null) {
         await prefs.setInt('cached_reports_$uid', reports);
@@ -98,20 +102,17 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
         _loading = false;
       });
     } catch (_) {
+      // Network/offline fallback: keep cached counts intact, do not reset to 0
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<int> _count(String table, String? uid, Map<String, String> eq) async {
     if (uid == null) return 0;
-    try {
-      var q = supabase.from(table).select('id').eq('user_id', uid);
-      eq.forEach((k, v) => q = q.eq(k, v));
-      final rows = await q;
-      return (rows as List).length;
-    } catch (_) {
-      return 0;
-    }
+    var q = supabase.from(table).select('id').eq('user_id', uid);
+    eq.forEach((k, v) => q = q.eq(k, v));
+    final rows = await q;
+    return (rows as List).length;
   }
 
   Future<void> _editProfile(UserProfile profile) async {

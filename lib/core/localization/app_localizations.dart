@@ -109,12 +109,12 @@ abstract final class NivaraStrings {
     'civic_standing': {
       AppLanguage.en: 'Civic Standing & XP',
       AppLanguage.hi: 'नागरिक प्रतिष्ठा एवं XP',
-      AppLanguage.ml: 'പൗരസ്കോറും പദവിയും (XP)',
+      AppLanguage.ml: 'നഗരവാസി സ്കോറും പദവിയും (XP)',
     },
     'civic_modules': {
       AppLanguage.en: 'Civic Modules',
       AppLanguage.hi: 'नागरिक सेवा मॉड्यूल',
-      AppLanguage.ml: 'പൗരസേവന വിഭാഗങ്ങൾ',
+      AppLanguage.ml: 'നഗര സേവന വിഭാഗങ്ങൾ',
     },
     'stat_reports': {
       AppLanguage.en: 'Reports',
@@ -128,7 +128,7 @@ abstract final class NivaraStrings {
     },
     'stat_finds': {
       AppLanguage.en: 'Finds',
-      AppLanguage.hi: 'കണ്ടെത്തിയവ',
+      AppLanguage.hi: 'प्राप्त वस्तुएं',
       AppLanguage.ml: 'കണ്ടെത്തിയവ',
     },
     'xp_points': {

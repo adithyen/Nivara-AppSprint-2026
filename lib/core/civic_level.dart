@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+/// Unified formula to calculate citizen civic score consistently across all screens.
+int calculateCivicScore({
+  required int reports,
+  required int confirms,
+  required int finds,
+}) {
+  return reports * 25 + confirms * 10 + finds * 15;
+}
+
 /// The civic-impact ladder: ten community-help ranks a citizen climbs as their
 /// activity score grows. Points are the derived civic score
 /// (reports×10 + confirms×5 + finds×15) computed on Home/Profile — this maps
@@ -43,11 +52,11 @@ class CivicLevel {
         2 => 'തെരുവ് സംരക്ഷകൻ',
         3 => 'വാർഡ് നിരീക്ഷകൻ',
         4 => 'വാർഡ് ഗാർഡിയൻ',
-        5 => 'പൗര സ്കൗട്ട്',
+        5 => 'നഗര സ്കൗട്ട്',
         6 => 'സമൂഹ നായകൻ',
         7 => 'നഗര കാവലാൾ',
         8 => 'വികസന മുന്നണി',
-        9 => 'പൗര പ്രമുഖൻ',
+        9 => 'നഗര പ്രമുഖൻ',
         _ => 'നിവാര ലെജൻഡ്',
       };
     } else if (langCode == 'hi') {
@@ -78,7 +87,7 @@ class CivicLevel {
         5 => 'നഗര പ്രശ്നങ്ങൾ കണ്ടെത്തുന്നു.',
         6 => 'നാടിനെ ഒന്നിപ്പിച്ച് നയിക്കുന്നു.',
         7 => 'നഗര സുരക്ഷയ്ക്കും സേവനത്തിനും മുന്നിൽ.',
-        8 => 'പൗര മാറ്റങ്ങൾക്ക് നേതൃത്വം നൽകുന്നു.',
+        8 => 'സാമൂഹിക മാറ്റങ്ങൾക്ക് നേതൃത്വം നൽകുന്നു.',
         9 => 'നഗരത്തിന് മാതൃകയായ വ്യക്തിത്വം.',
         _ => 'നിങ്ങൾ ഉള്ളതുകൊണ്ട് നഗരം കൂടുതൽ മികച്ചതാകുന്നു.',
       };
