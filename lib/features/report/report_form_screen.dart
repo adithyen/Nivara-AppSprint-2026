@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
@@ -33,6 +34,10 @@ class ReportFormScreen extends ConsumerStatefulWidget {
     this.initialLat,
     this.initialLng,
     this.initialAddress,
+    this.initialTitle,
+    this.initialDesc,
+    this.initialSeverity,
+    this.initialPhoto,
   });
 
   /// Preselect a category (e.g. when opened from the category grid on home).
@@ -40,6 +45,10 @@ class ReportFormScreen extends ConsumerStatefulWidget {
   final double? initialLat;
   final double? initialLng;
   final String? initialAddress;
+  final String? initialTitle;
+  final String? initialDesc;
+  final Severity? initialSeverity;
+  final XFile? initialPhoto;
 
   @override
   ConsumerState<ReportFormScreen> createState() => _ReportFormScreenState();
@@ -77,6 +86,18 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
     }
     if (widget.initialAddress != null && widget.initialAddress!.isNotEmpty) {
       _addressCtrl.text = widget.initialAddress!;
+    }
+    if (widget.initialTitle != null && widget.initialTitle!.isNotEmpty) {
+      _titleCtrl.text = widget.initialTitle!;
+    }
+    if (widget.initialDesc != null && widget.initialDesc!.isNotEmpty) {
+      _descCtrl.text = widget.initialDesc!;
+    }
+    if (widget.initialSeverity != null) {
+      _severity = widget.initialSeverity!;
+    }
+    if (widget.initialPhoto != null) {
+      _photos.add(widget.initialPhoto!);
     }
     _fetchLocation();
   }
@@ -174,6 +195,19 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: const Icon(Icons.auto_awesome_rounded, color: NivaraColors.primary),
+              title: const Text(
+                'AI Auto-Capture Scanner',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: const Text('Auto-detects potholes, drains & 19 civic issues'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/report/ai-camera', extra: _category);
+              },
+            ),
+            const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Take a photo'),
@@ -318,8 +352,87 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
       body: WithConnectivityBanner(
         child: Column(
           children: [
+            // AI Auto-Capture Scanner Hero Banner
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => context.push('/report/ai-camera'),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0284C7), Color(0xFF0F766E)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.28),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentLang == AppLanguage.ml
+                                    ? '🤖 AI ഓട്ടോ-ക്യാപ്ചർ സ്കാനർ'
+                                    : '🤖 AI Auto-Capture Scanner',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                currentLang == AppLanguage.ml
+                                    ? 'കുഴികളും ഡ്രെയിനേജും തനിയെ തിരിച്ചറിഞ്ഞ് 1-ടാപ്പിൽ റിപ്പോർട്ട് ചെയ്യാം'
+                                    : 'Auto-detects 19 civic issues & captures evidence with 1-tap submit',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: TextField(
                 controller: _categoryFilterCtrl,
                 onChanged: (_) => setState(() {}),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'features/activity/activity_log_screen.dart';
 import 'features/activity/pending_sync_screen.dart';
@@ -18,6 +19,7 @@ import 'features/lostfound/my_listings_screen.dart';
 import 'features/lostfound/match_screen.dart';
 import 'features/lostfound/report_found_screen.dart';
 import 'features/lostfound/report_lost_screen.dart';
+import 'features/ai_capture/presentation/civic_ai_camera_screen.dart';
 import 'features/map/civic_map.dart';
 import 'features/map/location_picker_screen.dart';
 import 'features/report/report_detail_screen.dart';
@@ -63,6 +65,7 @@ abstract final class Routes {
   static const activityLog = '/activity';
   static const pendingSync = '/activity/sync';
   static const locationPicker = '/map/picker';
+  static const aiCamera = '/report/ai-camera';
 }
 
 /// The single [GoRouter] instance, built with an auth/role redirect guard.
@@ -160,14 +163,31 @@ final routerProvider = Provider<GoRouter>((ref) {
             final lng = (extra['lng'] as num?)?.toDouble();
             final address = extra['address'] as String?;
             final cat = extra['category'] as ReportCategory?;
+            final title = extra['title'] as String?;
+            final desc = extra['description'] as String?;
+            final severity = extra['severity'] as Severity?;
+            final initialPhoto = extra['initialPhoto'] as XFile?;
             return ReportFormScreen(
               initialCategory: cat,
               initialLat: lat,
               initialLng: lng,
               initialAddress: address,
+              initialTitle: title,
+              initialDesc: desc,
+              initialSeverity: severity,
+              initialPhoto: initialPhoto,
             );
           }
           return const ReportFormScreen();
+        },
+      ),
+      GoRoute(
+        path: Routes.aiCamera,
+        builder: (context, state) {
+          final extra = state.extra;
+          return CivicAiCameraScreen(
+            initialCategory: extra is ReportCategory ? extra : null,
+          );
         },
       ),
       GoRoute(

@@ -25,7 +25,7 @@ abstract final class NivaraStrings {
     'role_citizen': {
       AppLanguage.en: 'Citizen',
       AppLanguage.hi: 'नागरिक',
-      AppLanguage.ml: 'നഗരവാസി',
+      AppLanguage.ml: 'പൗരൻ',
     },
     'role_worker': {
       AppLanguage.en: 'Field Worker',
@@ -83,6 +83,16 @@ abstract final class NivaraStrings {
       AppLanguage.en: 'SensorWatch',
       AppLanguage.hi: 'सड़क सेंसर वॉच',
       AppLanguage.ml: 'റോഡ് സെൻസർ വാച്ച്',
+    },
+    'ai_autocapture_title': {
+      AppLanguage.en: 'AI Civic Auto-Capture',
+      AppLanguage.hi: 'एआई ऑटो-कैप्चर स्कैनर',
+      AppLanguage.ml: 'AI ഓട്ടോ-ക്യാപ്ചർ സ്കാനർ',
+    },
+    'ai_autocapture_sub': {
+      AppLanguage.en: 'Smart vision detection for potholes, drains & 19 civic issues',
+      AppLanguage.hi: 'सड़क के गड्ढे, नाली और 19 नागरिक समस्याओं की स्मार्ट पहचान',
+      AppLanguage.ml: 'കുഴികൾ, ഓടകൾ തുടങ്ങി 19 തരം നഗര പ്രശ്നങ്ങൾ തനിയെ തിരിച്ചറിയാം',
     },
     'nav_tasks': {
       AppLanguage.en: 'Tasks',

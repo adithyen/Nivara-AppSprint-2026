@@ -204,11 +204,127 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   ),
           ),
 
+          const SizedBox(height: 18),
+
+          // AI Civic Auto-Capture Scanner Featured Hero Banner
+          StaggeredEntrance(
+            index: 2,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => context.push(Routes.aiCamera),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF00FFCC).withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00FFCC).withValues(alpha: 0.12),
+                        blurRadius: 18,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF00FFCC), Color(0xFF0284C7)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00FFCC).withValues(alpha: 0.4),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Colors.black,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  NivaraStrings.tr('ai_autocapture_title', currentLang),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF00FFCC).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFF00FFCC),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    '19 HAZARDS',
+                                    style: TextStyle(
+                                      color: Color(0xFF00FFCC),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              NivaraStrings.tr('ai_autocapture_sub', currentLang),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Color(0xFF00FFCC),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           const SizedBox(height: 24),
 
           // Section Title
           StaggeredEntrance(
-            index: 2,
+            index: 3,
             child: _SectionHeader(NivaraStrings.tr('civic_modules', currentLang)),
           ),
 
@@ -216,7 +332,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
           // 2x2 Feature Modules Grid
           StaggeredEntrance(
-            index: 3,
+            index: 4,
             child: GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
