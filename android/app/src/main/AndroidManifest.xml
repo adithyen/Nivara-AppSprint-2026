@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Nivara: network for Supabase/Ola/OSM; GPS for SensorWatch + CivicMap; VIBRATE for haptics. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -18,7 +19,8 @@
          Android ≤10. On 11+ the logger falls back to the app external-files
          dir (no permission needed) and shows the resolved path on-screen. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29"/>
+        android:maxSdkVersion="29"
+        tools:replace="android:maxSdkVersion"/>
 
     <!-- Package visibility queries for Android 11+ SpeechRecognizer services -->
     <queries>
