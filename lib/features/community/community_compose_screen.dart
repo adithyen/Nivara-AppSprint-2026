@@ -19,6 +19,8 @@ import '../../models/community_post.dart';
 import '../../models/enums.dart';
 import '../auth/auth_controller.dart';
 import '../lostfound/lf_contact.dart';
+import '../voice_reporting/models/voice_reporting_models.dart';
+import '../voice_reporting/presentation/voice_dictation_button.dart';
 import 'community_tab.dart' show communityTypeColor, communityTypeIcon;
 
 /// Full-screen composer for a Community post, reached from the feed's template
@@ -32,10 +34,20 @@ import 'community_tab.dart' show communityTypeColor, communityTypeIcon;
 /// left city-wide) and carry an optional one-tap contact. On success it pops
 /// `true` so the feed reloads.
 class CommunityComposeScreen extends ConsumerStatefulWidget {
-  const CommunityComposeScreen({super.key, required this.type, this.existing});
+  const CommunityComposeScreen({
+    super.key,
+    required this.type,
+    this.existing,
+    this.initialTitle,
+    this.initialBody,
+    this.initialLabel,
+  });
 
   final CommunityPostType type;
   final CommunityPost? existing;
+  final String? initialTitle;
+  final String? initialBody;
+  final String? initialLabel;
 
   @override
   ConsumerState<CommunityComposeScreen> createState() =>
@@ -78,6 +90,9 @@ class _CommunityComposeScreenState
   @override
   void initState() {
     super.initState();
+    if (widget.initialTitle != null) _titleCtrl.text = widget.initialTitle!;
+    if (widget.initialBody != null) _bodyCtrl.text = widget.initialBody!;
+    if (widget.initialLabel != null) _labelCtrl.text = widget.initialLabel!;
     final e = widget.existing;
     if (e != null) {
       _titleCtrl.text = e.title;
@@ -358,7 +373,27 @@ class _CommunityComposeScreenState
           padding: const EdgeInsets.all(16),
           children: [
             _Banner(type: _type, color: color),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: VoiceDictationButton(
+                mode: VoiceReportMode.community,
+                isCompact: true,
+                tooltip: 'Voice Dictate Post',
+                onPayloadReceived: (payload) {
+                  setState(() {
+                    if (payload.title.isNotEmpty) _titleCtrl.text = payload.title;
+                    if (payload.description.isNotEmpty && _allowsBody) {
+                      _bodyCtrl.text = payload.description;
+                    }
+                    if (payload.extractedLandmark != null && _labelCtrl.text.isEmpty) {
+                      _labelCtrl.text = payload.extractedLandmark!;
+                    }
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _titleCtrl,
               textCapitalization: TextCapitalization.sentences,

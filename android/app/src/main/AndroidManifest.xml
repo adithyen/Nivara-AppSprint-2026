@@ -4,8 +4,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
-    <!-- Camera for QR code scanning in Lost & Found handover verification -->
+    <!-- Camera for QR code scanning in Lost & Found handover verification and AI Auto-Capture -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Microphone for Voice-Based Reporting across Civic, Lost & Found, and Community -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Bluetooth & Nearby Device permissions for Proximity Handover Verification -->
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
@@ -17,6 +19,13 @@
          dir (no permission needed) and shows the resolved path on-screen. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29"/>
+
+    <!-- Package visibility queries for Android 11+ SpeechRecognizer services -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
     <application
         android:label="Nivara"
         android:name="${applicationName}"

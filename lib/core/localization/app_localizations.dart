@@ -94,6 +94,16 @@ abstract final class NivaraStrings {
       AppLanguage.hi: 'सड़क के गड्ढे, नाली और 19 नागरिक समस्याओं की स्मार्ट पहचान',
       AppLanguage.ml: 'കുഴികൾ, ഓടകൾ തുടങ്ങി 19 തരം നഗര പ്രശ്നങ്ങൾ തനിയെ തിരിച്ചറിയാം',
     },
+    'voice_reporter_title': {
+      AppLanguage.en: 'AI Voice Reporting',
+      AppLanguage.hi: 'एआई वॉइस रिपोर्टिंग',
+      AppLanguage.ml: 'AI വോയ്സ് റിപ്പോർട്ടിംഗ്',
+    },
+    'voice_reporter_sub': {
+      AppLanguage.en: 'Speak naturally to report civic hazards, lost items, or posts',
+      AppLanguage.hi: 'समस्या, खोया-पाया या पोस्ट दर्ज करने के लिए बोलें',
+      AppLanguage.ml: 'പരാതികൾ, നഷ്ടപ്പെട്ടവ, പോസ്റ്റുകൾ എന്നിവ ശബ്ദത്തിലൂടെ നൽകാം',
+    },
     'nav_tasks': {
       AppLanguage.en: 'Tasks',
       AppLanguage.hi: 'कार्य कतार',

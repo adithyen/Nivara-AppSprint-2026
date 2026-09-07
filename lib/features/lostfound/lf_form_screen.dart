@@ -15,6 +15,9 @@ import '../../core/widgets/connectivity_banner.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../map/location_picker_screen.dart';
+import '../voice_reporting/models/voice_reporting_models.dart';
+import '../voice_reporting/presentation/voice_dictation_button.dart';
+import '../voice_reporting/presentation/voice_reporting_sheet.dart';
 import 'item_card.dart';
 
 /// Shared 2-step form for reporting a lost OR found item — [itemType] selects which.
@@ -28,10 +31,16 @@ class LFFormScreen extends StatefulWidget {
     super.key,
     required this.itemType,
     this.initialCategory,
+    this.initialTitle,
+    this.initialDesc,
+    this.initialLabel,
   });
 
   final LFItemType itemType;
   final LFCategory? initialCategory;
+  final String? initialTitle;
+  final String? initialDesc;
+  final String? initialLabel;
 
   @override
   State<LFFormScreen> createState() => _LFFormScreenState();
@@ -68,6 +77,9 @@ class _LFFormScreenState extends State<LFFormScreen> {
   void initState() {
     super.initState();
     _category = widget.initialCategory;
+    if (widget.initialTitle != null) _titleCtrl.text = widget.initialTitle!;
+    if (widget.initialDesc != null) _descCtrl.text = widget.initialDesc!;
+    if (widget.initialLabel != null) _labelCtrl.text = widget.initialLabel!;
     _fetchLocation();
   }
 
@@ -311,8 +323,85 @@ class _LFFormScreenState extends State<LFFormScreen> {
       body: WithConnectivityBanner(
         child: Column(
           children: [
+            // Voice Reporting Assistant Quick Banner
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    showVoiceReportingSheet(
+                      context,
+                      initialMode: VoiceReportMode.lostFound,
+                      onPayloadReady: (payload) {
+                        setState(() {
+                          _category = payload.lfCategory ?? LFCategory.other;
+                          _titleCtrl.text = payload.title;
+                          _descCtrl.text = payload.description;
+                          if (payload.extractedLandmark != null) {
+                            _labelCtrl.text = payload.extractedLandmark!;
+                          }
+                        });
+                      },
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? [const Color(0xFF1E1B4B), const Color(0xFF0F172A)]
+                            : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF818CF8).withValues(alpha: 0.5),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF818CF8),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '🎙️ Voice Report ${widget.itemType.label} Item',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              Text(
+                                'Speak naturally (e.g. "Lost black wallet at bus stand")',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF818CF8)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
               child: TextField(
                 controller: _categoryFilterCtrl,
                 onChanged: (_) => setState(() {}),
@@ -511,7 +600,27 @@ class _LFFormScreenState extends State<LFFormScreen> {
 
               const SizedBox(height: 20),
 
-              const _SectionLabel('1. Item Details'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const _SectionLabel('1. Item Details'),
+                  VoiceDictationButton(
+                    mode: VoiceReportMode.lostFound,
+                    isCompact: true,
+                    tooltip: 'Voice Dictate',
+                    onPayloadReceived: (payload) {
+                      setState(() {
+                        if (payload.title.isNotEmpty) _titleCtrl.text = payload.title;
+                        if (payload.description.isNotEmpty) _descCtrl.text = payload.description;
+                        if (payload.lfCategory != null) _category = payload.lfCategory!;
+                        if (payload.extractedLandmark != null && _labelCtrl.text.isEmpty) {
+                          _labelCtrl.text = payload.extractedLandmark!;
+                        }
+                      });
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _titleCtrl,

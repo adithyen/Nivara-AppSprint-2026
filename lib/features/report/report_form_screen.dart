@@ -19,6 +19,9 @@ import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../map/location_picker_screen.dart';
 import '../settings/language_controller.dart';
+import '../voice_reporting/models/voice_reporting_models.dart';
+import '../voice_reporting/presentation/voice_dictation_button.dart';
+import '../voice_reporting/presentation/voice_reporting_sheet.dart';
 import 'category_grid.dart';
 
 /// Manual CivicReport filing.
@@ -431,8 +434,93 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                 ),
               ),
             ),
+            // Voice Reporting Assistant Quick Card
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    showVoiceReportingSheet(
+                      context,
+                      initialMode: VoiceReportMode.civic,
+                      onPayloadReady: (payload) {
+                        setState(() {
+                          _category = payload.civicCategory ?? ReportCategory.pothole;
+                          _titleCtrl.text = payload.title;
+                          _descCtrl.text = payload.description;
+                          _severity = payload.severity;
+                          if (payload.extractedLandmark != null) {
+                            _addressCtrl.text = payload.extractedLandmark!;
+                          }
+                        });
+                      },
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.5) : const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF818CF8).withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF818CF8).withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.mic_rounded,
+                            color: Color(0xFF818CF8),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentLang == AppLanguage.ml
+                                    ? '🎙️ ശബ്ദത്തിലൂടെ പരാതി നൽകാം'
+                                    : '🎙️ Voice Reporting Assistant',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              Text(
+                                currentLang == AppLanguage.ml
+                                    ? 'മലയാളത്തിലോ ഇംഗ്ലീഷിലോ സംസാരിക്കൂ'
+                                    : 'Speak naturally in English, Malayalam, or Hindi',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 14,
+                          color: Color(0xFF818CF8),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
               child: TextField(
                 controller: _categoryFilterCtrl,
                 onChanged: (_) => setState(() {}),
@@ -639,7 +727,28 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
 
               const SizedBox(height: 20),
 
-              _SectionLabel(NivaraStrings.tr('sec_issue_details', currentLang)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _SectionLabel(NivaraStrings.tr('sec_issue_details', currentLang)),
+                  VoiceDictationButton(
+                    mode: VoiceReportMode.civic,
+                    isCompact: true,
+                    tooltip: currentLang == AppLanguage.ml ? 'ശബ്ദത്തിൽ പറയൂ' : 'Voice Dictate',
+                    onPayloadReceived: (payload) {
+                      setState(() {
+                        if (payload.title.isNotEmpty) _titleCtrl.text = payload.title;
+                        if (payload.description.isNotEmpty) _descCtrl.text = payload.description;
+                        if (payload.civicCategory != null) _category = payload.civicCategory!;
+                        _severity = payload.severity;
+                        if (payload.extractedLandmark != null && _addressCtrl.text.isEmpty) {
+                          _addressCtrl.text = payload.extractedLandmark!;
+                        }
+                      });
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _titleCtrl,

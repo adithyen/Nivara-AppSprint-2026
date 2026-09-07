@@ -19,6 +19,7 @@ import 'features/lostfound/my_listings_screen.dart';
 import 'features/lostfound/match_screen.dart';
 import 'features/lostfound/report_found_screen.dart';
 import 'features/lostfound/report_lost_screen.dart';
+import 'features/lostfound/lf_form_screen.dart';
 import 'features/ai_capture/presentation/civic_ai_camera_screen.dart';
 import 'features/map/civic_map.dart';
 import 'features/map/location_picker_screen.dart';
@@ -216,11 +217,35 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.reportLost,
-        builder: (context, state) => const ReportLostScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map) {
+            return LFFormScreen(
+              itemType: LFItemType.lost,
+              initialCategory: extra['category'] as LFCategory?,
+              initialTitle: extra['title'] as String?,
+              initialDesc: extra['description'] as String?,
+              initialLabel: extra['address'] as String?,
+            );
+          }
+          return const ReportLostScreen();
+        },
       ),
       GoRoute(
         path: Routes.reportFound,
-        builder: (context, state) => const ReportFoundScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map) {
+            return LFFormScreen(
+              itemType: LFItemType.found,
+              initialCategory: extra['category'] as LFCategory?,
+              initialTitle: extra['title'] as String?,
+              initialDesc: extra['description'] as String?,
+              initialLabel: extra['address'] as String?,
+            );
+          }
+          return const ReportFoundScreen();
+        },
       ),
       GoRoute(
         path: Routes.lostFoundMatch,
@@ -291,6 +316,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             } else if (extra['post'] is CommunityPost) {
               existing = extra['post'] as CommunityPost;
             }
+            final title = extra['title'] as String?;
+            final body = extra['body'] as String? ?? extra['description'] as String?;
+            final label = extra['address'] as String? ?? extra['label'] as String?;
+            return CommunityComposeScreen(
+              type: type,
+              existing: existing,
+              initialTitle: title,
+              initialBody: body,
+              initialLabel: label,
+            );
           }
 
           return CommunityComposeScreen(

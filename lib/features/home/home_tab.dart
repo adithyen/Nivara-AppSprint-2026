@@ -15,6 +15,7 @@ import '../../router.dart';
 import '../auth/auth_controller.dart';
 import '../settings/accessibility_controller.dart';
 import '../settings/language_controller.dart';
+import '../voice_reporting/presentation/voice_reporting_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 2026-Level Flagship Citizen Home Dashboard with dynamic localization and accessibility contrast tokens.
@@ -320,11 +321,127 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             ),
           ),
 
+          const SizedBox(height: 12),
+
+          // AI Voice Reporting Assistant Featured Hero Banner
+          StaggeredEntrance(
+            index: 3,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => showVoiceReportingSheet(context),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1E1B4B), Color(0xFF0F172A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF818CF8).withValues(alpha: 0.45),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF818CF8).withValues(alpha: 0.12),
+                        blurRadius: 18,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF818CF8), Color(0xFF4F46E5)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF818CF8).withValues(alpha: 0.4),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.mic_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  NivaraStrings.tr('voice_reporter_title', currentLang),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF818CF8).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFF818CF8),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'VOICE AI',
+                                    style: TextStyle(
+                                      color: Color(0xFFC7D2FE),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              NivaraStrings.tr('voice_reporter_sub', currentLang),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Color(0xFF818CF8),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           const SizedBox(height: 24),
 
           // Section Title
           StaggeredEntrance(
-            index: 3,
+            index: 4,
             child: _SectionHeader(NivaraStrings.tr('civic_modules', currentLang)),
           ),
 
@@ -332,7 +449,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
           // 2x2 Feature Modules Grid
           StaggeredEntrance(
-            index: 4,
+            index: 5,
             child: GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
