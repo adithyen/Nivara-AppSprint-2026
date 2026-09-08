@@ -278,7 +278,9 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
           _currentDetection = detection;
         });
 
-        if (detection != null && detection.confidence >= 0.50) {
+        if (detection != null &&
+            detection.category != ReportCategory.other &&
+            detection.confidence >= 0.50) {
           DebugLogger.instance.log(
             'NIM-SCAN',
             'NIM live detection confirmed: ${detection.category.wire} (${detection.confidence}) → snapping steady lock to 100%!',
@@ -309,6 +311,10 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
 
   Future<void> _executeCapture({bool isAuto = false}) async {
     if (_controller == null || !_controller!.value.isInitialized) return;
+
+    // Immediately stop steady-lock progress and NIM scan loop during capture/review
+    _steadyLockTimer?.cancel();
+    _nimScanTimer?.cancel();
 
     try {
       DebugLogger.instance.log('CAPTURE', 'Executing capture (isAuto=$isAuto)...');

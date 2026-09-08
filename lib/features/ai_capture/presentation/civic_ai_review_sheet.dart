@@ -17,6 +17,7 @@ import '../../../models/report.dart';
 import '../../auth/auth_controller.dart';
 import '../../settings/language_controller.dart';
 import '../models/civic_ai_models.dart';
+import '../services/civic_ai_classifier_service.dart';
 
 class CivicAiReviewSheet extends ConsumerStatefulWidget {
   final CivicAiCapturePayload payload;
@@ -46,6 +47,17 @@ class _CivicAiReviewSheetState extends ConsumerState<CivicAiReviewSheet> {
     super.initState();
     final d = widget.payload.detection;
     _category = d.category;
+    // Multi-signal safety net: If category resolved to OTHER, check title, description & tags
+    if (_category == ReportCategory.other) {
+      final resolved = CivicAiClassifierService.resolveCivicCategory(
+        title: d.title,
+        desc: d.description,
+        tags: d.visualEvidenceTags,
+      );
+      if (resolved != ReportCategory.other) {
+        _category = resolved;
+      }
+    }
     _severity = d.severity;
     _titleCtrl = TextEditingController(text: d.title);
     _descCtrl = TextEditingController(text: d.description);

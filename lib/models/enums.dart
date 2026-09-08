@@ -71,8 +71,18 @@ enum ReportCategory {
   final String label;
   const ReportCategory(this.wire, this.label);
 
-  static ReportCategory fromWire(String? w) =>
-      values.firstWhere((e) => e.wire == w, orElse: () => ReportCategory.other);
+  static ReportCategory fromWire(String? w) {
+    if (w == null || w.trim().isEmpty) return ReportCategory.other;
+    final clean = w.trim().toUpperCase().replaceAll('-', '_').replaceAll(' ', '_');
+    return values.firstWhere(
+      (e) =>
+          e.wire == clean ||
+          e.wire == w.trim() ||
+          e.name.toUpperCase() == clean ||
+          e.label.toUpperCase() == w.trim().toUpperCase(),
+      orElse: () => ReportCategory.other,
+    );
+  }
 
   String localizedName(dynamic lang) {
     final langCode = lang.toString().split('.').last;

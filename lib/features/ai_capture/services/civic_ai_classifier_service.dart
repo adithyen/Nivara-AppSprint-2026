@@ -135,6 +135,25 @@ class CivicAiClassifierService {
     XFile photo, {
     ReportCategory? hintCategory,
   }) async {
+    // If we ALREADY have a high-confidence confirmed detection from the live scan
+    // (within the last 8 seconds) and it's a specific civic hazard, use it immediately!
+    // This makes review sheet presentation instantaneous (< 200ms) with zero timeout risk.
+    if (_lastConfirmedDetection != null &&
+        _lastConfirmedDetection!.category != ReportCategory.other &&
+        _lastConfirmedDetection!.confidence >= 0.50) {
+      final age = DateTime.now().difference(_lastConfirmedDetection!.timestamp).inSeconds;
+      if (age <= 8) {
+        DebugLogger.instance.log(
+          'NIM-CAP',
+          'Instant review sheet launch using live detection: ${_lastConfirmedDetection!.category.wire} ("${_lastConfirmedDetection!.title}")',
+        );
+        return _lastConfirmedDetection!.copyWith(
+          isSteady: true,
+          timestamp: DateTime.now(),
+        );
+      }
+    }
+
     final nimKey = dotenv.env['NVIDIA_NIM_API_KEY']?.trim();
     if (nimKey != null && nimKey.isNotEmpty) {
       try {
@@ -166,12 +185,11 @@ class CivicAiClassifierService {
       DebugLogger.instance.log('NIM-CAP', 'NVIDIA_NIM_API_KEY is empty/null, using fallback');
     }
 
-    // Fallback: use the last live detection if available, otherwise return
-    // a preset metadata result so the review sheet can still show something.
+    // Fallback: use the last live detection if available
     if (_lastConfirmedDetection != null) {
       DebugLogger.instance.log(
         'NIM-CAP',
-        'Using last confirmed live detection: ${_lastConfirmedDetection!.category.wire}',
+        'Using last confirmed live detection fallback: ${_lastConfirmedDetection!.category.wire}',
       );
       return _lastConfirmedDetection!.copyWith(
         isSteady: true,
@@ -217,18 +235,19 @@ class CivicAiClassifierService {
           : '';
 
       const systemPrompt =
-          'You are a high-speed civic hazard inspector for the Nivara municipal app. '
-          'Respond ONLY with a valid raw JSON object. '
-          'Never output markdown, explanations, or code blocks.';
+          'You are an expert municipal hazard inspector for the Nivara civic app. '
+          'Classify the image into one of the exact allowed civic categories. '
+          'Respond ONLY with a valid raw JSON object. Never output markdown or extra text.';
 
       final userPrompt = '''
 Analyze this image for civic/municipal hazards in public spaces (potholes, open drains, garbage dumps, waterlogging, street light damage, etc.).
 $categoryHint
-Allowed categories: ${validWires.join(', ')}, or "not_a_civic_issue" if no hazard is visible (e.g. indoor room, document, clear road).
+Allowed categories (use exact wire names):
+${validWires.join(', ')}, or "not_a_civic_issue" if no hazard is visible (e.g. clean indoor room, clear road).
 
 Respond ONLY with this raw JSON:
 {
-  "category": "<one of the wire values OR 'not_a_civic_issue'>",
+  "category": "<one of the exact uppercase wire values above OR 'not_a_civic_issue'>",
   "severity": "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY",
   "confidence": 0.0 to 1.0,
   "title_en": "<concise title>",
@@ -303,21 +322,34 @@ Respond ONLY with this raw JSON:
       final cleanJson = jsonMatch.group(0)!;
       final parsed = jsonDecode(cleanJson) as Map<String, dynamic>;
 
-      final rawCat = (parsed['category']?.toString() ?? 'not_a_civic_issue')
-          .trim()
-          .toLowerCase();
+      final rawCat = (parsed['category']?.toString() ?? '').trim();
+      final titleEn = (parsed['title_en']?.toString() ?? '').trim();
+      final descEn = (parsed['description_en']?.toString() ?? '').trim();
+      final titleMl = (parsed['title_ml']?.toString() ?? '').trim();
+      final descMl = (parsed['description_ml']?.toString() ?? '').trim();
+      final tags = (parsed['tags'] as List?)?.map((t) => t.toString().trim()).toList() ?? [];
 
-      // Explicitly bail out on non-civic scenes or negative confirmations
-      if (rawCat.isEmpty ||
-          rawCat == 'not_a_civic_issue' ||
-          rawCat == 'none' ||
-          rawCat == 'null' ||
-          rawCat == 'clear') {
-        DebugLogger.instance.log('NIM-API', 'Negative civic confirmation in ${elapsed}ms: $rawCat (${parsed['reasoning']})');
+      // Intelligently resolve the exact civic category using both raw category & title/desc/tags
+      final category = resolveCivicCategory(
+        rawCat: rawCat,
+        title: titleEn,
+        desc: descEn,
+        tags: tags,
+      );
+
+      // Explicitly bail out on genuine non-civic scenes
+      if (category == ReportCategory.other &&
+          (rawCat.toLowerCase() == 'not_a_civic_issue' ||
+              rawCat.toLowerCase() == 'none' ||
+              rawCat.toLowerCase() == 'null' ||
+              rawCat.toLowerCase() == 'clear')) {
+        DebugLogger.instance.log(
+          'NIM-API',
+          'Negative civic confirmation in ${elapsed}ms: $rawCat (${parsed['reasoning']})',
+        );
         return null;
       }
 
-      final category = ReportCategory.fromWire(rawCat);
       final sevWire = parsed['severity']?.toString();
       final severity = Severity.fromWire(sevWire);
       final conf = ((parsed['confidence'] as num?)?.toDouble() ?? 0.85)
@@ -325,7 +357,7 @@ Respond ONLY with this raw JSON:
 
       DebugLogger.instance.log(
         'NIM-API',
-        'NIM 11B detected in ${elapsed}ms: category=${category.wire}, conf=${conf.toStringAsFixed(2)}, sev=${severity.wire}, minConf=$minConfidence',
+        'NIM 11B detected in ${elapsed}ms: rawCat="$rawCat", title="$titleEn" → ${category.wire} (${category.label}), conf=${conf.toStringAsFixed(2)}, sev=${severity.wire}, minConf=$minConfidence',
       );
 
       // Filter out low confidence detections
@@ -333,12 +365,6 @@ Respond ONLY with this raw JSON:
         DebugLogger.instance.log('NIM-API', 'Confidence $conf below threshold $minConfidence, discarded.');
         return null;
       }
-
-      final titleEn = parsed['title_en']?.toString() ?? '';
-      final descEn = parsed['description_en']?.toString() ?? '';
-      final titleMl = parsed['title_ml']?.toString() ?? '';
-      final descMl = parsed['description_ml']?.toString() ?? '';
-      final tags = (parsed['tags'] as List?)?.map((t) => t.toString()).toList() ?? [];
 
       final preset = getPresetMetadata(category);
 
@@ -356,13 +382,92 @@ Respond ONLY with this raw JSON:
         isSteady: false,
       );
 
-      // Cache for continuity
+      // Cache for display continuity and instant review sheet launch
       _lastConfirmedDetection = detection;
       return detection;
     } catch (e, stack) {
       DebugLogger.instance.error('NIM-API', e, stack);
       return null;
     }
+  }
+
+  /// Multi-signal category resolver that maps NIM responses, titles, descriptions,
+  /// and tags to Nivara's 19 official ReportCategory values.
+  static ReportCategory resolveCivicCategory({
+    String rawCat = '',
+    String title = '',
+    String desc = '',
+    List<String> tags = const [],
+  }) {
+    // 1. Direct fromWire match on rawCat
+    if (rawCat.isNotEmpty &&
+        rawCat.toLowerCase() != 'not_a_civic_issue' &&
+        rawCat.toLowerCase() != 'other') {
+      final direct = ReportCategory.fromWire(rawCat);
+      if (direct != ReportCategory.other) {
+        return direct;
+      }
+    }
+
+    // 2. Check title, description, and tags for civic hazard keywords
+    final text = '${rawCat.toLowerCase()} ${title.toLowerCase()} ${desc.toLowerCase()} ${tags.map((t) => t.toLowerCase()).join(' ')}';
+
+    if (text.contains('footpath') || text.contains('sidewalk') || text.contains('pavement') || text.contains('walkway')) {
+      return ReportCategory.brokenFootpath;
+    }
+    if (text.contains('manhole') || text.contains('drain cover') || text.contains('sewer cover') || text.contains('sewer opening')) {
+      return ReportCategory.openManhole;
+    }
+    if (text.contains('pothole') || text.contains('crater') || text.contains('road cavity') || text.contains('asphalt hole')) {
+      return ReportCategory.pothole;
+    }
+    if (text.contains('waterlog') || text.contains('flooding') || text.contains('water puddle') || text.contains('stagnant water') || text.contains('standing water')) {
+      return ReportCategory.waterlogging;
+    }
+    if (text.contains('fallen tree') || text.contains('tree hazard') || text.contains('tree branch') || text.contains('fallen branch') || text.contains('uprooted tree')) {
+      return ReportCategory.fallenTree;
+    }
+    if (text.contains('street light') || text.contains('streetlight') || text.contains('lamp post') || text.contains('broken light') || text.contains('unlit light') || text.contains('dark street')) {
+      return ReportCategory.streetLight;
+    }
+    if (text.contains('blocked drain') || text.contains('clogged drain') || text.contains('drainage') || text.contains('open drain') || text.contains('gutter') || text.contains('culvert')) {
+      return ReportCategory.blockedDrain;
+    }
+    if (text.contains('garbage') || text.contains('trash') || text.contains('waste') || text.contains('rubbish') || text.contains('dump') || text.contains('litter')) {
+      return ReportCategory.garbage;
+    }
+    if (text.contains('sewage') || text.contains('blackwater') || text.contains('septic') || text.contains('waste water') || text.contains('wastewater')) {
+      return ReportCategory.sewage;
+    }
+    if (text.contains('damaged pole') || text.contains('electric pole') || text.contains('tilted pole') || text.contains('broken pole') || text.contains('utility pole') || text.contains('pole')) {
+      return ReportCategory.damagedPole;
+    }
+    if (text.contains('power issue') || text.contains('electric wire') || text.contains('hanging wire') || text.contains('loose cable') || text.contains('live wire') || text.contains('dangling cable') || text.contains('power cut')) {
+      return ReportCategory.powerIssue;
+    }
+    if (text.contains('pipe leak') || text.contains('pipeline leak') || text.contains('burst pipe') || text.contains('water pipe') || text.contains('water leak')) {
+      return ReportCategory.pipeLeak;
+    }
+    if (text.contains('water supply') || text.contains('drinking water') || text.contains('water shortage') || text.contains('water crisis')) {
+      return ReportCategory.waterSupply;
+    }
+    if (text.contains('road sign') || text.contains('signboard') || text.contains('traffic sign') || text.contains('damaged sign')) {
+      return ReportCategory.roadSign;
+    }
+    if (text.contains('encroach') || text.contains('illegal structure') || text.contains('footpath block') || text.contains('hawker')) {
+      return ReportCategory.encroachment;
+    }
+    if (text.contains('broken property') || text.contains('bus shelter') || text.contains('vandal') || text.contains('broken bench') || text.contains('damaged railing')) {
+      return ReportCategory.brokenProperty;
+    }
+    if (text.contains('stray') || text.contains('stray animal') || text.contains('stray dog') || text.contains('cattle') || text.contains('cows on road') || text.contains('dog')) {
+      return ReportCategory.strayAnimals;
+    }
+    if (text.contains('noise') || text.contains('loudspeaker') || text.contains('generator noise') || text.contains('decibel')) {
+      return ReportCategory.noise;
+    }
+
+    return ReportCategory.other;
   }
 
   /// Preset titles, descriptions, and tags for all 19 civic hazard categories.
