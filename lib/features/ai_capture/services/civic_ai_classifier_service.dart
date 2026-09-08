@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui';
-
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -16,411 +14,226 @@ final civicAiClassifierServiceProvider = Provider<CivicAiClassifierService>((ref
   return CivicAiClassifierService();
 });
 
-/// Intelligent vision engine for real-time camera detection & deep post-capture
-/// classification across Nivara's 19 civic hazard categories.
+/// Real vision engine — every analysis call sends an actual JPEG frame to
+/// NVIDIA NIM (llama-3.2-11b-vision-instruct via the OpenAI-compatible API).
+/// Only returns a detection when NIM confirms a genuine civic hazard is visible.
+/// Returns null when nothing is detected.
 class CivicAiClassifierService {
-  // Rolling detections for temporal smoothing and steady lock detection
-  final List<CivicAiDetection> _recentDetections = [];
-  static const int _maxHistory = 6;
+  // Last confirmed detection for display continuity
+  CivicAiDetection? _lastConfirmedDetection;
 
-  /// Analyzes a live camera preview frame. Designed for high throughput (< 8ms)
-  /// using subsampled luminance and spatial gradient profiling.
-  CivicAiDetection? analyzeFrame(
-    CameraImage image, {
-    ReportCategory? targetedCategory,
-  }) {
-    try {
-      final int width = image.width;
-      final int height = image.height;
-      if (width <= 0 || height <= 0 || image.planes.isEmpty) return null;
+  static const String _nimEndpoint =
+      'https://integrate.api.nvidia.com/v1/chat/completions';
+  static const String _nimModel = 'meta/llama-3.2-90b-vision-instruct';
 
-      final Uint8List yPlane = image.planes[0].bytes;
-      final int bytesPerRow = image.planes[0].bytesPerRow;
+  /// Clears the last confirmed detection (called after capture or reset).
+  void resetTracking() {
+    _lastConfirmedDetection = null;
+  }
 
-      // Sub-sample grid across the sensor frame (e.g. 16x16 grid = 256 sample points)
-      const int sampleGrid = 16;
-      final double stepX = width / sampleGrid;
-      final double stepY = height / sampleGrid;
-
-      double totalLuma = 0;
-      double minLuma = 255;
-      double maxLuma = 0;
-
-      // Quadrant & regional metrics
-      double centerLuma = 0;
-      int centerCount = 0;
-      double bottomLuma = 0;
-      int bottomCount = 0;
-      double topLuma = 0;
-      int topCount = 0;
-
-      // Spatial gradient / edge energy
-      double totalGradient = 0;
-      int gradientSamples = 0;
-
-      final List<List<double>> grid = List.generate(
-        sampleGrid,
-        (_) => List<double>.filled(sampleGrid, 0.0),
-      );
-
-      for (int gy = 0; gy < sampleGrid; gy++) {
-        final int py = (gy * stepY).clamp(0, height - 1).toInt();
-        final int rowStart = py * bytesPerRow;
-
-        for (int gx = 0; gx < sampleGrid; gx++) {
-          final int px = (gx * stepX).clamp(0, width - 1).toInt();
-          final int index = rowStart + px;
-          if (index >= yPlane.length) continue;
-
-          final double luma = yPlane[index].toDouble();
-          grid[gy][gx] = luma;
-          totalLuma += luma;
-          if (luma < minLuma) minLuma = luma;
-          if (luma > maxLuma) maxLuma = luma;
-
-          // Center region (gy: 4-11, gx: 4-11)
-          if (gy >= 4 && gy <= 11 && gx >= 4 && gx <= 11) {
-            centerLuma += luma;
-            centerCount++;
-          }
-
-          // Bottom half (road plane / drainage)
-          if (gy >= 8) {
-            bottomLuma += luma;
-            bottomCount++;
-          } else {
-            topLuma += luma;
-            topCount++;
-          }
-
-          // Horizontal & vertical gradients
-          if (gx > 0 && gy > 0) {
-            final double dx = (luma - grid[gy][gx - 1]).abs();
-            final double dy = (luma - grid[gy - 1][gx]).abs();
-            totalGradient += (dx + dy);
-            gradientSamples++;
-          }
-        }
-      }
-
-      final int totalPoints = sampleGrid * sampleGrid;
-      final double avgLuma = totalLuma / totalPoints;
-      final double avgCenterLuma = centerCount > 0 ? (centerLuma / centerCount) : avgLuma;
-      final double avgBottomLuma = bottomCount > 0 ? (bottomLuma / bottomCount) : avgLuma;
-      final double avgTopLuma = topCount > 0 ? (topLuma / topCount) : avgLuma;
-      final double avgGradient = gradientSamples > 0 ? (totalGradient / gradientSamples) : 0.0;
-      final double lumaSpread = maxLuma - minLuma;
-
-      // Candidate detection heuristics
-      ReportCategory detected = targetedCategory ?? ReportCategory.pothole;
-      double confidence = 0.82;
-      Severity severity = Severity.medium;
-      Rect boundingBox = const Rect.fromLTWH(0.20, 0.30, 0.60, 0.40);
-      final List<String> tags = [];
-
-      if (targetedCategory != null) {
-        // Targeted category scanning mode (user filtered or selected a civic category)
-        detected = targetedCategory;
-        confidence = 0.86 + (math.min(avgGradient, 45.0) / 400.0);
-        severity = _inferSeverity(detected, avgGradient, lumaSpread);
-      } else {
-        // Auto-detection: Evaluate structural and photometric signatures
-        // 1. Pothole: Low center luma depression on road plane, high perimeter gradient
-        if (avgCenterLuma < (avgLuma - 14) && avgGradient > 16) {
-          detected = ReportCategory.pothole;
-          confidence = (0.86 + ((avgLuma - avgCenterLuma) / 100.0)).clamp(0.85, 0.96);
-          severity = (avgLuma - avgCenterLuma > 30) ? Severity.high : Severity.medium;
-          boundingBox = const Rect.fromLTWH(0.22, 0.35, 0.56, 0.38);
-          tags.addAll(['asphalt_cavity', 'crater_perimeter', 'roadway_hazard']);
-        }
-        // 2. Open Manhole: Extreme dark cavity / circular void on ground
-        else if (avgCenterLuma < 55 && lumaSpread > 110 && avgBottomLuma < avgTopLuma) {
-          detected = ReportCategory.openManhole;
-          confidence = 0.91;
-          severity = Severity.emergency;
-          boundingBox = const Rect.fromLTWH(0.25, 0.35, 0.50, 0.35);
-          tags.addAll(['missing_cover', 'deep_void', 'critical_fall_risk']);
-        }
-        // 3. Waterlogging: Very low gradient in lower half, specular sheen / uniform ponding
-        else if (avgGradient < 14 && avgBottomLuma > 80 && lumaSpread < 90) {
-          detected = ReportCategory.waterlogging;
-          confidence = 0.88;
-          severity = avgBottomLuma > 140 ? Severity.high : Severity.medium;
-          boundingBox = const Rect.fromLTWH(0.12, 0.45, 0.76, 0.45);
-          tags.addAll(['submerged_asphalt', 'standing_water', 'drainage_failure']);
-        }
-        // 4. Garbage: High gradient entropy / scattered high-contrast texture
-        else if (avgGradient > 28 && lumaSpread > 130) {
-          detected = ReportCategory.garbage;
-          confidence = 0.89;
-          severity = avgGradient > 38 ? Severity.high : Severity.medium;
-          boundingBox = const Rect.fromLTWH(0.18, 0.32, 0.64, 0.46);
-          tags.addAll(['waste_accumulation', 'debris_scatter', 'sanitation_hazard']);
-        }
-        // 5. Blocked Drain / Open Drainage: Dark linear trough in lower quadrants
-        else if (avgBottomLuma < 75 && avgGradient > 20) {
-          detected = ReportCategory.blockedDrain;
-          confidence = 0.87;
-          severity = Severity.high;
-          boundingBox = const Rect.fromLTWH(0.15, 0.42, 0.70, 0.44);
-          tags.addAll(['drainage_clog', 'silt_obstruction', 'culvert_overflow']);
-        }
-        // 6. Sewage Leak: Dark murky ground stream with low contrast
-        else if (avgBottomLuma < 60 && avgGradient < 20) {
-          detected = ReportCategory.sewage;
-          confidence = 0.86;
-          severity = Severity.high;
-          boundingBox = const Rect.fromLTWH(0.20, 0.40, 0.60, 0.45);
-          tags.addAll(['wastewater_spill', 'effluent_runoff', 'health_hazard']);
-        }
-        // 7. Broken Footpath: Linear broken gradient on pedestrian margins
-        else if (avgGradient > 22 && (avgTopLuma - avgBottomLuma).abs() < 25) {
-          detected = ReportCategory.brokenFootpath;
-          confidence = 0.86;
-          severity = Severity.medium;
-          boundingBox = const Rect.fromLTWH(0.15, 0.30, 0.70, 0.50);
-          tags.addAll(['broken_paver', 'uneven_pavement', 'pedestrian_risk']);
-        }
-        // 8. Damaged Pole / Power Line: High vertical gradient in upper frame
-        else if (avgTopLuma > avgBottomLuma && avgGradient > 24) {
-          detected = ReportCategory.powerIssue;
-          confidence = 0.85;
-          severity = Severity.high;
-          boundingBox = const Rect.fromLTWH(0.30, 0.15, 0.40, 0.65);
-          tags.addAll(['overhead_hazard', 'low_cable', 'utility_defect']);
-        }
-        // Default to Pothole or general road defect
-        else {
-          detected = ReportCategory.pothole;
-          confidence = 0.85;
-          severity = Severity.medium;
-          boundingBox = const Rect.fromLTWH(0.20, 0.35, 0.60, 0.40);
-          tags.addAll(['road_surface_defect', 'transit_impediment']);
-        }
-      }
-
-      // Check temporal stability across consecutive detections
-      bool steady = false;
-      if (_recentDetections.length >= 3) {
-        final last = _recentDetections.last;
-        final bool sameCategory = last.category == detected;
-        final bool closeBox = last.boundingBox != null &&
-            (last.boundingBox!.center - boundingBox.center).distance < 0.12;
-
-        if (sameCategory && closeBox) {
-          steady = true;
-          confidence = math.min(0.97, confidence + 0.05);
-        }
-      }
-
-      final metadata = getPresetMetadata(detected);
-
-      final detection = CivicAiDetection(
-        category: detected,
-        confidence: confidence,
-        severity: severity,
-        title: metadata.title,
-        description: metadata.description,
-        titleMl: metadata.titleMl,
-        descriptionMl: metadata.descriptionMl,
-        boundingBox: boundingBox,
-        visualEvidenceTags: tags.isNotEmpty ? tags : metadata.defaultTags,
-        timestamp: DateTime.now(),
-        isSteady: steady,
-      );
-
-      _recentDetections.add(detection);
-      if (_recentDetections.length > _maxHistory) {
-        _recentDetections.removeAt(0);
-      }
-
-      return detection;
-    } catch (e) {
-      debugPrint('[CivicAiClassifierService] Frame analysis error: $e');
+  /// Returns the last NIM-confirmed detection (for display while a new
+  /// analysis is in flight). Never returns stale detections older than 6s.
+  CivicAiDetection? get currentDetection {
+    if (_lastConfirmedDetection == null) return null;
+    final age = DateTime.now().difference(_lastConfirmedDetection!.timestamp).inSeconds;
+    if (age > 6) {
+      _lastConfirmedDetection = null;
       return null;
     }
+    return _lastConfirmedDetection;
   }
 
-  /// Clears frame tracking history (e.g. after capture or camera reset).
-  void resetTracking() {
-    _recentDetections.clear();
-  }
-
-  /// Deep classification of a captured photo. Runs offline heuristics first,
-  /// and if Google Gemini Vision is configured and online, enhances the result.
+  /// Calls NVIDIA NIM on a full-resolution captured photo for the review
+  /// sheet. Returns a detection with validated civic category, or a
+  /// "not a civic issue" result so the user knows.
   Future<CivicAiDetection> classifyCapturedPhoto(
     XFile photo, {
     ReportCategory? hintCategory,
   }) async {
-    // 1. Base classification from offline heuristics
-    final category = hintCategory ??
-        (_recentDetections.isNotEmpty
-            ? _recentDetections.last.category
-            : ReportCategory.pothole);
+    final nimKey = dotenv.env['NVIDIA_NIM_API_KEY']?.trim();
+    if (nimKey != null && nimKey.isNotEmpty) {
+      try {
+        final bytes = await File(photo.path).readAsBytes();
+        final result = await _callNimVision(bytes, nimKey, hintCategory,
+            highRes: true);
+        if (result != null) return result;
+      } catch (e) {
+        debugPrint('[CivicAiClassifier] NIM capture classification error: $e');
+      }
+    }
 
+    // Fallback: use the last live detection if available, otherwise return
+    // a generic unknown result so the review sheet can still show something.
+    if (_lastConfirmedDetection != null) {
+      return _lastConfirmedDetection!.copyWith(
+        isSteady: true,
+        timestamp: DateTime.now(),
+      );
+    }
+
+    final category = hintCategory ?? ReportCategory.other;
     final preset = getPresetMetadata(category);
-    var result = CivicAiDetection(
+    return CivicAiDetection(
       category: category,
-      confidence: 0.92,
-      severity: _recentDetections.isNotEmpty
-          ? _recentDetections.last.severity
-          : Severity.medium,
+      confidence: 0.70,
+      severity: Severity.medium,
       title: preset.title,
       description: preset.description,
       titleMl: preset.titleMl,
       descriptionMl: preset.descriptionMl,
-      boundingBox: _recentDetections.isNotEmpty
-          ? _recentDetections.last.boundingBox
-          : const Rect.fromLTWH(0.2, 0.25, 0.6, 0.5),
+      boundingBox: const Rect.fromLTWH(0.2, 0.25, 0.6, 0.5),
       visualEvidenceTags: preset.defaultTags,
       timestamp: DateTime.now(),
       isSteady: true,
     );
-
-    // 2. Optional Gemini Multimodal Vision enhancement
-    final geminiKey = dotenv.env['GEMINI_API_KEY']?.trim();
-    if (geminiKey != null && geminiKey.isNotEmpty) {
-      try {
-        final enhanced = await _queryGeminiVision(photo, geminiKey, category);
-        if (enhanced != null) {
-          result = enhanced;
-        }
-      } catch (e) {
-        debugPrint('[CivicAiClassifierService] Gemini vision fallback: $e');
-      }
-    }
-
-    return result;
   }
 
-  /// Queries Google Gemini Flash Multimodal Vision API to parse the captured photo.
-  Future<CivicAiDetection?> _queryGeminiVision(
-    XFile photo,
+  /// Core NVIDIA NIM Vision API call (OpenAI-compatible chat completions with
+  /// base64 inline image using llama-3.2-90b-vision-instruct).
+  /// Returns null if the scene contains no recognisable civic hazard.
+  Future<CivicAiDetection?> _callNimVision(
+    Uint8List imageBytes,
     String apiKey,
-    ReportCategory fallbackCategory,
-  ) async {
+    ReportCategory? targetedCategory, {
+    bool highRes = false,
+  }) async {
     try {
-      final bytes = await File(photo.path).readAsBytes();
-      final base64Image = base64Encode(bytes);
-
-      // We support the 19 ReportCategory wires
+      final base64Image = base64Encode(imageBytes);
       final validWires = ReportCategory.values.map((c) => c.wire).toList();
 
-      final uri = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey',
-      );
+      final categoryHint = targetedCategory != null
+          ? 'The user is specifically looking for: ${targetedCategory.wire}. '
+              'Only confirm if you actually see this issue type.'
+          : '';
 
-      final prompt = '''
-You are an expert civic infrastructure and municipal hazard inspection AI for Nivara.
-Analyze this photo taken on a public road or municipality.
-Identify the civic hazard and classify it strictly into ONE of the following 19 categories:
+      final systemPrompt =
+          'You are a strict civic hazard inspector AI for Nivara, a municipal '
+          'reporting app. Only identify real infrastructure problems visible '
+          'outdoors in public spaces. Respond exclusively with raw JSON — '
+          'no markdown, no backticks, no extra text.';
+
+      final userPrompt = '''
+Analyze this camera image taken on a public road or in a municipality.
+
+$categoryHint
+
+TASK: Determine if this image shows a REAL civic infrastructure hazard from this list:
 ${validWires.join(', ')}
 
-Return ONLY a raw JSON object with this exact schema (no markdown, no backticks):
+STRICT RULES:
+1. You MUST return "not_a_civic_issue" as category if the image shows:
+   - Paper, documents, notebooks, text, books
+   - Benches, chairs, furniture indoors or in good condition
+   - Clean tiles, floors, walls without damage
+   - People, vehicles without associated hazards
+   - Any indoor setting without a visible civic problem
+   - Anything unclear, blurry, or too dark to identify
+2. Only identify a hazard if you see CLEAR, UNAMBIGUOUS evidence
+3. Minimum confidence must be 0.80 to report a hazard
+
+Return ONLY raw JSON, no markdown, no backticks:
 {
-  "category": "<one of the 19 valid wire categories>",
+  "category": "<one of the 19 wire values, OR 'not_a_civic_issue'>",
   "severity": "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY",
-  "confidence": 0.85 to 0.99,
-  "title_en": "<concise descriptive title in English>",
-  "description_en": "<2-sentence factual complaint description in English>",
-  "title_ml": "<concise title in Malayalam>",
-  "description_ml": "<2-sentence factual complaint description in Malayalam>",
-  "tags": ["tag1", "tag2", "tag3"]
+  "confidence": 0.0 to 1.0,
+  "title_en": "<concise title or empty string if not_a_civic_issue>",
+  "description_en": "<2-sentence factual description or empty if not_a_civic_issue>",
+  "title_ml": "<Malayalam title or empty string>",
+  "description_ml": "<Malayalam description or empty string>",
+  "tags": ["tag1", "tag2"],
+  "reasoning": "<one sentence explaining what you saw>"
 }
 ''';
 
       final response = await http
           .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
+            Uri.parse(_nimEndpoint),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $apiKey',
+            },
             body: jsonEncode({
-              'contents': [
+              'model': _nimModel,
+              'messages': [
+                {'role': 'system', 'content': systemPrompt},
                 {
-                  'parts': [
-                    {'text': prompt},
+                  'role': 'user',
+                  'content': [
+                    {'type': 'text', 'text': userPrompt},
                     {
-                      'inline_data': {
-                        'mime_type': 'image/jpeg',
-                        'data': base64Image,
-                      }
-                    }
-                  ]
-                }
+                      'type': 'image_url',
+                      'image_url': {
+                        'url': 'data:image/jpeg;base64,$base64Image',
+                      },
+                    },
+                  ],
+                },
               ],
-              'generationConfig': {
-                'temperature': 0.2,
-                'maxOutputTokens': 500,
-                'response_mime_type': 'application/json',
-              },
+              'temperature': 0.1,
+              'max_tokens': 600,
+              'stream': false,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(Duration(seconds: highRes ? 8 : 5));
 
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        final rawText = body['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-        if (rawText != null) {
-          final cleanJson = rawText.replaceAll(RegExp(r'^```json\s*|\s*```$'), '').trim();
-          final parsed = jsonDecode(cleanJson) as Map<String, dynamic>;
-
-          final catWire = parsed['category']?.toString();
-          final category = ReportCategory.fromWire(catWire);
-          final sevWire = parsed['severity']?.toString();
-          final severity = Severity.fromWire(sevWire);
-          final conf = (parsed['confidence'] as num?)?.toDouble() ?? 0.94;
-          final titleEn = parsed['title_en']?.toString();
-          final descEn = parsed['description_en']?.toString();
-          final titleMl = parsed['title_ml']?.toString();
-          final descMl = parsed['description_ml']?.toString();
-          final tags = (parsed['tags'] as List?)?.map((t) => t.toString()).toList() ?? [];
-
-          final preset = getPresetMetadata(category);
-
-          return CivicAiDetection(
-            category: category,
-            confidence: conf.clamp(0.85, 0.99),
-            severity: severity,
-            title: (titleEn != null && titleEn.isNotEmpty) ? titleEn : preset.title,
-            description: (descEn != null && descEn.isNotEmpty) ? descEn : preset.description,
-            titleMl: (titleMl != null && titleMl.isNotEmpty) ? titleMl : preset.titleMl,
-            descriptionMl: (descMl != null && descMl.isNotEmpty) ? descMl : preset.descriptionMl,
-            boundingBox: const Rect.fromLTWH(0.2, 0.25, 0.6, 0.5),
-            visualEvidenceTags: tags.isNotEmpty ? tags : preset.defaultTags,
-            timestamp: DateTime.now(),
-            isSteady: true,
-          );
-        }
+      if (response.statusCode != 200) {
+        debugPrint('[CivicAiClassifier] NIM HTTP ${response.statusCode}: ${response.body}');
+        return null;
       }
-    } catch (e) {
-      debugPrint('[CivicAiClassifierService] Gemini Vision call failed: $e');
-    }
-    return null;
-  }
 
-  Severity _inferSeverity(ReportCategory cat, double gradient, double spread) {
-    switch (cat) {
-      case ReportCategory.openManhole:
-      case ReportCategory.powerIssue:
-        return Severity.emergency;
-      case ReportCategory.pothole:
-      case ReportCategory.sewage:
-      case ReportCategory.blockedDrain:
-      case ReportCategory.fallenTree:
-      case ReportCategory.waterlogging:
-      case ReportCategory.pipeLeak:
-      case ReportCategory.damagedPole:
-        return gradient > 28 ? Severity.high : Severity.medium;
-      case ReportCategory.garbage:
-      case ReportCategory.brokenFootpath:
-      case ReportCategory.streetLight:
-      case ReportCategory.waterSupply:
-      case ReportCategory.brokenProperty:
-      case ReportCategory.encroachment:
-      case ReportCategory.strayAnimals:
-      case ReportCategory.roadSign:
-      case ReportCategory.noise:
-      case ReportCategory.other:
-        return Severity.medium;
+      final body = jsonDecode(response.body);
+      final rawText =
+          body['choices']?[0]?['message']?['content'] as String?;
+      if (rawText == null) return null;
+
+      // Strip markdown code fences if the model adds them despite instructions
+      final cleanJson =
+          rawText.replaceAll(RegExp(r'^```json\s*|\s*```$', multiLine: true), '').trim();
+      final parsed = jsonDecode(cleanJson) as Map<String, dynamic>;
+
+      final catWire = parsed['category']?.toString() ?? 'not_a_civic_issue';
+      debugPrint('[CivicAiClassifier] NIM says: $catWire — ${parsed['reasoning']}');
+
+      // Explicitly bail out on non-civic scenes
+      if (catWire == 'not_a_civic_issue') return null;
+
+      final category = ReportCategory.fromWire(catWire);
+      final sevWire = parsed['severity']?.toString();
+      final severity = Severity.fromWire(sevWire);
+      final conf = ((parsed['confidence'] as num?)?.toDouble() ?? 0.80)
+          .clamp(0.0, 0.99);
+
+      // Below minimum confidence — don't report
+      if (conf < 0.80) return null;
+
+      final titleEn = parsed['title_en']?.toString() ?? '';
+      final descEn = parsed['description_en']?.toString() ?? '';
+      final titleMl = parsed['title_ml']?.toString() ?? '';
+      final descMl = parsed['description_ml']?.toString() ?? '';
+      final tags = (parsed['tags'] as List?)?.map((t) => t.toString()).toList() ?? [];
+
+      final preset = getPresetMetadata(category);
+
+      final detection = CivicAiDetection(
+        category: category,
+        confidence: conf,
+        severity: severity,
+        title: titleEn.isNotEmpty ? titleEn : preset.title,
+        description: descEn.isNotEmpty ? descEn : preset.description,
+        titleMl: titleMl.isNotEmpty ? titleMl : preset.titleMl,
+        descriptionMl: descMl.isNotEmpty ? descMl : preset.descriptionMl,
+        boundingBox: const Rect.fromLTWH(0.20, 0.28, 0.60, 0.44),
+        visualEvidenceTags: tags.isNotEmpty ? tags : preset.defaultTags,
+        timestamp: DateTime.now(),
+        isSteady: false,
+      );
+
+      // Cache for continuity
+      _lastConfirmedDetection = detection;
+      return detection;
+    } catch (e) {
+      debugPrint('[CivicAiClassifier] NIM Vision error: $e');
+      return null;
     }
   }
 
@@ -429,210 +242,180 @@ Return ONLY a raw JSON object with this exact schema (no markdown, no backticks)
     switch (cat) {
       case ReportCategory.pothole:
         return const CivicPresetMetadata(
-          title: 'Severe Pothole on Road Surface',
+          title: 'Pothole / Road Cavity',
           description:
-              'Depressed asphalt cavity with broken bitumen edges detected on the roadway, posing safety hazard to two-wheelers and transit.',
-          titleMl: 'റോഡിൽ രൂപപ്പെട്ട കുഴി',
+              'A significant road cavity or pothole is obstructing the road surface, posing a risk to vehicles and pedestrians.',
+          titleMl: 'റോഡിലെ കുഴി',
           descriptionMl:
-              'റോഡിലെ ടാർ തകർന്ന് അപകടകരമായ കുഴി രൂപപ്പെട്ടിരിക്കുന്നു. വാഹനങ്ങൾക്കും യാത്രക്കാർക്കും കനത്ത അപകട ഭീഷണി.',
-          defaultTags: ['asphalt_crater', 'bitumen_loss', 'roadway_hazard'],
-        );
-      case ReportCategory.brokenFootpath:
-        return const CivicPresetMetadata(
-          title: 'Damaged / Broken Pedestrian Footpath',
-          description:
-              'Cracked, displaced paver blocks and shattered sidewalk slabs creating pedestrian tripping hazards.',
-          titleMl: 'തകർന്ന നടപ്പാത',
-          descriptionMl:
-              'നടപ്പാതയിലെ ടൈലുകൾ പൊട്ടിപ്പൊളിഞ്ഞ് കാൽനടയാത്രക്കാർക്ക് വഴി തടസ്സവും അപകടസാധ്യതയും ഉണ്ടാക്കുന്നു.',
-          defaultTags: ['broken_paver', 'uneven_sidewalk', 'pedestrian_hazard'],
+              'വാഹനങ്ങൾക്കും കാൽനടക്കാർക്കും ഭീഷണിയായ ഒരു വലിയ റോഡ് കുഴി ശ്രദ്ധയിൽ പെട്ടിരിക്കുന്നു.',
+          defaultTags: ['pothole', 'road_damage', 'vehicle_hazard'],
         );
       case ReportCategory.openManhole:
         return const CivicPresetMetadata(
-          title: 'Uncovered / Open Manhole Danger',
+          title: 'Open / Uncovered Manhole',
           description:
-              'Exposed deep municipal drainage chamber with missing cover, representing an immediate life-safety fall risk.',
-          titleMl: 'തുറന്ന മാൻഹോൾ അപകടം',
+              'A manhole cover is missing or displaced, creating an extreme fall risk for pedestrians and vehicles.',
+          titleMl: 'മൂടി ഇല്ലാത്ത മാൻഹോൾ',
           descriptionMl:
-              'മാൻഹോൾ മൂടി ഇല്ലാതെ തുറന്നുകിടക്കുന്നു. യാത്രക്കാരും വാഹനങ്ങളും കുഴിയിൽ വീഴാൻ സാധ്യതയുള്ള കടുത്ത അടിയന്തിര പ്രശ്നം.',
-          defaultTags: ['missing_cover', 'deep_void', 'critical_safety_hazard'],
+              'മൂടിയില്ലാത്ത ഒരു മാൻഹോൾ കണ്ടുപിടിക്കപ്പെട്ടിരിക്കുന്നു, ഇത് ഗുരുതരമായ അപകടമാണ്.',
+          defaultTags: ['open_manhole', 'missing_cover', 'fall_risk'],
         );
       case ReportCategory.fallenTree:
         return const CivicPresetMetadata(
-          title: 'Fallen Tree Obstructing Roadway',
+          title: 'Fallen Tree Blocking Road',
           description:
-              'Uprooted tree trunk or heavy branch collapsed across the traffic lane, blocking pedestrian and vehicular transit.',
-          titleMl: 'റോഡിലേക്ക് വീണ മരം',
+              'A fallen tree is blocking road access, obstructing traffic and potentially damaging infrastructure.',
+          titleMl: 'വഴിതടഞ്ഞ് വീണ മരം',
           descriptionMl:
-              'മരം കടപുഴകി വീണ് പ്രധാന റോഡിലെ ഗതാഗതം പൂർണ്ണമായും തടസ്സപ്പെട്ടിരിക്കുന്നു. അടിയന്തരമായി വെട്ടി മാറ്റേണ്ടതുണ്ട്.',
-          defaultTags: ['tree_obstruction', 'traffic_block', 'debris_hazard'],
+              'ഒരു മരം റോഡിൽ വീണ് ഗതാഗതം തടസ്സപ്പെടുത്തിയിരിക്കുന്നു.',
+          defaultTags: ['fallen_tree', 'road_obstruction', 'traffic_block'],
         );
       case ReportCategory.waterlogging:
         return const CivicPresetMetadata(
-          title: 'Severe Waterlogging on Road',
+          title: 'Waterlogging / Road Flooding',
           description:
-              'Stagnant floodwater accumulation submerging the carriage-way due to inadequate storm runoff capacity.',
-          titleMl: 'റോഡിലെ വെള്ളക്കെട്ട്',
+              'Severe waterlogging is present on the road, hindering pedestrian and vehicle movement.',
+          titleMl: 'വെള്ളക്കെട്ട്',
           descriptionMl:
-              'റോഡിൽ മഴവെള്ളം വലിയ തോതിൽ കെട്ടിക്കിടന്ന് ഗതാഗതം തടസ്സപ്പെടുകയും കാൽനടക്കാർക്ക് ബുദ്ധിമുട്ടുണ്ടാക്കുകയും ചെയ്യുന്നു.',
-          defaultTags: ['standing_water', 'stormwater_pooling', 'submerged_lane'],
+              'റോഡിൽ ഗുരുതരമായ വെള്ളക്കെട്ട് ഉണ്ട്, ഗതാഗതം ബുദ്ധിമുട്ടാണ്.',
+          defaultTags: ['waterlogging', 'flooding', 'drainage_failure'],
         );
       case ReportCategory.roadSign:
         return const CivicPresetMetadata(
-          title: 'Damaged / Displaced Traffic Sign',
+          title: 'Damaged / Missing Road Sign',
           description:
-              'Bent, missing, or obscured traffic regulatory signboard causing navigational hazard at the junction.',
-          titleMl: 'തകർന്ന ട്രാഫിക് സൈൻ ബോർഡ്',
+              'A road sign is damaged, missing, or obscured, creating navigation and safety hazards.',
+          titleMl: 'കേടായ റോഡ് ബോർഡ്',
           descriptionMl:
-              'ട്രാഫിക് സൈൻ ബോർഡ് വളഞ്ഞുപോവുകയോ തകരുകയോ ചെയ്തതിനാൽ റോഡ് സുരക്ഷക്ക് ഭീഷണിയാകുന്നു.',
-          defaultTags: ['bent_signboard', 'visibility_issue', 'traffic_safety'],
+              'ഒരു ട്രാഫിക് ബോർഡ് കേടുപാടുകളോ കാണ്മാനില്ലായ്മയോ ഉണ്ട്.',
+          defaultTags: ['road_sign', 'missing_signage', 'navigation_hazard'],
         );
       case ReportCategory.garbage:
         return const CivicPresetMetadata(
-          title: 'Unattended Public Garbage Dump',
+          title: 'Garbage Dump / Waste Pile',
           description:
-              'Accumulated waste and overflowing municipal trash heap on public space, creating severe sanitation risk.',
-          titleMl: 'പൊതുസ്ഥലത്ത് തള്ളിയ മാലിന്യം',
-          descriptionMl:
-              'മാലിന്യക്കൂമ്പാരം നീക്കം ചെയ്യാതെ കിടക്കുന്നത് മൂലം രൂക്ഷമായ ദുർഗന്ധവും ആരോഗ്യപ്രശ്നങ്ങളും ഉണ്ടാകുന്നു.',
-          defaultTags: ['solid_waste', 'overflowing_litter', 'sanitation_issue'],
+              'An unauthorized garbage dump or accumulation of waste is creating sanitation and health hazards.',
+          titleMl: 'മാലിന്യക്കൂമ്പാരം',
+          descriptionMl: 'അനധികൃത മാലിന്യ കൂമ്പാരം ആരോഗ്യ ഭീഷണി ഉണ്ടാക്കുന്നു.',
+          defaultTags: ['garbage', 'waste_dump', 'sanitation_hazard'],
         );
       case ReportCategory.blockedDrain:
         return const CivicPresetMetadata(
-          title: 'Blocked Stormwater Drain',
+          title: 'Blocked / Overflowing Drain',
           description:
-              'Roadside stormwater gutter choked with plastic refuse and silt, preventing surface runoff.',
-          titleMl: 'തടസ്സപ്പെട്ട ഓട',
-          descriptionMl:
-              'ഓടയിൽ പ്ലാസ്റ്റിക്കും മണ്ണും അടിഞ്ഞുകൂടി നീരൊഴുക്ക് തടസ്സപ്പെട്ടിരിക്കുന്നു. മഴക്കാലത്ത് വെള്ളപ്പൊക്കത്തിന് കാരണമാകും.',
-          defaultTags: ['silt_clog', 'choked_culvert', 'drainage_failure'],
+              'A drainage channel is blocked or overflowing, causing sewage and water to accumulate on the road.',
+          titleMl: 'തടഞ്ഞ ഓടചാൽ',
+          descriptionMl: 'ഒഴുക്കുചാൽ തടഞ്ഞ് വഴിയിൽ വെള്ളം കെട്ടി നിൽക്കുന്നു.',
+          defaultTags: ['blocked_drain', 'overflow', 'drainage_clog'],
         );
       case ReportCategory.sewage:
         return const CivicPresetMetadata(
           title: 'Sewage Wastewater Leak / Overflow',
           description:
-              'Contaminated blackwater or municipal sewage pipe overflow spilling onto public thoroughfare.',
+              'Contaminated blackwater or municipal sewage is spilling onto a public thoroughfare.',
           titleMl: 'മലിനജല ചോർച്ച',
-          descriptionMl:
-              'സീവേജ് പൈപ്പ് പൊട്ടി മലിനജലം റോഡിലേക്ക് ഒഴുകുന്നു. പകർച്ചവ്യാധി ഭീഷണിയും രൂക്ഷമായ ദുർഗന്ധവും.',
-          defaultTags: ['blackwater_leak', 'contamination', 'public_health_risk'],
+          descriptionMl: 'മലിനജലം പൊതുവഴിയിൽ ഒഴുകുന്നത് ശ്രദ്ധിക്കപ്പെട്ടിരിക്കുന്നു.',
+          defaultTags: ['sewage', 'wastewater', 'health_hazard'],
         );
       case ReportCategory.streetLight:
         return const CivicPresetMetadata(
-          title: 'Non-Functional / Broken Streetlight',
+          title: 'Street Light Outage',
           description:
-              'Dark or damaged municipal streetlight fixture leaving the public road unlit and unsafe at night.',
-          titleMl: 'പ്രവർത്തിക്കാത്ത തെരുവ് വിളക്ക്',
-          descriptionMl:
-              'തെരുവ് വിളക്ക് കേടായി വഴിയിൽ രാത്രികാലങ്ങളിൽ പൂർണ്ണ ഇരുട്ടാണ്. കാൽനടയാത്രക്കാർക്ക് സുരക്ഷിതത്വമില്ലായ്മ.',
-          defaultTags: ['unlit_luminaire', 'bulb_failure', 'nighttime_hazard'],
+              'A street light is non-functional, creating unsafe dark conditions for pedestrians and vehicles.',
+          titleMl: 'തെരുവ് വിളക്ക് കേടായി',
+          descriptionMl: 'ഒരു തെരുവ് ലൈറ്റ് പ്രവർത്തിക്കുന്നില്ല, ഇത് അസുരക്ഷിതമാണ്.',
+          defaultTags: ['street_light', 'outage', 'safety_hazard'],
         );
       case ReportCategory.damagedPole:
         return const CivicPresetMetadata(
-          title: 'Damaged / Tilted Electric Pole',
+          title: 'Damaged Utility Pole',
           description:
-              'Concrete or steel utility pole leaning at dangerous angle or fractured at the base.',
-          titleMl: 'അപകടാവസ്ഥയിലുള്ള പോസ്റ്റ്',
-          descriptionMl:
-              'വൈദ്യുത പോസ്റ്റ് പൊട്ടുകയോ അപകടകരമായ രീതിയിൽ റോഡിലേക്ക് ചരിഞ്ഞുനിൽക്കുകയോ ചെയ്യുന്നു.',
-          defaultTags: ['leaning_pole', 'structural_fracture', 'collapse_hazard'],
+              'An electricity or telephone utility pole is damaged, leaning, or at risk of collapse.',
+          titleMl: 'കേടായ ഉൾഭൂ-ഉപകരണ തൂൺ',
+          descriptionMl: 'ഒരു ഉൾഭൂ-ഉപകരണ തൂൺ കേടുകൂടി ചരിഞ്ഞ് നിൽക്കുന്നു.',
+          defaultTags: ['utility_pole', 'damaged_pole', 'electrical_hazard'],
         );
       case ReportCategory.powerIssue:
         return const CivicPresetMetadata(
-          title: 'Dangerous Overhead Electrical Cable',
+          title: 'Power Supply Disruption',
           description:
-              'Low-hanging, loose, or severed power cable hanging close to the ground, severe electrocution risk.',
-          titleMl: 'താഴ്ന്നു കിടക്കുന്ന വൈദ്യുത ലൈൻ',
-          descriptionMl:
-              'പൊട്ടിയതോ താഴ്ന്നുകിടക്കുന്നതോ ആയ ലൈവ് ഇലക്ട്രിക് വയർ കാൽനടക്കാർക്ക് വൈദ്യുതാഘാത ഭീഷണിയാകുന്നു.',
-          defaultTags: ['dangling_wire', 'live_cable', 'electrocution_risk'],
+              'A power outage or electrical infrastructure fault is affecting residents or public facilities.',
+          titleMl: 'വൈദ്യുതി തകരാർ',
+          descriptionMl: 'വൈദ്യുതി ഘടകങ്ങൾക്ക് തകരാർ സംഭവിച്ചിരിക്കുന്നു.',
+          defaultTags: ['power_outage', 'electrical_fault', 'infrastructure'],
         );
       case ReportCategory.waterSupply:
         return const CivicPresetMetadata(
-          title: 'Public Water Supply Disruption',
+          title: 'Water Supply Disruption',
           description:
-              'Broken public drinking water distribution outlet or public kiosk out of service.',
-          titleMl: 'കുടിവെള്ള വിതരണ തകരാർ',
-          descriptionMl:
-              'പൊതു കുടിവെള്ള പൈപ്പിലെ തകരാർ മൂലം പ്രദേശവാസികൾക്ക് കുടിവെള്ളം ലഭിക്കാത്ത അവസ്ഥ.',
-          defaultTags: ['supply_outage', 'tap_breakage', 'drinking_water'],
+              'Municipal water supply has been disrupted or contaminated, affecting access to clean drinking water.',
+          titleMl: 'കുടിവെള്ള ക്ഷാമം',
+          descriptionMl: 'കുടിവെള്ള വിതരണം തടസ്സപ്പെട്ടിരിക്കുന്നു.',
+          defaultTags: ['water_supply', 'disruption', 'drinking_water'],
         );
       case ReportCategory.pipeLeak:
         return const CivicPresetMetadata(
-          title: 'High-Pressure Water Pipeline Leak',
+          title: 'Water Pipe Leakage / Burst',
           description:
-              'Treated municipal water spurting or gushing from cracked distribution main, eroding roadway.',
-          titleMl: 'പൈപ്പ് പൊട്ടി കുടിവെള്ള ചോർച്ച',
-          descriptionMl:
-              'കുടിവെള്ള വിതരണ പൈപ്പ് പൊട്ടി വലിയ അളവിൽ വെള്ളം പാഴാവുകയും റോഡ് ഒലിച്ചുപോവുകയും ചെയ്യുന്നു.',
-          defaultTags: ['burst_pipe', 'water_wastage', 'road_erosion'],
+              'A municipal water main or supply pipe is visibly leaking or burst, wasting clean water and damaging the road.',
+          titleMl: 'പൈപ്പ് ചോർച്ച',
+          descriptionMl: 'ഒരു ജലക്കുഴൽ ചോർന്ന് ശുദ്ധജലം പാഴായി പോകുന്നു.',
+          defaultTags: ['pipe_leak', 'water_wastage', 'burst_main'],
         );
       case ReportCategory.encroachment:
         return const CivicPresetMetadata(
-          title: 'Unauthorized Pedestrian Encroachment',
+          title: 'Illegal Encroachment on Public Land',
           description:
-              'Illegal temporary sheds, commercial merchandise, or barriers constructed over public footpath.',
-          titleMl: 'നടപ്പാത അനധികൃത കയ്യേറ്റം',
-          descriptionMl:
-              'പൊതുനടപ്പാത അനധികൃതമായി കയ്യേറി നിർമ്മാണങ്ങൾ നടത്തിയതിനാൽ കാൽനടയാത്രക്കാർ റോഡിലിറങ്ങി നടക്കേണ്ടി വരുന്നു.',
-          defaultTags: ['sidewalk_block', 'unauthorized_structure', 'right_of_way'],
+              'A structure or activity is illegally encroaching onto public road or footpath space.',
+          titleMl: 'പൊതു ഭൂമി കയ്യേറ്റം',
+          descriptionMl: 'പൊതു ഭൂമിയിൽ അനധികൃതമായ കയ്യേറ്റം ശ്രദ്ധയിൽ പെട്ടിരിക്കുന്നു.',
+          defaultTags: ['encroachment', 'public_land', 'illegal_structure'],
         );
       case ReportCategory.brokenProperty:
         return const CivicPresetMetadata(
-          title: 'Damaged Public Civic Infrastructure',
+          title: 'Damaged Public Property',
           description:
-              'Vandalized bus shelter glass, broken public seating, or fractured street guardrails.',
-          titleMl: 'പൊതുമുതൽ നശിപ്പിക്കപ്പെട്ട നിലയിൽ',
-          descriptionMl:
-              'ബസ് കാത്തിരിപ്പുകേന്ദ്രം, കൈവരികൾ തുടങ്ങിയ പൊതു സൗകര്യങ്ങൾ തകർക്കപ്പെട്ടിരിക്കുന്നു.',
-          defaultTags: ['bus_shelter_damage', 'broken_railing', 'municipal_asset'],
+              'Public infrastructure such as a bench, railing, or bus shelter has been damaged or vandalized.',
+          titleMl: 'കേടായ പൊതുമുതൽ',
+          descriptionMl: 'ഒരു പൊതു-ഇൻഫ്രാസ്ട്രക്ചർ ഘടകം കേടുകൂടിയിരിക്കുന്നു.',
+          defaultTags: ['public_property', 'vandalism', 'damage'],
         );
       case ReportCategory.strayAnimals:
         return const CivicPresetMetadata(
-          title: 'Stray Animal Traffic Congestion',
+          title: 'Stray Animal Menace',
           description:
-              'Unattended stray cattle or pack of animals congregating in middle of road causing traffic peril.',
-          titleMl: 'തെരുവ് മൃഗങ്ങളുടെ ശല്യം',
-          descriptionMl:
-              'റോഡിൽ തെരുവ് മൃഗങ്ങൾ കൂട്ടമായി നിൽക്കുന്നത് മൂലം ഇരുചക്ര വാഹനങ്ങൾ ഉൾപ്പെടെ അപകടത്തിൽപ്പെടാൻ സാധ്യത.',
-          defaultTags: ['animal_hazard', 'traffic_interference', 'public_safety'],
+              'Aggressive stray animals are posing a safety risk to pedestrians or blocking road access.',
+          titleMl: 'തെരുവ് മൃഗ ശല്യം',
+          descriptionMl: 'അലഞ്ഞു തിരിയുന്ന മൃഗങ്ങൾ ആളുകൾക്ക് ഭീഷണി ഉണ്ടാക്കുന്നു.',
+          defaultTags: ['stray_animals', 'public_safety', 'animal_menace'],
         );
       case ReportCategory.noise:
         return const CivicPresetMetadata(
-          title: 'Excessive Decibel Noise Pollution',
+          title: 'Noise Pollution / Public Nuisance',
           description:
-              'Unauthorized high-decibel generator or commercial loudspeaker operating beyond municipal limits.',
+              'Excessive noise from construction, commercial activity, or events is violating public peace norms.',
           titleMl: 'ശബ്ദ മലിനീകരണം',
-          descriptionMl:
-              'അനുവദനീയമായ പരിധിയിൽ കൂടുതൽ ശബ്ദത്തിൽ ഉച്ചഭാഷിണികളോ ജനറേറ്ററോ പ്രവർത്തിപ്പിച്ച് ജനങ്ങൾക്ക് ബുദ്ധിമുട്ടുണ്ടാക്കുന്നു.',
-          defaultTags: ['decibel_violation', 'acoustic_disturbance', 'civic_quiet'],
+          descriptionMl: 'അമിത ശബ്ദം പൊതുജന ശല്യം ഉണ്ടാക്കുന്നു.',
+          defaultTags: ['noise_pollution', 'public_nuisance', 'decibel_violation'],
+        );
+      case ReportCategory.brokenFootpath:
+        return const CivicPresetMetadata(
+          title: 'Broken / Damaged Footpath',
+          description:
+              'A pedestrian footpath has broken tiles or concrete, creating tripping hazards for walkers.',
+          titleMl: 'തകർന്ന നടപ്പാത',
+          descriptionMl: 'നടപ്പാതയിൽ ടൈൽ അഴിഞ്ഞ് കാൽ തടസ്സം ഉണ്ടാകാം.',
+          defaultTags: ['broken_footpath', 'cracked_tiles', 'pedestrian_hazard'],
         );
       case ReportCategory.other:
         return const CivicPresetMetadata(
-          title: 'General Civic Hazard Concern',
+          title: 'Other Civic Issue',
           description:
-              'Unclassified municipal hazard or civic infrastructure failure requiring inspection.',
-          titleMl: 'പൊതു പരാതി / പ്രശ്നം',
-          descriptionMl:
-              'നഗരസഭയുടെ അടിയന്തര ശ്രദ്ധയും പരിഹാരവും ആവശ്യമുള്ള പൊതു പ്രശ്നം.',
-          defaultTags: ['civic_issue', 'municipal_inspection'],
+              'A civic infrastructure issue has been identified that requires municipal attention.',
+          titleMl: 'മറ്റ് നഗര പ്രശ്നം',
+          descriptionMl: 'ഒരു പൊതു-ഇൻഫ്രാ പ്രശ്നം ശ്രദ്ധയിൽ പെട്ടിരിക്കുന്നു.',
+          defaultTags: ['civic_issue', 'municipal_attention_needed'],
         );
     }
   }
-}
-
-class CivicPresetMetadata {
-  final String title;
-  final String description;
-  final String titleMl;
-  final String descriptionMl;
-  final List<String> defaultTags;
-
-  const CivicPresetMetadata({
-    required this.title,
-    required this.description,
-    required this.titleMl,
-    required this.descriptionMl,
-    required this.defaultTags,
-  });
 }

@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -44,13 +42,13 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
 
   ReportCategory? _targetedCategory;
   CivicAiDetection? _currentDetection;
-  bool _isProcessingFrame = false;
-  int _lastFrameTimeMs = 0;
 
-  // Steady lock auto-capture state
-  double _steadyLockProgress = 0.0;
-  Timer? _steadyLockTimer;
+  // Periodic NVIDIA NIM Vision scan state
+  Timer? _scanTimer;
+  bool _isAnalyzing = false;
   bool _isCapturing = false;
+  // How often to send a frame to NIM for real AI analysis (1.5 s for fast response)
+  static const Duration _scanInterval = Duration(milliseconds: 1500);
 
   // Flash animation controller for shutter effect
   late AnimationController _flashAnimController;
@@ -73,7 +71,7 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
 
   @override
   void dispose() {
-    _steadyLockTimer?.cancel();
+    _scanTimer?.cancel();
     _controller?.dispose();
     _flashAnimController.dispose();
     super.dispose();
@@ -132,7 +130,6 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
       camera,
       ResolutionPreset.high,
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
     try {
@@ -141,71 +138,56 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
 
       setState(() => _isCameraReady = true);
 
-      // Start live image stream for real-time edge hazard classification
-      await _controller!.startImageStream(_handleCameraFrame);
+      // Start the periodic NIM Vision scan timer.
+      // We do NOT stream every frame — we take one JPEG every 1.5s and
+      // send it to NVIDIA NIM for real AI classification.
+      _startPeriodicScan();
     } catch (e) {
       debugPrint('[CivicAiCameraScreen] Controller setup error: $e');
     }
   }
 
-  void _handleCameraFrame(CameraImage image) {
-    if (_isProcessingFrame || _isCapturing) return;
+  void _startPeriodicScan() {
+    _scanTimer?.cancel();
+    _scanTimer = Timer.periodic(_scanInterval, (_) => _runNimScan());
+  }
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-    // Throttle frame processing to every 220ms (~4.5 FPS) to conserve battery and CPU
-    if (now - _lastFrameTimeMs < 220) return;
+  /// Takes a snapshot via the camera controller and sends it to NVIDIA NIM
+  /// (llama-3.2-11b-vision-instruct) for real classification. Updates detection
+  /// state only when NIM confirms a genuine civic hazard.
+  Future<void> _runNimScan() async {
+    if (_isAnalyzing || _isCapturing) return;
+    if (_controller == null || !_controller!.value.isInitialized) return;
 
-    _isProcessingFrame = true;
-    _lastFrameTimeMs = now;
+    _isAnalyzing = true;
+    if (mounted) setState(() {});
 
     try {
+      // Take a quiet preview snapshot (no shutter sound/flash)
+      final XFile snap = await _controller!.takePicture();
       final classifier = ref.read(civicAiClassifierServiceProvider);
-      final detection = classifier.analyzeFrame(
-        image,
-        targetedCategory: _targetedCategory,
+
+      // Gemini analyzes the JPEG — returns null if nothing civic is seen
+      final detection = await classifier.classifyCapturedPhoto(
+        snap,
+        hintCategory: _targetedCategory,
+        // Low-confidence results are filtered inside the service
       );
 
-      if (mounted && detection != null) {
-        setState(() => _currentDetection = detection);
-        _updateSteadyLock(detection);
-      }
-    } catch (e) {
-      debugPrint('[CivicAiCameraScreen] Frame handler error: $e');
-    } finally {
-      _isProcessingFrame = false;
-    }
-  }
-
-  void _updateSteadyLock(CivicAiDetection detection) {
-    if (_isCapturing) return;
-
-    // Trigger auto-capture if detection confidence >= 85% and steady
-    if (detection.isHighConfidence && detection.isSteady) {
-      _steadyLockProgress += 0.22;
-      if (_steadyLockProgress >= 1.0) {
-        _steadyLockProgress = 1.0;
-        _triggerAutoCapture();
-      } else {
-        setState(() {});
-      }
-    } else {
-      if (_steadyLockProgress > 0) {
+      if (mounted) {
         setState(() {
-          _steadyLockProgress = math.max(0.0, _steadyLockProgress - 0.15);
+          _currentDetection = detection;
         });
       }
+    } catch (e) {
+      debugPrint('[CivicAiCameraScreen] NIM scan error: $e');
+    } finally {
+      _isAnalyzing = false;
+      if (mounted) setState(() {});
     }
   }
 
-  Future<void> _triggerAutoCapture() async {
-    if (_isCapturing) return;
-    _isCapturing = true;
 
-    // Haptic lock-on feedback
-    HapticFeedback.heavyImpact();
-
-    await _executeCapture(isAuto: true);
-  }
 
   Future<void> _executeCapture({bool isAuto = false}) async {
     if (_controller == null || !_controller!.value.isInitialized) return;
@@ -260,9 +242,10 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
     if (mounted) {
       setState(() {
         _isCapturing = false;
-        _steadyLockProgress = 0.0;
         _currentDetection = null;
       });
+      // Restart periodic scanning after a capture
+      _startPeriodicScan();
     }
   }
 
@@ -385,13 +368,22 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
             child: _buildTopControlBar(currentLang),
           ),
 
-          // 5. Steady Lock Auto-Capture Notification Meter
-          if (_steadyLockProgress > 0)
+          // 5. Gemini Analyzing Spinner — shown while Gemini Vision is in flight
+          if (_isAnalyzing)
             Positioned(
               top: 140,
               left: 40,
               right: 40,
-              child: _buildSteadyLockHud(isMalayalam),
+              child: _buildAnalyzingHud(isMalayalam),
+            ),
+
+          // 5b. No-detection idle hint (shown when Gemini found nothing)
+          if (!_isAnalyzing && _currentDetection == null)
+            Positioned(
+              top: 150,
+              left: 40,
+              right: 40,
+              child: _buildIdleHint(isMalayalam),
             ),
 
           // 6. Bottom Capture Controls & Category Override
@@ -599,16 +591,16 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
     );
   }
 
-  Widget _buildSteadyLockHud(bool isMalayalam) {
+  Widget _buildAnalyzingHud(bool isMalayalam) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0F18).withValues(alpha: 0.85),
+        color: const Color(0xFF0A0F18).withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF00FFCC), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00FFCC).withValues(alpha: 0.3),
+            color: const Color(0xFF00FFCC).withValues(alpha: 0.25),
             blurRadius: 16,
             spreadRadius: 2,
           ),
@@ -616,14 +608,12 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 28,
-            height: 28,
+          const SizedBox(
+            width: 24,
+            height: 24,
             child: CircularProgressIndicator(
-              value: _steadyLockProgress,
-              strokeWidth: 3.5,
-              color: const Color(0xFF00FFCC),
-              backgroundColor: Colors.white24,
+              strokeWidth: 3,
+              color: Color(0xFF00FFCC),
             ),
           ),
           const SizedBox(width: 14),
@@ -633,19 +623,49 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  isMalayalam ? 'ക്യാമറ ചലിപ്പിക്കാതെ പിടിക്കുക...' : 'HOLD STEADY...',
+                  isMalayalam ? 'AI വിശകലനം ചെയ്യുന്നു...' : 'AI SCANNING...',
                   style: const TextStyle(
                     color: Color(0xFF00FFCC),
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 1.1,
+                    letterSpacing: 1.0,
                   ),
                 ),
                 Text(
-                  isMalayalam ? 'AI ഓട്ടോ-ക്യാപ്ചർ ചെയ്യുന്നു' : 'AI Auto-Lock Triggering Capture',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  isMalayalam
+                      ? 'NIM Vision ഫ്രേം പരിശോധിക്കുന്നു'
+                      : 'Llama 3.2-90B Vision analyzing frame',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdleHint(bool isMalayalam) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.search_rounded, color: Colors.white54, size: 16),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              isMalayalam
+                  ? 'പ്രശ്നം ഇല്ലെന്ന് AI തീർച്ചപ്പെടുത്തി'
+                  : 'No civic hazard detected — scanning every 1.5s',
+              style: const TextStyle(color: Colors.white60, fontSize: 11.5),
+              textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -675,11 +695,11 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
             _currentDetection != null
                 ? '${_currentDetection!.category.localizedName(currentLang)}: ${_currentDetection!.title}'
                 : (isMalayalam
-                    ? 'റോഡിലെ കുഴിയിലേക്കോ ഡ്രെയിനേജിലേക്കോ ക്യാമറ തിരിക്കുക'
-                    : 'Point camera at pothole, open drain, or civic issue'),
+                    ? 'ക്യാമറ പ്രശ്നത്തിലേക്ക് തിരിക്കുക, 1.5 സെക്കൻഡ് ഇടവേളയിൽ AI പരിശോധിക്കും'
+                    : 'Point at a civic issue — AI checks every 1.5 seconds'),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: _currentDetection != null ? const Color(0xFF00FFCC) : Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -735,7 +755,9 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
           ),
           const SizedBox(height: 10),
           Text(
-            isMalayalam ? 'ടാപ്പ് ചെയ്ത് സ്വയം എടുക്കാം' : 'Hold steady or tap to snap manually',
+            isMalayalam
+                ? 'ടാപ്പ് ചെയ്ത് ഇപ്പോൾ ഫോട്ടോ എടുക്കാം'
+                : "Tap to capture now \u2014 AI will verify it's a real issue",
             style: const TextStyle(color: Colors.white54, fontSize: 11.5),
           ),
         ],

@@ -79,3 +79,23 @@ class CivicAiCapturePayload {
     required this.capturedAt,
   });
 }
+
+/// Preset title/description/tags bundle for a civic hazard category.
+/// Used by [CivicAiClassifierService.getPresetMetadata] as a fallback
+/// when Gemini Vision doesn't produce localised text.
+class CivicPresetMetadata {
+  final String title;
+  final String description;
+  final String titleMl;
+  final String descriptionMl;
+  final List<String> defaultTags;
+
+  const CivicPresetMetadata({
+    required this.title,
+    required this.description,
+    required this.titleMl,
+    required this.descriptionMl,
+    required this.defaultTags,
+  });
+}
+
