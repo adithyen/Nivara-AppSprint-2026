@@ -113,6 +113,10 @@ class DebugLogger {
       _pending.add(line);
     }
 
+    // Always print to console / logcat so 'adb logcat -s flutter:V' captures it
+    // even in release builds, while debugPrint keeps Flutter DevTools in sync.
+    // ignore: avoid_print
+    print('NIVARA $line'.trimRight());
     if (kDebugMode) debugPrint('NIVARA $line'.trimRight());
     revision.value++;
   }

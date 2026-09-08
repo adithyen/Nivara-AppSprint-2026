@@ -7,6 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/services/debug_logger.dart';
 import '../../../models/enums.dart';
 import '../models/civic_ai_models.dart';
 
@@ -14,8 +15,8 @@ final civicAiClassifierServiceProvider = Provider<CivicAiClassifierService>((ref
   return CivicAiClassifierService();
 });
 
-/// Real vision engine — every analysis call sends an actual JPEG frame to
-/// NVIDIA NIM (llama-3.2-11b-vision-instruct via the OpenAI-compatible API).
+/// Real vision engine — sends camera JPEG frames to NVIDIA NIM
+/// (llama-3.2-11b-vision-instruct via OpenAI-compatible API).
 /// Only returns a detection when NIM confirms a genuine civic hazard is visible.
 /// Returns null when nothing is detected.
 class CivicAiClassifierService {
@@ -43,11 +44,15 @@ class CivicAiClassifierService {
     return _lastConfirmedDetection;
   }
 
-  /// Resizes image bytes to at most 800 px wide (keeping aspect ratio) using
-  /// dart:ui before sending to NIM for live-scan analysis.
-  /// This keeps the base64 payload under ~400 KB so the call completes within
-  /// the 10-second timeout on a typical Indian 4G connection.
-  Future<_ResizeResult> _resizeForNimLiveScan(Uint8List original) async {
+  /// Prepares image bytes for NIM live scanning.
+  /// If the camera snapshot is already reasonably sized (<= 450 KB), we preserve
+  /// the native hardware-compressed JPEG to avoid bloated PNG conversions.
+  /// If larger, we resize to 480px wide to minimize token usage.
+  Future<_ResizeResult> _prepareLiveScanBytes(Uint8List original) async {
+    if (original.lengthInBytes <= 450 * 1024) {
+      return _ResizeResult(bytes: original, mimeType: 'image/jpeg');
+    }
+
     try {
       final buffer = await ImmutableBuffer.fromUint8List(original);
       final descriptor = await ImageDescriptor.encoded(buffer);
@@ -55,13 +60,7 @@ class CivicAiClassifierService {
       final srcH = descriptor.height;
       buffer.dispose();
 
-      // Only resize if the image is large (> 900 px wide).
-      if (srcW <= 900) {
-        descriptor.dispose();
-        return _ResizeResult(bytes: original, mimeType: 'image/jpeg');
-      }
-
-      const targetW = 800;
+      const targetW = 480;
       final targetH = (srcH * targetW / srcW).round();
 
       final codec = await descriptor.instantiateCodec(
@@ -83,37 +82,49 @@ class CivicAiClassifierService {
         );
       }
     } catch (e) {
-      debugPrint('[CivicAiClassifier] Resize failed, using original: $e');
+      DebugLogger.instance.log('NIM-SCAN', 'Resize error, keeping original: $e');
     }
     return _ResizeResult(bytes: original, mimeType: 'image/jpeg');
   }
 
   /// Real-time live frame scanner. Sends a frame to NVIDIA NIM (11B Vision).
   /// Returns a valid [CivicAiDetection] only if a genuine municipal hazard is
-  /// detected with confidence >= 0.55 (lower than capture to be responsive).
+  /// detected with confidence >= 0.50.
   /// Returns null if no hazard is visible, confidence is low, or on network failure.
-  /// (Does NOT return any fake fallbacks).
   Future<CivicAiDetection?> scanLiveFrame(
     XFile photo, {
     ReportCategory? hintCategory,
   }) async {
     final nimKey = dotenv.env['NVIDIA_NIM_API_KEY']?.trim();
-    if (nimKey == null || nimKey.isEmpty) return null;
+    if (nimKey == null || nimKey.isEmpty) {
+      DebugLogger.instance.log('NIM-SCAN', 'Missing NVIDIA_NIM_API_KEY in .env!');
+      return null;
+    }
 
     try {
-      final originalBytes = await File(photo.path).readAsBytes();
-      // Shrink image before upload — keeps payload < 400 KB on mobile connections.
-      final resized = await _resizeForNimLiveScan(originalBytes);
+      final file = File(photo.path);
+      final originalBytes = await file.readAsBytes();
+      // Clean up temporary preview snapshot file
+      try {
+        await file.delete();
+      } catch (_) {}
+
+      final prepared = await _prepareLiveScanBytes(originalBytes);
+      DebugLogger.instance.log(
+        'NIM-SCAN',
+        'Live scan dispatching: original=${originalBytes.lengthInBytes}B, prepared=${prepared.bytes.lengthInBytes}B (${prepared.mimeType}), hint=${hintCategory?.wire ?? "auto"}',
+      );
+
       return await _callNimVision(
-        resized.bytes,
+        prepared.bytes,
         nimKey,
         hintCategory,
         highRes: false,
-        minConfidence: 0.55,
-        mimeType: resized.mimeType,
+        minConfidence: 0.50,
+        mimeType: prepared.mimeType,
       );
-    } catch (e) {
-      debugPrint('[CivicAiClassifier] Live frame scan error: $e');
+    } catch (e, stack) {
+      DebugLogger.instance.error('NIM-SCAN', e, stack);
       return null;
     }
   }
@@ -128,17 +139,40 @@ class CivicAiClassifierService {
     if (nimKey != null && nimKey.isNotEmpty) {
       try {
         final bytes = await File(photo.path).readAsBytes();
-        final result = await _callNimVision(bytes, nimKey, hintCategory,
-            highRes: true);
-        if (result != null) return result;
-      } catch (e) {
-        debugPrint('[CivicAiClassifier] NIM capture classification error: $e');
+        DebugLogger.instance.log(
+          'NIM-CAP',
+          'Classifying photo: ${photo.path} (${bytes.lengthInBytes} bytes), hint=${hintCategory?.wire ?? "auto"}',
+        );
+
+        final result = await _callNimVision(
+          bytes,
+          nimKey,
+          hintCategory,
+          highRes: true,
+          minConfidence: 0.45,
+        );
+
+        if (result != null) {
+          DebugLogger.instance.log(
+            'NIM-CAP',
+            'Capture classified: ${result.category.wire} (conf: ${result.confidence.toStringAsFixed(2)}, sev: ${result.severity.wire})',
+          );
+          return result;
+        }
+      } catch (e, stack) {
+        DebugLogger.instance.error('NIM-CAP', e, stack);
       }
+    } else {
+      DebugLogger.instance.log('NIM-CAP', 'NVIDIA_NIM_API_KEY is empty/null, using fallback');
     }
 
     // Fallback: use the last live detection if available, otherwise return
-    // a generic unknown result so the review sheet can still show something.
+    // a preset metadata result so the review sheet can still show something.
     if (_lastConfirmedDetection != null) {
+      DebugLogger.instance.log(
+        'NIM-CAP',
+        'Using last confirmed live detection: ${_lastConfirmedDetection!.category.wire}',
+      );
       return _lastConfirmedDetection!.copyWith(
         isSteady: true,
         timestamp: DateTime.now(),
@@ -147,6 +181,7 @@ class CivicAiClassifierService {
 
     final category = hintCategory ?? ReportCategory.pothole;
     final preset = getPresetMetadata(category);
+    DebugLogger.instance.log('NIM-CAP', 'Using preset metadata fallback for: ${category.wire}');
     return CivicAiDetection(
       category: category,
       confidence: 0.85,
@@ -205,6 +240,12 @@ Respond ONLY with this raw JSON:
 }
 ''';
 
+      final stopwatch = Stopwatch()..start();
+      DebugLogger.instance.log(
+        'NIM-API',
+        'POST to NIM ($_nimModel, mime=$mimeType, bytes=${imageBytes.lengthInBytes}, hint=${targetedCategory?.wire ?? "none"})...',
+      );
+
       final response = await http
           .post(
             Uri.parse(_nimEndpoint),
@@ -234,22 +275,29 @@ Respond ONLY with this raw JSON:
               'stream': false,
             }),
           )
-          .timeout(Duration(seconds: highRes ? 15 : 10));
+          .timeout(const Duration(seconds: 35));
 
+      final elapsed = stopwatch.elapsedMilliseconds;
       if (response.statusCode != 200) {
-        debugPrint('[CivicAiClassifier] NIM HTTP ${response.statusCode}: ${response.body}');
+        DebugLogger.instance.log(
+          'NIM-API',
+          'NIM HTTP ${response.statusCode} in ${elapsed}ms: ${response.body}',
+        );
         return null;
       }
 
       final body = jsonDecode(response.body);
       final rawText =
           body['choices']?[0]?['message']?['content'] as String?;
-      if (rawText == null || rawText.trim().isEmpty) return null;
+      if (rawText == null || rawText.trim().isEmpty) {
+        DebugLogger.instance.log('NIM-API', 'Empty response content in ${elapsed}ms');
+        return null;
+      }
 
       // Robustly extract JSON object using RegExp to handle any markdown or conversational preamble
       final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(rawText);
       if (jsonMatch == null) {
-        debugPrint('[CivicAiClassifier] No JSON object found in reply: $rawText');
+        DebugLogger.instance.log('NIM-API', 'No JSON found in ${elapsed}ms: $rawText');
         return null;
       }
       final cleanJson = jsonMatch.group(0)!;
@@ -258,7 +306,6 @@ Respond ONLY with this raw JSON:
       final rawCat = (parsed['category']?.toString() ?? 'not_a_civic_issue')
           .trim()
           .toLowerCase();
-      debugPrint('[CivicAiClassifier] NIM 11B detected: $rawCat — ${parsed['reasoning']}');
 
       // Explicitly bail out on non-civic scenes or negative confirmations
       if (rawCat.isEmpty ||
@@ -266,6 +313,7 @@ Respond ONLY with this raw JSON:
           rawCat == 'none' ||
           rawCat == 'null' ||
           rawCat == 'clear') {
+        DebugLogger.instance.log('NIM-API', 'Negative civic confirmation in ${elapsed}ms: $rawCat (${parsed['reasoning']})');
         return null;
       }
 
@@ -275,8 +323,16 @@ Respond ONLY with this raw JSON:
       final conf = ((parsed['confidence'] as num?)?.toDouble() ?? 0.85)
           .clamp(0.0, 0.99);
 
+      DebugLogger.instance.log(
+        'NIM-API',
+        'NIM 11B detected in ${elapsed}ms: category=${category.wire}, conf=${conf.toStringAsFixed(2)}, sev=${severity.wire}, minConf=$minConfidence',
+      );
+
       // Filter out low confidence detections
-      if (conf < minConfidence) return null;
+      if (conf < minConfidence) {
+        DebugLogger.instance.log('NIM-API', 'Confidence $conf below threshold $minConfidence, discarded.');
+        return null;
+      }
 
       final titleEn = parsed['title_en']?.toString() ?? '';
       final descEn = parsed['description_en']?.toString() ?? '';
@@ -303,8 +359,8 @@ Respond ONLY with this raw JSON:
       // Cache for continuity
       _lastConfirmedDetection = detection;
       return detection;
-    } catch (e) {
-      debugPrint('[CivicAiClassifier] NIM Vision error: $e');
+    } catch (e, stack) {
+      DebugLogger.instance.error('NIM-API', e, stack);
       return null;
     }
   }

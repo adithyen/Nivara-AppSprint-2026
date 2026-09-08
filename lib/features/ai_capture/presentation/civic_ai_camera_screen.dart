@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -6,8 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/services/debug_logger.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/ola_maps_service.dart';
 import '../../../core/theme.dart';
@@ -44,16 +47,21 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
   ReportCategory? _targetedCategory;
   CivicAiDetection? _currentDetection;
 
-  // Periodic NVIDIA NIM Vision scan state
-  Timer? _scanTimer;
+  // Sensor-based physical stability detection
+  StreamSubscription<UserAccelerometerEvent>? _accelSub;
+  double _currentGForce = 0.0;
+  bool _isDeviceSteady = true;
+  int _steadyTicks = 0;
+
+  // Timers & async state
+  Timer? _steadyLockTimer;
+  Timer? _nimScanTimer;
+  bool _isNimScanInFlight = false;
   bool _isAnalyzing = false;
   bool _isCapturing = false;
-  // How often to send a frame to NIM for real AI analysis (1.5 s for fast response)
-  static const Duration _scanInterval = Duration(milliseconds: 1500);
 
   // Steady lock auto-capture state
   double _steadyLockProgress = 0.0;
-  int _consecutiveHazardHits = 0;
 
   // Flash animation controller for shutter effect
   late AnimationController _flashAnimController;
@@ -70,15 +78,47 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
       duration: const Duration(milliseconds: 180),
     );
 
+    DebugLogger.instance.log(
+      'AI-CAMERA',
+      'CivicAiCameraScreen initialized (targetedCategory=${_targetedCategory?.wire ?? "none"})',
+    );
+
+    _initAccelerometer();
     _initPermissionsAndCamera();
     _fetchLocation();
   }
 
+  void _initAccelerometer() {
+    try {
+      _accelSub = userAccelerometerEventStream(
+        samplingPeriod: const Duration(milliseconds: 100),
+      ).listen(
+        (e) {
+          final g = math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z) / 9.80665;
+          _currentGForce = g;
+          // When phone is held steady on a scene, linear acceleration is < 0.28 g
+          _isDeviceSteady = g < 0.28;
+        },
+        onError: (err) {
+          DebugLogger.instance.log('SENSOR', 'Accelerometer error ($err), defaulting to steady');
+          _isDeviceSteady = true;
+        },
+      );
+      DebugLogger.instance.log('SENSOR', 'Accelerometer tracking initiated');
+    } catch (e) {
+      DebugLogger.instance.log('SENSOR', 'Accelerometer stream failed: $e');
+      _isDeviceSteady = true;
+    }
+  }
+
   @override
   void dispose() {
-    _scanTimer?.cancel();
+    _accelSub?.cancel();
+    _steadyLockTimer?.cancel();
+    _nimScanTimer?.cancel();
     _controller?.dispose();
     _flashAnimController.dispose();
+    DebugLogger.instance.log('AI-CAMERA', 'CivicAiCameraScreen disposed');
     super.dispose();
   }
 
@@ -94,7 +134,7 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
         if (mounted) setState(() => _currentAddress = addr);
       }
     } catch (e) {
-      debugPrint('[CivicAiCameraScreen] Location error: $e');
+      DebugLogger.instance.log('AI-CAMERA', 'Location error: $e');
     }
   }
 
@@ -125,7 +165,7 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
 
       await _setupController(_cameras[_selectedCameraIndex]);
     } catch (e) {
-      debugPrint('[CivicAiCameraScreen] Camera init error: $e');
+      DebugLogger.instance.log('AI-CAMERA', 'Camera init error: $e');
     }
   }
 
@@ -133,9 +173,6 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
     await _controller?.dispose();
     _controller = CameraController(
       camera,
-      // medium (~1280x720) keeps JPEG under ~400KB so NIM live-scan
-      // calls complete within the 10s timeout. High resolution causes
-      // 3–6 MB payloads that reliably time out on mobile connections.
       ResolutionPreset.medium,
       enableAudio: false,
     );
@@ -145,37 +182,92 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
       if (!mounted) return;
 
       setState(() => _isCameraReady = true);
+      DebugLogger.instance.log(
+        'AI-CAMERA',
+        'Camera controller initialized: ${camera.lensDirection.name}, medium resolution',
+      );
 
-      // Start the periodic NIM Vision scan timer.
-      // We do NOT stream every frame — we take one JPEG every 1.5s and
-      // send it to NVIDIA NIM for real AI classification.
       _startPeriodicScan();
-    } catch (e) {
-      debugPrint('[CivicAiCameraScreen] Controller setup error: $e');
+    } catch (e, stack) {
+      DebugLogger.instance.error('AI-CAMERA', 'Controller setup error: $e', stack);
     }
   }
 
   void _startPeriodicScan() {
-    _scanTimer?.cancel();
-    _scanTimer = Timer.periodic(_scanInterval, (_) => _runNimScan());
+    _startSteadyLockTimer();
+    _startNimScanLoop();
   }
 
-  /// Takes a snapshot via the camera controller and sends it to NVIDIA NIM
-  /// (llama-3.2-11b-vision-instruct) for real classification. Updates detection
-  /// state only when NIM confirms a genuine civic hazard.
+  /// Physical steady-lock ticker. Every 250ms, if the device is held steady
+  /// (low accelerometer jitter < 0.28 g), progress advances toward 1.0.
+  /// When held steady on a scene for ~2.5 to 3.2 seconds, it automatically triggers capture!
+  void _startSteadyLockTimer() {
+    _steadyLockTimer?.cancel();
+    _steadyLockTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      _onSteadyLockTick();
+    });
+  }
+
+  void _onSteadyLockTick() {
+    if (_isCapturing || !_isCameraReady || _controller == null || !_controller!.value.isInitialized) {
+      return;
+    }
+
+    if (_isDeviceSteady) {
+      _steadyTicks++;
+      // Progress increment per 250ms tick:
+      // - Standard steady hold: 0.08 (~3.1s to 100%)
+      // - Targeted category mode: 0.10 (~2.5s to 100%)
+      // - NIM live detection confirmed: 0.18 (~1.4s to 100%)
+      final double step = (_currentDetection != null && _currentDetection!.confidence >= 0.50)
+          ? 0.18
+          : (_targetedCategory != null ? 0.10 : 0.08);
+
+      _steadyLockProgress = (_steadyLockProgress + step).clamp(0.0, 1.0);
+      if (mounted) setState(() {});
+
+      if (_steadyTicks % 4 == 0) {
+        DebugLogger.instance.log(
+          'STEADY',
+          'Aim steady: g=${_currentGForce.toStringAsFixed(3)}, progress=${(_steadyLockProgress * 100).toInt()}%, ticks=$_steadyTicks',
+        );
+      }
+
+      if (_steadyLockProgress >= 1.0) {
+        DebugLogger.instance.log('AUTO-CAP', 'Steady-lock reached 100% → Firing auto-capture!');
+        _triggerAutoCapture();
+      }
+    } else {
+      // Movement or shaking detected
+      if (_steadyLockProgress > 0) {
+        _steadyTicks = 0;
+        _steadyLockProgress = (_steadyLockProgress - 0.20).clamp(0.0, 1.0);
+        if (mounted) setState(() {});
+      }
+    }
+  }
+
+  /// Background NIM Vision live scan loop. Dispatches frames to NVIDIA NIM
+  /// every 2.5 seconds without blocking the steady-lock viewfinder.
+  void _startNimScanLoop() {
+    _nimScanTimer?.cancel();
+    _nimScanTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      _runNimScan();
+    });
+  }
+
   Future<void> _runNimScan() async {
-    if (_isAnalyzing || _isCapturing) return;
+    if (_isNimScanInFlight || _isCapturing) return;
     if (_controller == null || !_controller!.value.isInitialized) return;
 
+    _isNimScanInFlight = true;
     _isAnalyzing = true;
     if (mounted) setState(() {});
 
     try {
-      // Take a quiet preview snapshot (no shutter sound/flash)
       final XFile snap = await _controller!.takePicture();
       final classifier = ref.read(civicAiClassifierServiceProvider);
 
-      // Real-time live frame detection via NVIDIA NIM (11B Vision)
       final detection = await classifier.scanLiveFrame(
         snap,
         hintCategory: _targetedCategory,
@@ -185,38 +277,23 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
         setState(() {
           _currentDetection = detection;
         });
-        _updateSteadyLock(detection);
+
+        if (detection != null && detection.confidence >= 0.50) {
+          DebugLogger.instance.log(
+            'NIM-SCAN',
+            'NIM live detection confirmed: ${detection.category.wire} (${detection.confidence}) → snapping steady lock to 100%!',
+          );
+          _steadyLockProgress = 1.0;
+          if (mounted) setState(() {});
+          _triggerAutoCapture();
+        }
       }
-    } catch (e) {
-      debugPrint('[CivicAiCameraScreen] NIM scan error: $e');
+    } catch (e, stack) {
+      DebugLogger.instance.error('NIM-SCAN', e, stack);
     } finally {
+      _isNimScanInFlight = false;
       _isAnalyzing = false;
       if (mounted) setState(() {});
-    }
-  }
-
-  void _updateSteadyLock(CivicAiDetection? detection) {
-    if (_isCapturing) return;
-
-    // Lower threshold to 0.55: the 11B NIM model is conservative on live
-    // compressed frames and rarely exceeds 0.70 even on obvious hazards.
-    // A single confirmed hit (multiplier 1.0) triggers auto-capture
-    // immediately rather than requiring two consecutive responses.
-    if (detection != null && detection.confidence >= 0.55) {
-      _consecutiveHazardHits++;
-      _steadyLockProgress = (_consecutiveHazardHits * 1.0).clamp(0.0, 1.0);
-      setState(() {});
-
-      if (_steadyLockProgress >= 1.0) {
-        _triggerAutoCapture();
-      }
-    } else {
-      if (_steadyLockProgress > 0) {
-        _consecutiveHazardHits = 0;
-        setState(() {
-          _steadyLockProgress = (_steadyLockProgress - 0.35).clamp(0.0, 1.0);
-        });
-      }
     }
   }
 
@@ -224,7 +301,7 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
     if (_isCapturing) return;
     _isCapturing = true;
 
-    // Haptic feedback when AI locks on and triggers auto-capture
+    DebugLogger.instance.log('AUTO-CAP', 'Auto-capture triggered! Firing haptic impact...');
     HapticFeedback.heavyImpact();
 
     await _executeCapture(isAuto: true);
@@ -234,16 +311,22 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
     if (_controller == null || !_controller!.value.isInitialized) return;
 
     try {
+      DebugLogger.instance.log('CAPTURE', 'Executing capture (isAuto=$isAuto)...');
       // Trigger shutter flash animation
       _flashAnimController.forward().then((_) => _flashAnimController.reverse());
 
       final XFile photo = await _controller!.takePicture();
+      DebugLogger.instance.log('CAPTURE', 'Photo taken: ${photo.path}');
 
       // Deep AI classification on the captured full-res photo
       final classifier = ref.read(civicAiClassifierServiceProvider);
       final finalDetection = await classifier.classifyCapturedPhoto(
         photo,
         hintCategory: _currentDetection?.category ?? _targetedCategory,
+      );
+      DebugLogger.instance.log(
+        'CAPTURE',
+        'Classification complete: ${finalDetection.category.wire} (conf: ${finalDetection.confidence})',
       );
 
       final payload = CivicAiCapturePayload(
@@ -257,6 +340,7 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
 
       if (!mounted) return;
 
+      DebugLogger.instance.log('CAPTURE', 'Displaying CivicAiReviewSheet modal bottom sheet');
       // Present the post-capture review modal sheet
       await showModalBottomSheet<bool>(
         context: context,
@@ -272,8 +356,8 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
       );
 
       _resetForNextCapture();
-    } catch (e) {
-      debugPrint('[CivicAiCameraScreen] Capture execution error: $e');
+    } catch (e, stack) {
+      DebugLogger.instance.error('CAPTURE', e, stack);
       _resetForNextCapture();
     }
   }
@@ -284,11 +368,12 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
       setState(() {
         _isCapturing = false;
         _steadyLockProgress = 0.0;
-        _consecutiveHazardHits = 0;
+        _steadyTicks = 0;
         _currentDetection = null;
       });
-      // Restart periodic scanning after a capture
-      _startPeriodicScan();
+      DebugLogger.instance.log('CAM-RESET', 'Reset completed, restarting scan cycles.');
+      _startSteadyLockTimer();
+      _startNimScanLoop();
     }
   }
 
@@ -493,6 +578,12 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
                 ),
               ),
               const Spacer(),
+              // Diagnostic Logs Toggle
+              IconButton(
+                icon: const Icon(Icons.receipt_long_rounded, color: Colors.cyanAccent),
+                tooltip: 'Diagnostic Logs',
+                onPressed: () => _showDiagnosticLogs(context),
+              ),
               // Torch Toggle
               IconButton(
                 icon: Icon(
@@ -867,6 +958,149 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
           ),
         ],
       ),
+    );
+  }
+
+  void _showDiagnosticLogs(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final recentLogs = DebugLogger.instance.recent;
+        final allText = recentLogs.join('\n');
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (ctx, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.terminal_rounded, color: Colors.cyanAccent, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'AI Diagnostic Console',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, color: Colors.white70, size: 20),
+                        tooltip: 'Copy all logs',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: allText));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Copied all logs to clipboard!'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'File: ${DebugLogger.instance.resolvedPath}',
+                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Divider(color: Colors.white12, height: 16),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF030712),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: recentLogs.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No logs recorded yet. Point camera at a scene.',
+                                style: TextStyle(color: Colors.white38, fontSize: 12),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              itemCount: recentLogs.length,
+                              itemBuilder: (ctx, idx) {
+                                final line = recentLogs[idx];
+                                Color textColor = Colors.white70;
+                                if (line.contains('[ERROR]')) {
+                                  textColor = Colors.redAccent;
+                                } else if (line.contains('[AUTO-CAP]') || line.contains('[CAPTURE]')) {
+                                  textColor = Colors.amberAccent;
+                                } else if (line.contains('[NIM-API]') || line.contains('[NIM-SCAN]')) {
+                                  textColor = Colors.cyanAccent;
+                                } else if (line.contains('[STEADY]')) {
+                                  textColor = Colors.lightGreenAccent;
+                                }
+                                return Text(
+                                  line,
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10.5,
+                                    color: textColor,
+                                    height: 1.35,
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: allText));
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('All logs copied to clipboard! Paste in chat.'),
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy_rounded, size: 18),
+                      label: const Text('COPY ALL LOGS TO CLIPBOARD'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: NivaraColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
