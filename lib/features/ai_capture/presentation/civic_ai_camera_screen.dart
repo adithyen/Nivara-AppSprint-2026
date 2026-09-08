@@ -133,7 +133,10 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
     await _controller?.dispose();
     _controller = CameraController(
       camera,
-      ResolutionPreset.high,
+      // medium (~1280x720) keeps JPEG under ~400KB so NIM live-scan
+      // calls complete within the 10s timeout. High resolution causes
+      // 3–6 MB payloads that reliably time out on mobile connections.
+      ResolutionPreset.medium,
       enableAudio: false,
     );
 
@@ -195,10 +198,13 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
   void _updateSteadyLock(CivicAiDetection? detection) {
     if (_isCapturing) return;
 
-    if (detection != null && detection.confidence >= 0.70) {
+    // Lower threshold to 0.55: the 11B NIM model is conservative on live
+    // compressed frames and rarely exceeds 0.70 even on obvious hazards.
+    // A single confirmed hit (multiplier 1.0) triggers auto-capture
+    // immediately rather than requiring two consecutive responses.
+    if (detection != null && detection.confidence >= 0.55) {
       _consecutiveHazardHits++;
-      // Auto-lock progression: 1st hit -> 50%, 2nd hit -> 100% and auto-captures
-      _steadyLockProgress = (_consecutiveHazardHits * 0.5).clamp(0.0, 1.0);
+      _steadyLockProgress = (_consecutiveHazardHits * 1.0).clamp(0.0, 1.0);
       setState(() {});
 
       if (_steadyLockProgress >= 1.0) {

@@ -43,9 +43,54 @@ class CivicAiClassifierService {
     return _lastConfirmedDetection;
   }
 
+  /// Resizes image bytes to at most 800 px wide (keeping aspect ratio) using
+  /// dart:ui before sending to NIM for live-scan analysis.
+  /// This keeps the base64 payload under ~400 KB so the call completes within
+  /// the 10-second timeout on a typical Indian 4G connection.
+  Future<_ResizeResult> _resizeForNimLiveScan(Uint8List original) async {
+    try {
+      final buffer = await ImmutableBuffer.fromUint8List(original);
+      final descriptor = await ImageDescriptor.encoded(buffer);
+      final srcW = descriptor.width;
+      final srcH = descriptor.height;
+      buffer.dispose();
+
+      // Only resize if the image is large (> 900 px wide).
+      if (srcW <= 900) {
+        descriptor.dispose();
+        return _ResizeResult(bytes: original, mimeType: 'image/jpeg');
+      }
+
+      const targetW = 800;
+      final targetH = (srcH * targetW / srcW).round();
+
+      final codec = await descriptor.instantiateCodec(
+        targetWidth: targetW,
+        targetHeight: targetH,
+      );
+      descriptor.dispose();
+
+      final frame = await codec.getNextFrame();
+      codec.dispose();
+
+      final byteData = await frame.image.toByteData(format: ImageByteFormat.png);
+      frame.image.dispose();
+
+      if (byteData != null) {
+        return _ResizeResult(
+          bytes: byteData.buffer.asUint8List(),
+          mimeType: 'image/png',
+        );
+      }
+    } catch (e) {
+      debugPrint('[CivicAiClassifier] Resize failed, using original: $e');
+    }
+    return _ResizeResult(bytes: original, mimeType: 'image/jpeg');
+  }
+
   /// Real-time live frame scanner. Sends a frame to NVIDIA NIM (11B Vision).
   /// Returns a valid [CivicAiDetection] only if a genuine municipal hazard is
-  /// detected with high confidence (>= 70%).
+  /// detected with confidence >= 0.55 (lower than capture to be responsive).
   /// Returns null if no hazard is visible, confidence is low, or on network failure.
   /// (Does NOT return any fake fallbacks).
   Future<CivicAiDetection?> scanLiveFrame(
@@ -56,8 +101,17 @@ class CivicAiClassifierService {
     if (nimKey == null || nimKey.isEmpty) return null;
 
     try {
-      final bytes = await File(photo.path).readAsBytes();
-      return await _callNimVision(bytes, nimKey, hintCategory, highRes: false);
+      final originalBytes = await File(photo.path).readAsBytes();
+      // Shrink image before upload — keeps payload < 400 KB on mobile connections.
+      final resized = await _resizeForNimLiveScan(originalBytes);
+      return await _callNimVision(
+        resized.bytes,
+        nimKey,
+        hintCategory,
+        highRes: false,
+        minConfidence: 0.55,
+        mimeType: resized.mimeType,
+      );
     } catch (e) {
       debugPrint('[CivicAiClassifier] Live frame scan error: $e');
       return null;
@@ -116,6 +170,8 @@ class CivicAiClassifierService {
     String apiKey,
     ReportCategory? targetedCategory, {
     bool highRes = false,
+    double minConfidence = 0.70,
+    String mimeType = 'image/jpeg',
   }) async {
     try {
       final base64Image = base64Encode(imageBytes);
@@ -167,7 +223,7 @@ Respond ONLY with this raw JSON:
                     {
                       'type': 'image_url',
                       'image_url': {
-                        'url': 'data:image/jpeg;base64,$base64Image',
+                        'url': 'data:$mimeType;base64,$base64Image',
                       },
                     },
                   ],
@@ -178,7 +234,7 @@ Respond ONLY with this raw JSON:
               'stream': false,
             }),
           )
-          .timeout(Duration(seconds: highRes ? 12 : 7));
+          .timeout(Duration(seconds: highRes ? 15 : 10));
 
       if (response.statusCode != 200) {
         debugPrint('[CivicAiClassifier] NIM HTTP ${response.statusCode}: ${response.body}');
@@ -220,7 +276,7 @@ Respond ONLY with this raw JSON:
           .clamp(0.0, 0.99);
 
       // Filter out low confidence detections
-      if (conf < 0.70) return null;
+      if (conf < minConfidence) return null;
 
       final titleEn = parsed['title_en']?.toString() ?? '';
       final descEn = parsed['description_en']?.toString() ?? '';
@@ -434,4 +490,13 @@ Respond ONLY with this raw JSON:
         );
     }
   }
+}
+
+/// Internal helper returned by [CivicAiClassifierService._resizeForNimLiveScan].
+/// Carries the (possibly resized) image bytes and the correct MIME type to use
+/// in the NIM API request.
+class _ResizeResult {
+  const _ResizeResult({required this.bytes, required this.mimeType});
+  final Uint8List bytes;
+  final String mimeType;
 }
