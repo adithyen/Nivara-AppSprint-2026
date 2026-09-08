@@ -128,7 +128,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 130),
         children: [
           // Greeting header
           StaggeredEntrance(
@@ -218,19 +218,25 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? const [Color(0xFF0F172A), Color(0xFF1E293B)]
+                          : const [Colors.white, Color(0xFFF0FDF4)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: const Color(0xFF00FFCC).withValues(alpha: 0.5),
+                      color: isDark
+                          ? const Color(0xFF00FFCC).withValues(alpha: 0.5)
+                          : const Color(0xFF00BFA5).withValues(alpha: 0.4),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF00FFCC).withValues(alpha: 0.12),
+                        color: isDark
+                            ? const Color(0xFF00FFCC).withValues(alpha: 0.12)
+                            : Colors.black.withValues(alpha: 0.05),
                         blurRadius: 18,
                         offset: const Offset(0, 4),
                       ),
@@ -264,31 +270,39 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
                               children: [
                                 Text(
                                   NivaraStrings.tr('ai_autocapture_title', currentLang),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : scheme.onSurface,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF00FFCC).withValues(alpha: 0.2),
+                                    color: isDark
+                                        ? const Color(0xFF00FFCC).withValues(alpha: 0.2)
+                                        : const Color(0xFF00BFA5).withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: const Color(0xFF00FFCC),
+                                      color: isDark
+                                          ? const Color(0xFF00FFCC)
+                                          : const Color(0xFF00BFA5),
                                       width: 0.8,
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     '19 HAZARDS',
                                     style: TextStyle(
-                                      color: Color(0xFF00FFCC),
+                                      color: isDark
+                                          ? const Color(0xFF00FFCC)
+                                          : const Color(0xFF00897B),
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 0.5,
@@ -300,8 +314,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                             const SizedBox(height: 4),
                             Text(
                               NivaraStrings.tr('ai_autocapture_sub', currentLang),
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -309,9 +323,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.arrow_forward_ios_rounded,
-                        color: Color(0xFF00FFCC),
+                        color: isDark ? const Color(0xFF00FFCC) : const Color(0xFF00897B),
                         size: 16,
                       ),
                     ],
@@ -334,19 +348,25 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1E1B4B), Color(0xFF0F172A)],
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? const [Color(0xFF1E1B4B), Color(0xFF0F172A)]
+                          : const [Colors.white, Color(0xFFEEF2FF)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: const Color(0xFF818CF8).withValues(alpha: 0.45),
+                      color: isDark
+                          ? const Color(0xFF818CF8).withValues(alpha: 0.45)
+                          : const Color(0xFF6366F1).withValues(alpha: 0.35),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF818CF8).withValues(alpha: 0.12),
+                        color: isDark
+                            ? const Color(0xFF818CF8).withValues(alpha: 0.12)
+                            : Colors.black.withValues(alpha: 0.05),
                         blurRadius: 18,
                         offset: const Offset(0, 4),
                       ),
@@ -380,31 +400,39 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
                               children: [
                                 Text(
                                   NivaraStrings.tr('voice_reporter_title', currentLang),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : scheme.onSurface,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF818CF8).withValues(alpha: 0.2),
+                                    color: isDark
+                                        ? const Color(0xFF818CF8).withValues(alpha: 0.2)
+                                        : const Color(0xFF6366F1).withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: const Color(0xFF818CF8),
+                                      color: isDark
+                                          ? const Color(0xFF818CF8)
+                                          : const Color(0xFF6366F1),
                                       width: 0.8,
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'VOICE AI',
                                     style: TextStyle(
-                                      color: Color(0xFFC7D2FE),
+                                      color: isDark
+                                          ? const Color(0xFFC7D2FE)
+                                          : const Color(0xFF4F46E5),
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 0.5,
@@ -416,8 +444,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                             const SizedBox(height: 4),
                             Text(
                               NivaraStrings.tr('voice_reporter_sub', currentLang),
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -425,9 +453,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.arrow_forward_ios_rounded,
-                        color: Color(0xFF818CF8),
+                        color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
                         size: 16,
                       ),
                     ],
@@ -456,7 +484,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 14,
               mainAxisSpacing: 14,
-              childAspectRatio: 0.94,
+              childAspectRatio: 0.98,
               children: [
                 _FeatureModuleTile(
                   icon: Icons.sensors_rounded,

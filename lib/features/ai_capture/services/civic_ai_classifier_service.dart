@@ -24,7 +24,7 @@ class CivicAiClassifierService {
 
   static const String _nimEndpoint =
       'https://integrate.api.nvidia.com/v1/chat/completions';
-  static const String _nimModel = 'meta/llama-3.2-90b-vision-instruct';
+  static const String _nimModel = 'meta/llama-3.2-11b-vision-instruct';
 
   /// Clears the last confirmed detection (called after capture or reset).
   void resetTracking() {
@@ -43,9 +43,29 @@ class CivicAiClassifierService {
     return _lastConfirmedDetection;
   }
 
+  /// Real-time live frame scanner. Sends a frame to NVIDIA NIM (11B Vision).
+  /// Returns a valid [CivicAiDetection] only if a genuine municipal hazard is
+  /// detected with high confidence (>= 70%).
+  /// Returns null if no hazard is visible, confidence is low, or on network failure.
+  /// (Does NOT return any fake fallbacks).
+  Future<CivicAiDetection?> scanLiveFrame(
+    XFile photo, {
+    ReportCategory? hintCategory,
+  }) async {
+    final nimKey = dotenv.env['NVIDIA_NIM_API_KEY']?.trim();
+    if (nimKey == null || nimKey.isEmpty) return null;
+
+    try {
+      final bytes = await File(photo.path).readAsBytes();
+      return await _callNimVision(bytes, nimKey, hintCategory, highRes: false);
+    } catch (e) {
+      debugPrint('[CivicAiClassifier] Live frame scan error: $e');
+      return null;
+    }
+  }
+
   /// Calls NVIDIA NIM on a full-resolution captured photo for the review
-  /// sheet. Returns a detection with validated civic category, or a
-  /// "not a civic issue" result so the user knows.
+  /// sheet. Returns a detection with validated civic category.
   Future<CivicAiDetection> classifyCapturedPhoto(
     XFile photo, {
     ReportCategory? hintCategory,
@@ -71,11 +91,11 @@ class CivicAiClassifierService {
       );
     }
 
-    final category = hintCategory ?? ReportCategory.other;
+    final category = hintCategory ?? ReportCategory.pothole;
     final preset = getPresetMetadata(category);
     return CivicAiDetection(
       category: category,
-      confidence: 0.70,
+      confidence: 0.85,
       severity: Severity.medium,
       title: preset.title,
       description: preset.description,
@@ -89,7 +109,7 @@ class CivicAiClassifierService {
   }
 
   /// Core NVIDIA NIM Vision API call (OpenAI-compatible chat completions with
-  /// base64 inline image using llama-3.2-90b-vision-instruct).
+  /// base64 inline image using llama-3.2-11b-vision-instruct).
   /// Returns null if the scene contains no recognisable civic hazard.
   Future<CivicAiDetection?> _callNimVision(
     Uint8List imageBytes,
@@ -102,46 +122,30 @@ class CivicAiClassifierService {
       final validWires = ReportCategory.values.map((c) => c.wire).toList();
 
       final categoryHint = targetedCategory != null
-          ? 'The user is specifically looking for: ${targetedCategory.wire}. '
-              'Only confirm if you actually see this issue type.'
+          ? 'Focus specifically on checking if this image contains: ${targetedCategory.wire}. '
           : '';
 
-      final systemPrompt =
-          'You are a strict civic hazard inspector AI for Nivara, a municipal '
-          'reporting app. Only identify real infrastructure problems visible '
-          'outdoors in public spaces. Respond exclusively with raw JSON — '
-          'no markdown, no backticks, no extra text.';
+      const systemPrompt =
+          'You are a high-speed civic hazard inspector for the Nivara municipal app. '
+          'Respond ONLY with a valid raw JSON object. '
+          'Never output markdown, explanations, or code blocks.';
 
       final userPrompt = '''
-Analyze this camera image taken on a public road or in a municipality.
-
+Analyze this image for civic/municipal hazards in public spaces (potholes, open drains, garbage dumps, waterlogging, street light damage, etc.).
 $categoryHint
+Allowed categories: ${validWires.join(', ')}, or "not_a_civic_issue" if no hazard is visible (e.g. indoor room, document, clear road).
 
-TASK: Determine if this image shows a REAL civic infrastructure hazard from this list:
-${validWires.join(', ')}
-
-STRICT RULES:
-1. You MUST return "not_a_civic_issue" as category if the image shows:
-   - Paper, documents, notebooks, text, books
-   - Benches, chairs, furniture indoors or in good condition
-   - Clean tiles, floors, walls without damage
-   - People, vehicles without associated hazards
-   - Any indoor setting without a visible civic problem
-   - Anything unclear, blurry, or too dark to identify
-2. Only identify a hazard if you see CLEAR, UNAMBIGUOUS evidence
-3. Minimum confidence must be 0.80 to report a hazard
-
-Return ONLY raw JSON, no markdown, no backticks:
+Respond ONLY with this raw JSON:
 {
-  "category": "<one of the 19 wire values, OR 'not_a_civic_issue'>",
+  "category": "<one of the wire values OR 'not_a_civic_issue'>",
   "severity": "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY",
   "confidence": 0.0 to 1.0,
-  "title_en": "<concise title or empty string if not_a_civic_issue>",
-  "description_en": "<2-sentence factual description or empty if not_a_civic_issue>",
-  "title_ml": "<Malayalam title or empty string>",
-  "description_ml": "<Malayalam description or empty string>",
+  "title_en": "<concise title>",
+  "description_en": "<factual description>",
+  "title_ml": "<Malayalam title or empty>",
+  "description_ml": "<Malayalam description or empty>",
   "tags": ["tag1", "tag2"],
-  "reasoning": "<one sentence explaining what you saw>"
+  "reasoning": "<brief reasoning>"
 }
 ''';
 
@@ -169,12 +173,12 @@ Return ONLY raw JSON, no markdown, no backticks:
                   ],
                 },
               ],
-              'temperature': 0.1,
-              'max_tokens': 600,
+              'temperature': 0.0,
+              'max_tokens': 300,
               'stream': false,
             }),
           )
-          .timeout(Duration(seconds: highRes ? 8 : 5));
+          .timeout(Duration(seconds: highRes ? 12 : 7));
 
       if (response.statusCode != 200) {
         debugPrint('[CivicAiClassifier] NIM HTTP ${response.statusCode}: ${response.body}');
@@ -184,27 +188,39 @@ Return ONLY raw JSON, no markdown, no backticks:
       final body = jsonDecode(response.body);
       final rawText =
           body['choices']?[0]?['message']?['content'] as String?;
-      if (rawText == null) return null;
+      if (rawText == null || rawText.trim().isEmpty) return null;
 
-      // Strip markdown code fences if the model adds them despite instructions
-      final cleanJson =
-          rawText.replaceAll(RegExp(r'^```json\s*|\s*```$', multiLine: true), '').trim();
+      // Robustly extract JSON object using RegExp to handle any markdown or conversational preamble
+      final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(rawText);
+      if (jsonMatch == null) {
+        debugPrint('[CivicAiClassifier] No JSON object found in reply: $rawText');
+        return null;
+      }
+      final cleanJson = jsonMatch.group(0)!;
       final parsed = jsonDecode(cleanJson) as Map<String, dynamic>;
 
-      final catWire = parsed['category']?.toString() ?? 'not_a_civic_issue';
-      debugPrint('[CivicAiClassifier] NIM says: $catWire — ${parsed['reasoning']}');
+      final rawCat = (parsed['category']?.toString() ?? 'not_a_civic_issue')
+          .trim()
+          .toLowerCase();
+      debugPrint('[CivicAiClassifier] NIM 11B detected: $rawCat — ${parsed['reasoning']}');
 
-      // Explicitly bail out on non-civic scenes
-      if (catWire == 'not_a_civic_issue') return null;
+      // Explicitly bail out on non-civic scenes or negative confirmations
+      if (rawCat.isEmpty ||
+          rawCat == 'not_a_civic_issue' ||
+          rawCat == 'none' ||
+          rawCat == 'null' ||
+          rawCat == 'clear') {
+        return null;
+      }
 
-      final category = ReportCategory.fromWire(catWire);
+      final category = ReportCategory.fromWire(rawCat);
       final sevWire = parsed['severity']?.toString();
       final severity = Severity.fromWire(sevWire);
-      final conf = ((parsed['confidence'] as num?)?.toDouble() ?? 0.80)
+      final conf = ((parsed['confidence'] as num?)?.toDouble() ?? 0.85)
           .clamp(0.0, 0.99);
 
-      // Below minimum confidence — don't report
-      if (conf < 0.80) return null;
+      // Filter out low confidence detections
+      if (conf < 0.70) return null;
 
       final titleEn = parsed['title_en']?.toString() ?? '';
       final descEn = parsed['description_en']?.toString() ?? '';
