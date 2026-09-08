@@ -1396,6 +1396,61 @@ abstract final class NivaraStrings {
       AppLanguage.hi: 'इंटरनेट कनेक्शन बहाल होने पर सूचियां स्वतः अपडेट हो जाएंगी।',
       AppLanguage.ml: 'ഇന്റർനെറ്റ് ലഭ്യമാകുമ്പോൾ തത്സമയം ലഭ്യമാകും.',
     },
+    'notifications_title': {
+      AppLanguage.en: 'Notifications',
+      AppLanguage.hi: 'सूचनाएँ',
+      AppLanguage.ml: 'അറിയിപ്പുകൾ',
+    },
+    'notifications_empty': {
+      AppLanguage.en: 'No notifications yet',
+      AppLanguage.hi: 'कोई नई सूचना नहीं',
+      AppLanguage.ml: 'പുതിയ അറിയിപ്പുകളൊന്നുമില്ല',
+    },
+    'notifications_empty_sub': {
+      AppLanguage.en: 'You\'re all caught up! New updates, task assignments, and civic alerts will appear here.',
+      AppLanguage.hi: 'आप पूरी तरह अपडेट हैं! नए अलर्ट और कार्य अपडेट यहाँ दिखाई देंगे।',
+      AppLanguage.ml: 'പുതിയ അറിയിപ്പുകളും ജോലി മാറ്റങ്ങളും ഇവിടെ കാണാം.',
+    },
+    'notifications_mark_all_read': {
+      AppLanguage.en: 'Mark all as read',
+      AppLanguage.hi: 'सभी पढ़ा हुआ चिह्नित करें',
+      AppLanguage.ml: 'എല്ലാം വായിച്ചതായി അടയാളപ്പെടുത്തുക',
+    },
+    'notifications_clear_all': {
+      AppLanguage.en: 'Clear all',
+      AppLanguage.hi: 'सभी साफ़ करें',
+      AppLanguage.ml: 'എല്ലാം ഒഴിവാക്കുക',
+    },
+    'notifications_filter_all': {
+      AppLanguage.en: 'All',
+      AppLanguage.hi: 'सभी',
+      AppLanguage.ml: 'എല്ലാം',
+    },
+    'notifications_filter_unread': {
+      AppLanguage.en: 'Unread',
+      AppLanguage.hi: 'अपठित',
+      AppLanguage.ml: 'വായിക്കാത്തവ',
+    },
+    'notifications_filter_reports': {
+      AppLanguage.en: 'Reports',
+      AppLanguage.hi: 'रिपोर्ट',
+      AppLanguage.ml: 'റിപ്പോർട്ടുകൾ',
+    },
+    'notifications_filter_work': {
+      AppLanguage.en: 'Work & Tasks',
+      AppLanguage.hi: 'कार्य एवं कार्यभार',
+      AppLanguage.ml: 'ജോലികൾ',
+    },
+    'notifications_filter_lf': {
+      AppLanguage.en: 'Lost & Found',
+      AppLanguage.hi: 'खोया-पाया',
+      AppLanguage.ml: 'നഷ്ടപ്പെട്ടവ & കിട്ടിയവ',
+    },
+    'notifications_filter_community': {
+      AppLanguage.en: 'Community',
+      AppLanguage.hi: 'समुदाय',
+      AppLanguage.ml: 'കമ്മ്യൂണിറ്റി',
+    },
   };
 
   /// Translate a string key for a given language.

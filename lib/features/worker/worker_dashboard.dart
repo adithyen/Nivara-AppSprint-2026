@@ -13,6 +13,7 @@ import '../../models/report.dart';
 import '../../router.dart';
 import '../admin/status_style.dart';
 import '../../core/widgets/bouncy_tap.dart';
+import '../notifications/presentation/notification_bell_button.dart';
 import '../report/category_grid.dart';
 
 /// The field worker's task list — body-only widget used inside [WorkerShell].
@@ -154,6 +155,42 @@ class _WorkerDashboardState extends ConsumerState<WorkerDashboard> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.engineering_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Field Tasks',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+              const NotificationBellButton(),
+            ],
+          ),
+        ),
         _FilterBar(
           tasks: _tasks.values,
           selectedKey: _filterKey,

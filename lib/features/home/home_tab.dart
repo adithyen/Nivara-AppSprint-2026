@@ -13,6 +13,7 @@ import '../../core/widgets/staggered_entrance.dart';
 import '../../models/user_profile.dart';
 import '../../router.dart';
 import '../auth/auth_controller.dart';
+import '../notifications/presentation/notification_bell_button.dart';
 import '../settings/accessibility_controller.dart';
 import '../settings/language_controller.dart';
 import '../voice_reporting/presentation/voice_reporting_sheet.dart';
@@ -159,29 +160,36 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                     ),
                   ],
                 ),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: isDark ? 0.15 : 0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: scheme.primary.withValues(alpha: isDark ? 0.4 : 0.5),
-                      width: a11y.highContrast ? 2.5 : 1.5,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      (profile != null && profile.displayName.trim().isNotEmpty)
-                          ? profile.displayName.trim().characters.first.toUpperCase()
-                          : 'C',
-                      style: TextStyle(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const NotificationBellButton(),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: isDark ? 0.15 : 0.1),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: scheme.primary.withValues(alpha: isDark ? 0.4 : 0.5),
+                          width: a11y.highContrast ? 2.5 : 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          (profile != null && profile.displayName.trim().isNotEmpty)
+                              ? profile.displayName.trim().characters.first.toUpperCase()
+                              : 'C',
+                          style: TextStyle(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),

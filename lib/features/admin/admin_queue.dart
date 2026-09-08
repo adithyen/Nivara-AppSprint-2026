@@ -11,6 +11,7 @@ import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import '../../models/report.dart';
 import '../../router.dart';
+import '../notifications/presentation/notification_bell_button.dart';
 import '../report/category_grid.dart';
 import '../worker/worker_repo.dart';
 import 'status_style.dart';
@@ -190,6 +191,42 @@ class _AdminQueueState extends State<AdminQueue> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.admin_panel_settings_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Dispatch Command',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+              const NotificationBellButton(),
+            ],
+          ),
+        ),
         _MetricFilterBar(
           reports: _reports.values,
           selectedKey: _filterKey,

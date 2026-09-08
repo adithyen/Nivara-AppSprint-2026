@@ -219,6 +219,11 @@ flutter build apk --release     # produce the release APK (→ GitHub Releases)
 #   supabase db push  (if using the Supabase CLI)
 ```
 
+### GitHub Release Policy (AUTOMATIC)
+- **Always build & create a GitHub Release** after completing features or fixes without waiting for user prompts.
+- **Release Retention Rule**: Always keep `v1.0.55` and the latest release on GitHub. Remove/delete all intermediate releases from GitHub (`gh release delete <tag> --yes --cleanup-tag`) so only `v1.0.55` and the newest release are present.
+
+
 ---
 
 ## Do NOT Do These

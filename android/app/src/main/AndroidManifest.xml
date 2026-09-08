@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Required on Android 13+ (API 33+) for notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Camera for QR code scanning in Lost & Found handover verification and AI Auto-Capture -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Microphone for Voice-Based Reporting across Civic, Lost & Found, and Community -->

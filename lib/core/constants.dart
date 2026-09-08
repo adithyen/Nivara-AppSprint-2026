@@ -88,6 +88,7 @@ const String kTableStatusHistory = 'report_status_history';
 const String kTableCommunityPosts = 'community_posts';
 const String kTableCommunityPollOptions = 'community_poll_options';
 const String kTableCommunityPollVotes = 'community_poll_votes';
+const String kTableNotifications = 'notifications';
 const String kBucketPhotos = 'complaint-photos';
 
 // ── Demo admin (hackathon) ──────────────────────────────────────────────────

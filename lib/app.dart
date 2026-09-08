@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +6,9 @@ import 'core/constants.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/services/offline_queue_service.dart';
 import 'core/theme.dart';
+import 'features/notifications/data/notification_model.dart';
+import 'features/notifications/data/notification_repository.dart';
+import 'features/notifications/services/local_notification_service.dart';
 import 'features/settings/accessibility_controller.dart';
 import 'features/settings/settings_controller.dart';
 import 'models/enums.dart';
@@ -22,6 +26,9 @@ class NivaraApp extends ConsumerStatefulWidget {
 
 class _NivaraAppState extends ConsumerState<NivaraApp> {
   bool _prevOnline = true;
+  StreamSubscription? _notifClickSub;
+  final Set<String> _seenNotificationIds = {};
+  bool _initialNotifLoadDone = false;
 
   @override
   void initState() {
@@ -30,6 +37,17 @@ class _NivaraAppState extends ConsumerState<NivaraApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       OfflineQueueService.drainAll();
     });
+
+    // Listen to notification click events to route dynamically
+    _notifClickSub = LocalNotificationService.instance.onNotificationClick.listen((payload) {
+      ref.read(routerProvider).push(Routes.notifications);
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifClickSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -47,6 +65,36 @@ class _NivaraAppState extends ConsumerState<NivaraApp> {
         OfflineQueueService.drainAll();
       }
       _prevOnline = nowOnline;
+    });
+
+    // Watch for newly arrived real-time notifications to show immediate system banners
+    ref.listen<AsyncValue<List<AppNotification>>>(notificationsStreamProvider, (prev, next) {
+      final list = next.value;
+      if (list == null) return;
+
+      if (!_initialNotifLoadDone) {
+        // Populate initial set without spamming notifications on app launch
+        for (final n in list) {
+          _seenNotificationIds.add(n.id);
+        }
+        _initialNotifLoadDone = true;
+        return;
+      }
+
+      for (final n in list) {
+        if (!_seenNotificationIds.contains(n.id)) {
+          _seenNotificationIds.add(n.id);
+          if (!n.isRead) {
+            LocalNotificationService.instance.showNotification(
+              id: n.id.hashCode,
+              title: n.title,
+              body: n.body,
+              type: n.type,
+              payload: n.payload,
+            );
+          }
+        }
+      }
     });
 
     Widget app = MaterialApp.router(

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/services/debug_logger.dart';
+import 'features/notifications/services/local_notification_service.dart';
 import 'features/settings/settings_controller.dart';
 
 /// App entry point: load env → init Supabase → run inside a Riverpod scope.
@@ -32,6 +33,9 @@ Future<void> main() async {
 
   await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
   DebugLogger.instance.log('BOOT', 'Supabase initialized → runApp');
+
+  // Initialize local notifications service and channels
+  await LocalNotificationService.instance.init();
 
   // Preload settings so theme mode + accent apply on the very first frame.
   final prefs = await SharedPreferences.getInstance();

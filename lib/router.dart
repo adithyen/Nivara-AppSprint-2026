@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'core/constants.dart';
+import 'core/supabase_client.dart';
 import 'features/activity/activity_log_screen.dart';
 import 'features/activity/pending_sync_screen.dart';
 import 'features/admin/admin_report_detail.dart';
@@ -20,6 +22,7 @@ import 'features/lostfound/match_screen.dart';
 import 'features/lostfound/report_found_screen.dart';
 import 'features/lostfound/report_lost_screen.dart';
 import 'features/lostfound/lf_form_screen.dart';
+import 'features/notifications/presentation/notification_center_screen.dart';
 import 'features/ai_capture/presentation/civic_ai_camera_screen.dart';
 import 'features/map/civic_map.dart';
 import 'features/map/location_picker_screen.dart';
@@ -67,6 +70,7 @@ abstract final class Routes {
   static const pendingSync = '/activity/sync';
   static const locationPicker = '/map/picker';
   static const aiCamera = '/report/ai-camera';
+  static const notifications = '/notifications';
 }
 
 /// The single [GoRouter] instance, built with an auth/role redirect guard.
@@ -197,6 +201,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extra = state.extra;
           if (extra is Report) {
             return ReportDetailScreen(report: extra);
+          }
+          final id = extra is String ? extra : state.uri.queryParameters['id'];
+          if (id != null) {
+            return _ReportIdResolver(
+              reportId: id,
+              builder: (r) => ReportDetailScreen(report: r),
+            );
           }
           return const Scaffold(
             body: Center(child: Text('Report details unavailable')),
@@ -356,8 +367,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.workerTask,
-        builder: (context, state) =>
-            WorkerTaskDetailScreen(report: state.extra as Report),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Report) {
+            return WorkerTaskDetailScreen(report: extra);
+          }
+          final id = extra is String ? extra : state.uri.queryParameters['id'];
+          if (id != null) {
+            return _ReportIdResolver(
+              reportId: id,
+              builder: (r) => WorkerTaskDetailScreen(report: r),
+            );
+          }
+          return const Scaffold(body: Center(child: Text('Task unavailable')));
+        },
       ),
       GoRoute(
         path: Routes.admin,
@@ -365,8 +388,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.adminReportDetail,
-        builder: (context, state) =>
-            AdminReportDetailScreen(report: state.extra as Report),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Report) {
+            return AdminReportDetailScreen(report: extra);
+          }
+          final id = extra is String ? extra : state.uri.queryParameters['id'];
+          if (id != null) {
+            return _ReportIdResolver(
+              reportId: id,
+              builder: (r) => AdminReportDetailScreen(report: r),
+            );
+          }
+          return const Scaffold(body: Center(child: Text('Report unavailable')));
+        },
+      ),
+      GoRoute(
+        path: Routes.notifications,
+        builder: (context, state) => const NotificationCenterScreen(),
       ),
       GoRoute(
         path: Routes.activityLog,
@@ -383,3 +422,71 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Resolves a Report from Supabase by its ID if navigated with an ID rather than a model.
+class _ReportIdResolver extends StatefulWidget {
+  final String reportId;
+  final Widget Function(Report report) builder;
+
+  const _ReportIdResolver({required this.reportId, required this.builder});
+
+  @override
+  State<_ReportIdResolver> createState() => _ReportIdResolverState();
+}
+
+class _ReportIdResolverState extends State<_ReportIdResolver> {
+  Report? _report;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final row = await supabase
+          .from(kTableReports)
+          .select()
+          .eq('id', widget.reportId)
+          .maybeSingle();
+      if (row != null && mounted) {
+        setState(() {
+          _report = Report.fromMap(row);
+          _loading = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _error = 'Report not found';
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_report != null) {
+      return widget.builder(_report!);
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('Error')),
+      body: Center(child: Text(_error ?? 'Report unavailable')),
+    );
+  }
+}
+
