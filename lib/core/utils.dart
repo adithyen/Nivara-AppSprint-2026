@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:intl/intl.dart';
@@ -80,9 +81,25 @@ DateTime? toDateTimeOrNull(dynamic v) {
   return DateTime.tryParse(v.toString());
 }
 
-/// Parse a `List<String>` from a Supabase array column (or null).
+/// Parse a `List<String>` from a Supabase array column, JSON string, or string list (or null).
 List<String>? toStringListOrNull(dynamic v) {
   if (v == null) return null;
   if (v is List) return v.map((e) => e.toString()).toList();
+  if (v is String) {
+    final str = v.trim();
+    if (str.isEmpty) return null;
+    if (str.startsWith('[') && str.endsWith(']')) {
+      try {
+        final decoded = jsonDecode(str);
+        if (decoded is List) return decoded.map((e) => e.toString()).toList();
+      } catch (_) {}
+    }
+    if (str.startsWith('{') && str.endsWith('}')) {
+      final inner = str.substring(1, str.length - 1);
+      if (inner.trim().isEmpty) return [];
+      return inner.split(',').map((e) => e.replaceAll('"', '').trim()).toList();
+    }
+    return [str];
+  }
   return null;
 }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -45,7 +47,23 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
           .eq('id', widget.report.id)
           .maybeSingle();
       if (row != null && mounted) {
-        setState(() => _report = Report.fromMap(row));
+        var rep = Report.fromMap(row);
+        // Live verify confirmations count directly from confirmations table
+        try {
+          final confRows = await supabase
+              .from(kTableConfirmations)
+              .select('id')
+              .eq('report_id', rep.id)
+              .eq('type', 'CONFIRM');
+          final realCount = (confRows as List).length;
+          if (realCount > rep.confirmationCount) {
+            rep = rep.copyWith(
+              confirmationCount: realCount,
+              isCommunityVerified: realCount >= 5 || rep.isCommunityVerified,
+            );
+          }
+        } catch (_) {}
+        setState(() => _report = rep);
       }
     } catch (_) {}
   }
@@ -55,22 +73,30 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
     if (uid == null) return;
     final own = _report.userId != null && _report.userId == uid;
     var confirmed = false;
-    if (!own) {
-      try {
-        final rows = await supabase
-            .from(kTableConfirmations)
-            .select('id')
-            .eq('report_id', _report.id)
-            .eq('user_id', uid)
-            .eq('type', 'CONFIRM')
-            .limit(1);
-        confirmed = (rows as List).isNotEmpty;
-      } catch (_) {}
-    }
+    int? liveCount;
+    try {
+      final rows = await supabase
+          .from(kTableConfirmations)
+          .select('id, user_id')
+          .eq('report_id', _report.id)
+          .eq('type', 'CONFIRM');
+      final list = rows as List;
+      liveCount = list.length;
+      if (!own) {
+        confirmed = list.any((r) => (r as Map)['user_id'] == uid);
+      }
+    } catch (_) {}
+
     if (mounted) {
       setState(() {
         _isOwn = own;
         _alreadyConfirmed = confirmed;
+        if (liveCount != null && liveCount > _report.confirmationCount) {
+          _report = _report.copyWith(
+            confirmationCount: liveCount,
+            isCommunityVerified: liveCount >= 5 || _report.isCommunityVerified,
+          );
+        }
       });
     }
   }
@@ -88,7 +114,25 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
         'user_id': uid,
         'type': 'CONFIRM',
       });
-      setState(() => _alreadyConfirmed = true);
+
+      // Optimistically update count immediately in state so UI shows the new count
+      final newCount = _report.confirmationCount + 1;
+      setState(() {
+        _alreadyConfirmed = true;
+        _report = _report.copyWith(
+          confirmationCount: newCount,
+          isCommunityVerified: newCount >= 5 || _report.isCommunityVerified,
+        );
+      });
+
+      // Try direct update to reports table in case trigger has delay or RLS permits
+      try {
+        await supabase.from(kTableReports).update({
+          'confirmation_count': newCount,
+          if (newCount >= 5) 'is_community_verified': true,
+        }).eq('id', _report.id);
+      } catch (_) {}
+
       await _refresh();
       if (mounted) _snack('Thank you — civic confirmation recorded.');
     } on Object catch (e) {
@@ -250,8 +294,8 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                 title: 'Description',
                 child: Text(
                   r.description!.trim(),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                     fontSize: 14,
                     height: 1.4,
                   ),
@@ -271,8 +315,8 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         r.address!.trim(),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -281,7 +325,7 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                   Text(
                     'GPS: ${r.lat.toStringAsFixed(5)}, ${r.lng.toStringAsFixed(5)}',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF64748B),
                       fontSize: 12,
                       fontFamily: 'monospace',
                     ),
@@ -383,7 +427,10 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                 title: 'Field Worker Resolution Note',
                 child: Text(
                   r.resolutionNotes!.trim(),
-                  style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                    fontSize: 13.5,
+                  ),
                 ),
               ),
             ],
@@ -725,6 +772,40 @@ class _PhotoStrip extends StatelessWidget {
   const _PhotoStrip({required this.urls});
   final List<String> urls;
 
+  void _showFullImage(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: url.startsWith('http')
+                    ? Image.network(url, fit: BoxFit.contain)
+                    : Image.file(File(url), fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -734,21 +815,69 @@ class _PhotoStrip extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: urls.length,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Image.network(
-            urls[i],
-            width: 120,
-            height: 120,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Container(
-              width: 120,
-              height: 120,
-              color: isDark ? const Color(0xFF10161E) : const Color(0xFFE2E8F0),
-              child: Icon(Icons.broken_image_rounded, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+        itemBuilder: (ctx, i) {
+          final url = urls[i];
+          final isHttp = url.startsWith('http');
+          return GestureDetector(
+            onTap: () => _showFullImage(ctx, url),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: isHttp
+                  ? Image.network(
+                      url,
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          width: 120,
+                          height: 120,
+                          color: isDark ? const Color(0xFF10161E) : const Color(0xFFE2E8F0),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 120,
+                        height: 120,
+                        color: isDark ? const Color(0xFF10161E) : const Color(0xFFE2E8F0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.broken_image_rounded, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tap to inspect',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Image.file(
+                      File(url),
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 120,
+                        height: 120,
+                        color: isDark ? const Color(0xFF10161E) : const Color(0xFFE2E8F0),
+                        child: Icon(Icons.broken_image_rounded, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+                      ),
+                    ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

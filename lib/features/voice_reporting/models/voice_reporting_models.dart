@@ -22,6 +22,7 @@ enum VoiceState {
 
 /// Language modes supported by Nivara's speech engine.
 enum VoiceLanguage {
+  auto('auto', 'Auto (Device)', '🌐'),
   en('en_IN', 'English', '🇬🇧'),
   ml('ml_IN', 'മലയാളം', '🇮🇳'),
   hi('hi_IN', 'हिंदी', '🇮🇳');
@@ -34,7 +35,8 @@ enum VoiceLanguage {
   static VoiceLanguage fromCode(String code) {
     if (code.startsWith('ml')) return VoiceLanguage.ml;
     if (code.startsWith('hi')) return VoiceLanguage.hi;
-    return VoiceLanguage.en;
+    if (code.startsWith('en')) return VoiceLanguage.en;
+    return VoiceLanguage.auto;
   }
 }
 

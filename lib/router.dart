@@ -171,7 +171,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             final title = extra['title'] as String?;
             final desc = extra['description'] as String?;
             final severity = extra['severity'] as Severity?;
-            final initialPhoto = extra['initialPhoto'] as XFile?;
+            final initialPhoto = (extra['initialPhoto'] as XFile?) ??
+                (extra['photoPath'] is String ? XFile(extra['photoPath'] as String) : null);
             return ReportFormScreen(
               initialCategory: cat,
               initialLat: lat,

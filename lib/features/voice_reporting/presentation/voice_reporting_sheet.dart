@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../../core/constants.dart';
 import '../../../core/services/location_service.dart';
@@ -56,7 +61,7 @@ class VoiceReportingSheet extends ConsumerStatefulWidget {
 
 class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   late VoiceReportMode _mode;
-  VoiceLanguage _language = VoiceLanguage.en;
+  VoiceLanguage _language = VoiceLanguage.auto;
   VoiceState _voiceState = VoiceState.idle;
   double _soundLevel = 0.0;
   String _liveTranscript = '';
@@ -65,11 +70,19 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
 
   Position? _currentPosition;
   String? _currentAddress;
+  String? _attachedPhotoPath;
+
+  late TextEditingController _transcriptController;
+  late FocusNode _transcriptFocusNode;
+  Timer? _debounceTimer;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
     _mode = widget.initialMode ?? VoiceReportMode.civic;
+    _transcriptController = TextEditingController();
+    _transcriptFocusNode = FocusNode();
 
     // Match current app language if possible
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -78,6 +91,8 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         _language = VoiceLanguage.ml;
       } else if (appLang == AppLanguage.hi) {
         _language = VoiceLanguage.hi;
+      } else {
+        _language = VoiceLanguage.auto;
       }
       setState(() {});
       _fetchLocation();
@@ -87,6 +102,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _transcriptController.dispose();
+    _transcriptFocusNode.dispose();
     ref.read(voiceRecognitionServiceProvider).stopListening();
     super.dispose();
   }
@@ -110,6 +128,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
 
     final started = await speechService.startListening(
       language: _language,
+      existingText: _transcriptController.text,
       onSoundLevel: (level) {
         if (mounted) setState(() => _soundLevel = level);
       },
@@ -118,7 +137,16 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
       },
       onResult: (text, isFinal) async {
         if (!mounted) return;
-        setState(() => _liveTranscript = text);
+        _liveTranscript = text;
+
+        // Auto-type words into the text box if the user isn't typing manually
+        if (!_transcriptFocusNode.hasFocus) {
+          _transcriptController.value = TextEditingValue(
+            text: text,
+            selection: TextSelection.collapsed(offset: text.length),
+          );
+        }
+        setState(() {});
 
         if (text.trim().isNotEmpty) {
           final parser = ref.read(voiceIntentParserServiceProvider);
@@ -126,6 +154,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             text,
             forcedMode: _mode,
             language: _language,
+            enableAiRefinement: isFinal,
           );
           if (mounted) {
             setState(() {
@@ -135,6 +164,8 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
               }
             });
           }
+        } else {
+          if (mounted) setState(() => _parsedPayload = null);
         }
       },
     );
@@ -142,6 +173,32 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     if (!started && mounted) {
       setState(() => _voiceState = VoiceState.idle);
     }
+  }
+
+  void _onTranscriptChanged(String val) {
+    _liveTranscript = val;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      if (val.trim().isNotEmpty) {
+        final parser = ref.read(voiceIntentParserServiceProvider);
+        final payload = await parser.parseTranscript(
+          val,
+          forcedMode: _mode,
+          language: _language,
+          enableAiRefinement: false,
+        );
+        if (mounted) {
+          setState(() {
+            _parsedPayload = payload;
+            if (payload.mode != _mode && widget.initialMode == null) {
+              _mode = payload.mode;
+            }
+          });
+        }
+      } else {
+        if (mounted) setState(() => _parsedPayload = null);
+      }
+    });
   }
 
   Future<void> _toggleListening() async {
@@ -156,9 +213,26 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     }
   }
 
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+      if (picked != null && mounted) {
+        setState(() => _attachedPhotoPath = picked.path);
+        HapticFeedback.lightImpact();
+      }
+    } catch (e) {
+      debugPrint('[VoiceReportingSheet] Photo pick error: $e');
+    }
+  }
+
   Future<void> _runSimulation(String sampleText) async {
     setState(() {
-      _liveTranscript = '';
+      _liveTranscript = sampleText;
+      _transcriptController.text = sampleText;
       _voiceState = VoiceState.listening;
     });
 
@@ -169,7 +243,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
       },
       onResult: (text, isFinal) async {
         if (!mounted) return;
-        setState(() => _liveTranscript = text);
+        _liveTranscript = text;
+        _transcriptController.text = text;
+        setState(() {});
 
         if (text.trim().isNotEmpty) {
           final parser = ref.read(voiceIntentParserServiceProvider);
@@ -177,6 +253,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             text,
             forcedMode: _mode,
             language: _language,
+            enableAiRefinement: isFinal,
           );
           if (mounted) {
             setState(() {
@@ -193,12 +270,148 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   }
 
   Future<void> _submit1Tap() async {
-    if (_parsedPayload == null || _liveTranscript.trim().isEmpty) return;
+    final text = _transcriptController.text.trim();
+    if (text.isEmpty) return;
+
+    if (_parsedPayload == null) {
+      final parser = ref.read(voiceIntentParserServiceProvider);
+      _parsedPayload = await parser.parseTranscript(
+        text,
+        forcedMode: _mode,
+        language: _language,
+        enableAiRefinement: false,
+      );
+    }
+
+    // Photo proof verification for Civic hazard reports
+    if (_mode == VoiceReportMode.civic && _attachedPhotoPath == null) {
+      final proceed = await _showPhotoProofPrompt();
+      if (proceed != true) return;
+    }
+
+    await _executeSubmit();
+  }
+
+  Future<bool?> _showPhotoProofPrompt() {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final scheme = Theme.of(ctx).colorScheme;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(
+              color: Colors.amber.withValues(alpha: 0.3),
+            ),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add_a_photo_rounded, color: Colors.amber, size: 32),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Photo Proof Required',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Civic hazard reports require photo evidence so municipal field teams can verify and dispatch workers accurately. Would you like to take a photo proof now?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: scheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Submit Without Photo'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        Navigator.of(ctx).pop(false);
+                        await _pickPhoto(ImageSource.camera);
+                        if (_attachedPhotoPath != null) {
+                          _executeSubmit();
+                        }
+                      },
+                      icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                      label: const Text('Take Photo Proof'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: NivaraColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _executeSubmit() async {
     setState(() => _isSubmitting = true);
     HapticFeedback.mediumImpact();
 
     final profile = ref.read(authControllerProvider).asData?.value;
     final uid = profile?.id ?? supabase.auth.currentUser?.id;
+
+    List<String>? photoUrls;
+    if (_attachedPhotoPath != null) {
+      final file = File(_attachedPhotoPath!);
+      if (await file.exists()) {
+        final ext = _attachedPhotoPath!.split('.').last.toLowerCase();
+        final path = '${uid ?? 'anon'}/voice_${DateTime.now().millisecondsSinceEpoch}.$ext';
+        final bytes = await file.readAsBytes();
+
+        try {
+          await supabase.storage.from(kBucketPhotos).uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+          final publicUrl = supabase.storage.from(kBucketPhotos).getPublicUrl(path);
+          photoUrls = [publicUrl];
+        } catch (e) {
+          debugPrint('[VoiceReportingSheet] Storage upload error: $e');
+        }
+      }
+    }
 
     try {
       switch (_mode) {
@@ -210,10 +423,11 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             severity: _parsedPayload!.severity,
             title: _parsedPayload!.title,
             description: _parsedPayload!.description,
+            photoUrls: photoUrls,
             lat: _currentPosition?.latitude ?? kDefaultLat,
             lng: _currentPosition?.longitude ?? kDefaultLng,
             address: _parsedPayload!.extractedLandmark ?? _currentAddress,
-            source: 'MANUAL',
+            source: 'VOICE',
             createdAt: DateTime.now(),
           );
           try {
@@ -231,6 +445,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             category: _parsedPayload!.lfCategory ?? LFCategory.other,
             title: _parsedPayload!.title,
             description: _parsedPayload!.description,
+            photoUrls: photoUrls,
             eventDate: DateTime.now(),
             locationLabel: _parsedPayload!.extractedLandmark ?? _currentAddress,
             lat: _currentPosition?.latitude ?? kDefaultLat,
@@ -246,6 +461,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             'post_type': _parsedPayload!.communityType.wire,
             'title': _parsedPayload!.title,
             'body': _parsedPayload!.description,
+            if (photoUrls != null && photoUrls.isNotEmpty) 'photo_urls': photoUrls,
             'lat': _currentPosition?.latitude ?? kDefaultLat,
             'lng': _currentPosition?.longitude ?? kDefaultLng,
             'location_label': _parsedPayload!.extractedLandmark ?? _currentAddress,
@@ -302,6 +518,8 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             'address': _parsedPayload!.extractedLandmark ?? _currentAddress,
             'lat': _currentPosition?.latitude ?? kDefaultLat,
             'lng': _currentPosition?.longitude ?? kDefaultLng,
+            if (_attachedPhotoPath != null) 'photoPath': _attachedPhotoPath,
+            if (_attachedPhotoPath != null) 'initialPhoto': XFile(_attachedPhotoPath!),
           },
         );
         break;
@@ -538,29 +756,102 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
 
             const SizedBox(height: 14),
 
-            // Live Transcript Card
+            // Live Editable Transcript Card
             Container(
-              constraints: const BoxConstraints(minHeight: 56),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF131F37) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: isDark ? Colors.white12 : Colors.black12,
+                  color: _transcriptFocusNode.hasFocus
+                      ? NivaraColors.primary
+                      : (isDark ? Colors.white12 : Colors.black12),
+                  width: _transcriptFocusNode.hasFocus ? 1.5 : 1.0,
                 ),
               ),
-              child: Text(
-                _liveTranscript.isNotEmpty
-                    ? '"$_liveTranscript"'
-                    : 'e.g. "Huge pothole near East Fort bus stand with water leaking"',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontStyle: _liveTranscript.isEmpty ? FontStyle.italic : FontStyle.normal,
-                  color: _liveTranscript.isNotEmpty
-                      ? scheme.onSurface
-                      : scheme.onSurfaceVariant.withValues(alpha: 0.6),
-                  height: 1.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.edit_note_rounded,
+                            size: 16,
+                            color: NivaraColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Spoken Transcript (Editable)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_transcriptController.text.isNotEmpty)
+                        GestureDetector(
+                          onTap: () {
+                            _transcriptController.clear();
+                            _liveTranscript = '';
+                            _debounceTimer?.cancel();
+                            setState(() {
+                              _parsedPayload = null;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.clear_rounded, size: 13, color: scheme.onSurfaceVariant),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Clear',
+                                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _transcriptController,
+                    focusNode: _transcriptFocusNode,
+                    maxLines: 4,
+                    minLines: 2,
+                    textInputAction: TextInputAction.done,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: scheme.onSurface,
+                      height: 1.4,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Speak or type here... (e.g. "Huge pothole near East Fort bus stand with water leaking")',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        height: 1.4,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    onChanged: _onTranscriptChanged,
+                  ),
+                ],
               ),
             ),
 
@@ -651,6 +942,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                 ),
               ),
             ],
+
+            // Photo Proof Evidence Section
+            _buildPhotoProofSection(isDark, scheme),
 
             // Quick Demo Chips
             const SizedBox(height: 12),
@@ -764,4 +1058,159 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
       ),
     );
   }
+
+  Widget _buildPhotoProofSection(bool isDark, ColorScheme scheme) {
+    final isCivic = _mode == VoiceReportMode.civic;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF162032) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _attachedPhotoPath != null
+              ? Colors.teal.withValues(alpha: 0.5)
+              : (isCivic ? Colors.amber.withValues(alpha: 0.4) : (isDark ? Colors.white12 : Colors.black12)),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _attachedPhotoPath != null ? Icons.check_circle_rounded : Icons.photo_camera_rounded,
+                    size: 16,
+                    color: _attachedPhotoPath != null ? Colors.teal : (isCivic ? Colors.amber : scheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Photo Proof Evidence',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _attachedPhotoPath != null ? Colors.teal : (isCivic ? Colors.amber : scheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (_attachedPhotoPath != null ? Colors.teal : (isCivic ? Colors.amber : scheme.onSurfaceVariant))
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  _attachedPhotoPath != null
+                      ? 'Attached'
+                      : (isCivic ? 'Required for Civic' : 'Optional'),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: _attachedPhotoPath != null ? Colors.teal : (isCivic ? Colors.amber : scheme.onSurfaceVariant),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_attachedPhotoPath != null) ...[
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(_attachedPhotoPath!),
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Photo proof ready',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Will be uploaded on submission',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Retake',
+                  icon: const Icon(Icons.camera_alt_outlined, size: 20),
+                  onPressed: () => _pickPhoto(ImageSource.camera),
+                ),
+                IconButton(
+                  tooltip: 'Remove',
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.redAccent),
+                  onPressed: () => setState(() => _attachedPhotoPath = null),
+                ),
+              ],
+            ),
+          ] else ...[
+            Text(
+              isCivic
+                  ? 'Attach photo evidence so field workers and civic admins can locate & resolve the issue faster.'
+                  : 'Add a photo to help provide visual context for this report.',
+              style: TextStyle(
+                fontSize: 12,
+                color: scheme.onSurfaceVariant,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickPhoto(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_rounded, size: 16),
+                    label: const Text('Camera', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickPhoto(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_rounded, size: 16),
+                    label: const Text('Gallery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
+

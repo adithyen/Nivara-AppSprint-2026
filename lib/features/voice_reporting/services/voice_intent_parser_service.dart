@@ -20,7 +20,8 @@ class VoiceIntentParserService {
   Future<VoiceReportPayload> parseTranscript(
     String transcript, {
     VoiceReportMode? forcedMode,
-    VoiceLanguage language = VoiceLanguage.en,
+    VoiceLanguage language = VoiceLanguage.auto,
+    bool enableAiRefinement = false,
   }) async {
     final cleanText = transcript.trim();
     if (cleanText.isEmpty) {
@@ -36,7 +37,7 @@ class VoiceIntentParserService {
     // 1. Determine target mode (Civic, Lost & Found, or Community)
     final mode = forcedMode ?? _detectMode(cleanText);
 
-    // 2. Offline semantic slot extraction
+    // 2. Fast offline semantic slot extraction (zero latency)
     VoiceReportPayload payload;
     switch (mode) {
       case VoiceReportMode.civic:
@@ -50,16 +51,18 @@ class VoiceIntentParserService {
         break;
     }
 
-    // 3. Optional Gemini Flash semantic refinement if API key exists
-    final geminiKey = dotenv.isInitialized ? dotenv.env['GEMINI_API_KEY']?.trim() : null;
-    if (geminiKey != null && geminiKey.isNotEmpty) {
-      try {
-        final refined = await _refineWithGemini(cleanText, mode, payload, geminiKey);
-        if (refined != null) {
-          payload = refined;
+    // 3. Optional Gemini Flash semantic refinement only when enabled (final result)
+    if (enableAiRefinement) {
+      final geminiKey = dotenv.isInitialized ? dotenv.env['GEMINI_API_KEY']?.trim() : null;
+      if (geminiKey != null && geminiKey.isNotEmpty) {
+        try {
+          final refined = await _refineWithGemini(cleanText, mode, payload, geminiKey);
+          if (refined != null) {
+            payload = refined;
+          }
+        } catch (e) {
+          debugPrint('[VoiceIntentParserService] Gemini refinement skipped: $e');
         }
-      } catch (e) {
-        debugPrint('[VoiceIntentParserService] Gemini refinement skipped: $e');
       }
     }
 
@@ -315,7 +318,9 @@ class VoiceIntentParserService {
     final place = landmark != null ? ' near $landmark' : '';
 
     if (lang == VoiceLanguage.ml) {
-      return '${cat.localizedName(lang)}$place';
+      return '${cat.localizedName('ml')}$place';
+    } else if (lang == VoiceLanguage.hi) {
+      return '${cat.localizedName('hi')}$place';
     }
     return '$prefix${cat.label}$place';
   }
