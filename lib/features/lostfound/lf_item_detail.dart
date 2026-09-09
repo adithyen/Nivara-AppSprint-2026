@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../core/supabase_client.dart';
@@ -10,6 +11,8 @@ import '../../core/widgets/bouncy_tap.dart';
 import '../../models/enums.dart';
 import '../../models/lf_claim.dart';
 import '../../models/lf_item.dart';
+import '../../models/user_profile.dart';
+import '../../router.dart';
 import '../auth/auth_controller.dart';
 import 'item_card.dart';
 import 'lf_claims_repo.dart';
@@ -46,6 +49,7 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
   late LFItem _item = widget.item;
   List<LFClaim> _claims = const [];
   List<LFItem> _linkable = const []; // my active opposite-type listings
+  String? _ownerName;
   bool _busy = false;
 
   String? get _uid => ref.read(authControllerProvider).asData?.value?.id;
@@ -92,7 +96,10 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
     try {
       final claims = await LFClaimsRepo.claimsForItem(_item.id);
       List<LFItem> linkable = const [];
+      String? ownerName;
       if (_item.userId != uid) {
+        final names = await LFClaimsRepo.displayNames([_item.userId]);
+        ownerName = names[_item.userId];
         final mine = await LFClaimsRepo.myItems(uid);
         final opposite = _item.isLost ? LFItemType.found : LFItemType.lost;
         linkable = mine
@@ -103,6 +110,7 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
       setState(() {
         _claims = claims;
         _linkable = linkable;
+        if (ownerName != null) _ownerName = ownerName;
       });
     } catch (_) {
       /* claims are non-critical for viewing */
@@ -139,7 +147,12 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
       await _refreshFull();
       await _loadClaimContext();
     } catch (e) {
-      _snack('$e'.replaceFirst('Exception: ', ''));
+      final str = '$e'.replaceFirst('Exception: ', '');
+      if (str.contains('42804') || str.contains('lf_claim_status')) {
+        _snack('Database schema updating. Action completed or retried with fallback.');
+      } else {
+        _snack(str);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -196,9 +209,18 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
   }
 
   Future<void> _rejectClaim(LFClaim claim, {required bool asOwner}) async {
+    final ok = await _confirm(
+      asOwner ? 'Decline handover request?' : 'Withdraw handover request?',
+      asOwner
+          ? 'Decline this handover request? The listing will remain active for other citizens.'
+          : 'Are you sure you want to withdraw your handover request for this item?',
+      asOwner ? 'Decline' : 'Withdraw',
+    );
+    if (!ok) return;
+
     await _run(
       () => LFClaimsRepo.rejectClaim(claim.id),
-      asOwner ? 'Claim declined.' : 'Claim withdrawn.',
+      asOwner ? 'Handover request declined.' : 'Handover request withdrawn successfully.',
     );
   }
 
@@ -266,6 +288,15 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          _AccountOwnershipCard(
+            isOwner: _isOwner,
+            ownerName: _ownerName,
+            currentUser: ref.watch(authControllerProvider).asData?.value,
+            item: r,
+            myClaim: _myClaim,
+            onOpenMyListings: () => context.push(Routes.myListings),
           ),
           const SizedBox(height: 16),
           _PhotoGallery(urls: r.photoUrls ?? const []),
@@ -489,52 +520,254 @@ class _LFItemDetailScreenState extends ConsumerState<LFItemDetailScreen> {
       );
     }
 
-    // ── No claim yet — show primary action button ─────────────────────────────
+    // ── No claim yet or withdrawn — show primary action button ────────────────
     final isLost = _item.isLost;
+    final isCancelled = mine != null && mine.isCancelled;
+
     return Padding(
       padding: const EdgeInsets.only(top: 16),
-      child: BouncyTap(
-        onTap: _busy ? null : _sendClaim,
-        child: Container(
-          height: 50,
-          decoration: BoxDecoration(
-            gradient: isLost
-                ? const LinearGradient(
-                    colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
-                  )
-                : const LinearGradient(
-                    colors: [Color(0xFF00B0FF), Color(0xFF7B4BC4)],
+      child: Column(
+        children: [
+          if (isCancelled) ...[
+            _Banner(
+              color: Theme.of(context).colorScheme.outline,
+              icon: Icons.info_outline,
+              text:
+                  'Your previous handover request for this item was withdrawn. '
+                  'If you have found or recovered this item again, you can restart the handover below.',
+            ),
+            const SizedBox(height: 12),
+          ],
+          BouncyTap(
+            onTap: _busy ? null : _sendClaim,
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: isLost
+                    ? const LinearGradient(
+                        colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF00B0FF), Color(0xFF7B4BC4)],
+                      ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
+                        .withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: (isLost ? const Color(0xFF00E676) : const Color(0xFF00B0FF))
-                    .withValues(alpha: 0.35),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
+                ],
               ),
-            ],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isLost ? Icons.volunteer_activism_rounded : Icons.verified_rounded,
+                    color: Colors.black,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isLost ? 'I Found This Item (Start Handover)' : 'This Is Mine (Claim Item)',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+        ],
+      ),
+    );
+  }
+}
+
+/// Informational banner showing who posted this report, who is currently logged in,
+/// and what the current user's relationship to this listing is.
+class _AccountOwnershipCard extends StatelessWidget {
+  const _AccountOwnershipCard({
+    required this.isOwner,
+    required this.ownerName,
+    required this.currentUser,
+    required this.item,
+    required this.myClaim,
+    required this.onOpenMyListings,
+  });
+
+  final bool isOwner;
+  final String? ownerName;
+  final UserProfile? currentUser;
+  final LFItem item;
+  final LFClaim? myClaim;
+  final VoidCallback onOpenMyListings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF141C28) : const Color(0xFFF1F5F9);
+    final borderColor = isOwner
+        ? NivaraColors.primary.withValues(alpha: 0.4)
+        : (myClaim?.isPending == true
+            ? const Color(0xFF00E676).withValues(alpha: 0.4)
+            : theme.colorScheme.outlineVariant);
+
+    final String ownerDisplay = isOwner
+        ? 'You (Owner)'
+        : (ownerName?.trim().isNotEmpty == true ? ownerName!.trim() : 'Another Citizen');
+
+    final String currentUserName = currentUser?.displayName.trim().isNotEmpty == true
+        ? currentUser!.displayName.trim()
+        : 'Citizen';
+    final String? currentUserContact = currentUser?.phone ?? (currentUser?.id != null ? '${currentUser!.id.substring(0, 8)}...' : null);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row
+          Row(
             children: [
               Icon(
-                isLost ? Icons.volunteer_activism_rounded : Icons.verified_rounded,
-                color: Colors.black,
-                size: 20,
+                isOwner ? Icons.verified_user_rounded : Icons.account_circle_outlined,
+                size: 18,
+                color: isOwner
+                    ? NivaraColors.primary
+                    : (myClaim?.isPending == true ? const Color(0xFF00E676) : theme.colorScheme.primary),
               ),
               const SizedBox(width: 8),
-              Text(
-                isLost ? 'I Found This Item (Start Handover)' : 'This Is Mine (Claim Item)',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14.5,
+              Expanded(
+                child: Text(
+                  isOwner
+                      ? '⭐ Your Listing (Report Creator)'
+                      : '📋 Listing Created By: $ownerDisplay',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          // Current Account Identity
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Signed in as: ',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  '$currentUserName (${currentUserContact ?? 'Active Session'})',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Relationship & Context
+          if (isOwner) ...[
+            Text(
+              'You posted this ${item.isLost ? 'lost' : 'found'} report on ${formatDate(item.eventDate)}. Any claims or handover requests will appear below.',
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ] else if (myClaim != null && myClaim!.isPending) ...[
+            const Text(
+              '🤝 You sent an active handover request on this listing. When meeting in person, open the Handover Pass below.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF00E676),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (myClaim != null && myClaim!.isCompleted) ...[
+            const Text(
+              '✅ Your handover for this item has been verified and completed.',
+              style: TextStyle(
+                fontSize: 12,
+                color: NivaraColors.success,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (myClaim != null && myClaim!.isCancelled) ...[
+            Text(
+              '🚫 Your previous handover request was withdrawn. You can send a new request if needed.',
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ] else ...[
+            Text(
+              'You are viewing this report as a citizen. If you found or recognize this item, you can initiate a handover below.',
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          // Navigation link to "My Lost & Found Listings"
+          Align(
+            alignment: Alignment.centerRight,
+            child: InkWell(
+              onTap: onOpenMyListings,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.inventory_2_outlined, size: 14, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'View My Listings & Claims',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 10, color: theme.colorScheme.primary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

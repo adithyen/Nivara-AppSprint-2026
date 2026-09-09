@@ -47,6 +47,8 @@ class LFClaim {
 
   bool get isPending => status == LFClaimStatus.pending;
   bool get isCompleted => status == LFClaimStatus.completed;
+  bool get isCancelled => status == LFClaimStatus.cancelled;
+  bool get isRejected => status == LFClaimStatus.rejected;
 
   factory LFClaim.fromMap(Map<String, dynamic> map) => LFClaim(
     id: map['id'] as String,
