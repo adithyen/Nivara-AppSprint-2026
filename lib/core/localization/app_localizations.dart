@@ -25,17 +25,17 @@ abstract final class NivaraStrings {
     'role_citizen': {
       AppLanguage.en: 'Citizen',
       AppLanguage.hi: 'नागरिक',
-      AppLanguage.ml: 'പൗരൻ',
+      AppLanguage.ml: 'നഗരവാസി',
     },
     'role_worker': {
       AppLanguage.en: 'Field Worker',
       AppLanguage.hi: 'फील्ड कर्मचारी',
-      AppLanguage.ml: 'ഫീൽഡ് ജീവനക്കാരൻ',
+      AppLanguage.ml: 'ഫീൽഡ് സ്റ്റാഫ്',
     },
     'role_admin': {
       AppLanguage.en: 'Municipal Officer',
       AppLanguage.hi: 'नगर निगम अधिकारी',
-      AppLanguage.ml: 'നഗരസഭാ ഉദ്യോഗസ്ഥൻ',
+      AppLanguage.ml: 'നഗരസഭാ ഉദ്യോഗസ്ഥർ',
     },
     'role_superadmin': {
       AppLanguage.en: 'Super Admin',
@@ -129,7 +129,7 @@ abstract final class NivaraStrings {
     'civic_standing': {
       AppLanguage.en: 'Civic Standing & XP',
       AppLanguage.hi: 'नागरिक प्रतिष्ठा एवं XP',
-      AppLanguage.ml: 'നഗരവാസി സ്കോറും പദവിയും (XP)',
+      AppLanguage.ml: 'നഗരവാസി സ്കോറും പദവിയും',
     },
     'civic_modules': {
       AppLanguage.en: 'Civic Modules',
@@ -1446,10 +1446,385 @@ abstract final class NivaraStrings {
       AppLanguage.hi: 'खोया-पाया',
       AppLanguage.ml: 'നഷ്ടപ്പെട്ടവ & കിട്ടിയവ',
     },
+    'notifications_filter_lostfound': {
+      AppLanguage.en: 'Lost & Found',
+      AppLanguage.hi: 'खोया-पाया',
+      AppLanguage.ml: 'നഷ്ടപ്പെട്ടവ & കിട്ടിയവ',
+    },
     'notifications_filter_community': {
       AppLanguage.en: 'Community',
       AppLanguage.hi: 'समुदाय',
       AppLanguage.ml: 'കമ്മ്യൂണിറ്റി',
+    },
+
+    // Settings & Accent
+    'theme_palette_title': {
+      AppLanguage.en: 'Theme & Accent Palette',
+      AppLanguage.hi: 'थीम और एक्सेंट रंग',
+      AppLanguage.ml: 'തീമും ആക്സൻ്റ് നിറങ്ങളും',
+    },
+    'theme_palette_sub': {
+      AppLanguage.en: 'Personalise the app look and colours',
+      AppLanguage.hi: 'ऐप का रूप और रंग अनुकूलित करें',
+      AppLanguage.ml: 'ആപ്പിന്റെ കാഴ്ചയും നിറങ്ങളും മാറ്റാം',
+    },
+    'accent_colour_sub': {
+      AppLanguage.en: 'Primary brand accent across buttons, badges & highlights',
+      AppLanguage.hi: 'बटन, बैज और हाइलाइट्स के लिए प्राथमिक रंग',
+      AppLanguage.ml: 'ബട്ടണുകൾക്കും ഹൈലൈറ്റുകൾക്കുമുള്ള പ്രധാന നിറം',
+    },
+    'theme_active_suffix': {
+      AppLanguage.en: 'theme active.',
+      AppLanguage.hi: 'थीम सक्रिय है।',
+      AppLanguage.ml: 'തീം സജീവം.',
+    },
+
+    // Activity Log
+    'activity_my_activity': {
+      AppLanguage.en: 'My Activity',
+      AppLanguage.hi: 'मेरी गतिविधियां',
+      AppLanguage.ml: 'എന്റെ പ്രവർത്തനങ്ങൾ',
+    },
+    'today': {
+      AppLanguage.en: 'Today',
+      AppLanguage.hi: 'आज',
+      AppLanguage.ml: 'ഇന്ന്',
+    },
+    'yesterday': {
+      AppLanguage.en: 'Yesterday',
+      AppLanguage.hi: 'कल',
+      AppLanguage.ml: 'ഇന്നലെ',
+    },
+    'activity_empty_title': {
+      AppLanguage.en: 'No activity yet',
+      AppLanguage.hi: 'अभी कोई गतिविधि नहीं',
+      AppLanguage.ml: 'പ്രവർത്തനങ്ങളൊന്നുമില്ല',
+    },
+    'activity_empty_sub': {
+      AppLanguage.en: 'Your reports, posts, and tasks will appear here.',
+      AppLanguage.hi: 'आपकी रिपोर्ट, पोस्ट और कार्य यहां दिखाई देंगे।',
+      AppLanguage.ml: 'നിങ്ങളുടെ റിപ്പോർട്ടുകളും പോസ്റ്റുകളും ഇവിടെ കാണാം.',
+    },
+    'activity_sensor_detection': {
+      AppLanguage.en: '🔊 Sensor Detection',
+      AppLanguage.hi: '🔊 सेंसर पहचान',
+      AppLanguage.ml: '🔊 സെൻസർ കണ്ടെത്തൽ',
+    },
+    'activity_manual_report': {
+      AppLanguage.en: '📋 Manual Report',
+      AppLanguage.hi: '📋 सामान्य रिपोर्ट',
+      AppLanguage.ml: '📋 നേരിട്ടുള്ള റിപ്പോർട്ട്',
+    },
+    'activity_lost_report': {
+      AppLanguage.en: '🔍 Lost Report',
+      AppLanguage.hi: '🔍 खोई वस्तु रिपोर्ट',
+      AppLanguage.ml: '🔍 നഷ്ടപ്പെട്ട വസ്തു റിപ്പോർട്ട്',
+    },
+    'activity_found_report': {
+      AppLanguage.en: '📦 Found Report',
+      AppLanguage.hi: '📦 मिली वस्तु रिपोर्ट',
+      AppLanguage.ml: '📦 കിട്ടിയ വസ്തു റിപ്പോർട്ട്',
+    },
+    'activity_confirmed_report': {
+      AppLanguage.en: '👍 Confirmed a report',
+      AppLanguage.hi: '👍 रिपोर्ट की पुष्टि की',
+      AppLanguage.ml: '👍 പ്രശ്നം സ്ഥിരീകരിച്ചു',
+    },
+    'activity_disputed_report': {
+      AppLanguage.en: '🚩 Disputed a report',
+      AppLanguage.hi: '🚩 रिपोर्ट पर आपत्ति जताई',
+      AppLanguage.ml: '🚩 എതിർപ്പ് രേഖപ്പെടുത്തി',
+    },
+    'activity_community_post': {
+      AppLanguage.en: '💬 Community Post',
+      AppLanguage.hi: '💬 समुदाय पोस्ट',
+      AppLanguage.ml: '💬 കമ്മ്യൂണിറ്റി പോസ്റ്റ്',
+    },
+    'activity_assigned_task': {
+      AppLanguage.en: '🔨 Assigned task',
+      AppLanguage.hi: '🔨 आवंटित कार्य',
+      AppLanguage.ml: '🔨 ഏൽപ്പിച്ച ജോലി',
+    },
+    'activity_progress_note': {
+      AppLanguage.en: '📝 Progress update',
+      AppLanguage.hi: '📝 प्रगति अपडेट',
+      AppLanguage.ml: '📝 പുരോഗതി വിവരണം',
+    },
+    'activity_acknowledged': {
+      AppLanguage.en: '✅ Acknowledged report',
+      AppLanguage.hi: '✅ रिपोर्ट स्वीकृत की',
+      AppLanguage.ml: '✅ റിപ്പോർട്ട് അംഗീകരിച്ചു',
+    },
+    'activity_assigned_worker': {
+      AppLanguage.en: '🔨 Assigned to worker',
+      AppLanguage.hi: '🔨 कर्मचारी को आवंटित किया',
+      AppLanguage.ml: '🔨 ജീവനക്കാരന് നൽകി',
+    },
+    'activity_marked_resolved': {
+      AppLanguage.en: '🏁 Marked resolved',
+      AppLanguage.hi: '🏁 पूर्ण घोषित किया',
+      AppLanguage.ml: '🏁 പരിഹരിച്ചതായി രേഖപ്പെടുത്തി',
+    },
+    'activity_status_update': {
+      AppLanguage.en: '📋 Status update',
+      AppLanguage.hi: '📋 स्थिति अपडेट',
+      AppLanguage.ml: '📋 സ്ഥിതിവിവര മാറ്റം',
+    },
+
+    // Pending Sync
+    'pending_sync_title': {
+      AppLanguage.en: 'Pending Sync',
+      AppLanguage.hi: 'प्रतीक्षारत सिंक',
+      AppLanguage.ml: 'പെൻഡിംഗ് സിങ്ക്',
+    },
+    'pending_sync_clear': {
+      AppLanguage.en: 'Clear all',
+      AppLanguage.hi: 'सभी हटाएं',
+      AppLanguage.ml: 'എല്ലാം നീക്കുക',
+    },
+    'pending_sync_refresh': {
+      AppLanguage.en: 'Refresh',
+      AppLanguage.hi: 'രिफ्रेश करें',
+      AppLanguage.ml: 'പുതുക്കുക',
+    },
+    'pending_sync_clear_title': {
+      AppLanguage.en: 'Clear pending sync?',
+      AppLanguage.hi: 'प्रतीक्षारत सिंक हटाएं?',
+      AppLanguage.ml: 'പെൻഡിംഗ് വിവരങ്ങൾ നീക്കണോ?',
+    },
+    'pending_sync_clear_body': {
+      AppLanguage.en: 'All queued items will be discarded and will NOT be submitted. This cannot be undone.',
+      AppLanguage.hi: 'सभी कतारबद्ध आइटम हटा दिए जाएंगे और सबमिट नहीं किए जाएंगे। इसे पूर्ववत नहीं किया जा सकता।',
+      AppLanguage.ml: 'ക്യൂവിലുള്ള എല്ലാ ഇനങ്ങളും ഒഴിവാക്കപ്പെടും, സമർപ്പിക്കപ്പെടുകയില്ല. ഇത് പുനഃസ്ഥാപിക്കാൻ കഴിയില്ല.',
+    },
+    'pending_sync_empty_title': {
+      AppLanguage.en: 'All synced!',
+      AppLanguage.hi: 'सब कुछ सिंक हो गया!',
+      AppLanguage.ml: 'എല്ലാം സിങ്ക് ആയി!',
+    },
+    'pending_sync_empty_sub': {
+      AppLanguage.en: 'No pending items. Everything has been submitted.',
+      AppLanguage.hi: 'कोई आइटम लंबित नहीं है। सब कुछ सबमिट हो चुका है।',
+      AppLanguage.ml: 'പെൻഡിംഗ് ഇനങ്ങളൊന്നുമില്ല. എല്ലാം വിജയകരമായി സമർപ്പിച്ചു.',
+    },
+    'pending_sync_now': {
+      AppLanguage.en: 'Sync now',
+      AppLanguage.hi: 'अभी सिंक करें',
+      AppLanguage.ml: 'ഇപ്പോൾ സിങ്ക് ചെയ്യുക',
+    },
+    'pending_sync_syncing': {
+      AppLanguage.en: 'Syncing…',
+      AppLanguage.hi: 'सिंक हो रहा है…',
+      AppLanguage.ml: 'സിങ്ക് ചെയ്യുന്നു…',
+    },
+    'pending_sync_banner_sub': {
+      AppLanguage.en: 'Tap "Sync now" once connection is restored.',
+      AppLanguage.hi: 'इंटरनेट चालू होने पर "अभी सिंक करें" दबाएं।',
+      AppLanguage.ml: 'ഇന്റർനെറ്റ് ലഭ്യമാകുമ്പോൾ "ഇപ്പോൾ സിങ്ക് ചെയ്യുക" അമർത്തുക.',
+    },
+    'pending_sync_photo_error': {
+      AppLanguage.en: 'Photo cleared from temp storage. Submitted as text-only.',
+      AppLanguage.hi: 'फोटो अस्थायी स्टोरेज से हट गया। केवल टेक्स्ट के रूप में सबमिट होगा।',
+      AppLanguage.ml: 'ഫോട്ടോ താത്കാലിക സംഭരണത്തിൽ നിന്നൊഴിവാക്കി. വിവരങ്ങൾ മാത്രമായി സമർപ്പിക്കും.',
+    },
+    'pending_sync_text_only': {
+      AppLanguage.en: 'Text only',
+      AppLanguage.hi: 'केवल टेक्स्ट',
+      AppLanguage.ml: 'വിവരങ്ങൾ മാത്രം',
+    },
+    'pending_sync_with_photo': {
+      AppLanguage.en: '📷 +photo',
+      AppLanguage.hi: '📷 +फोटो',
+      AppLanguage.ml: '📷 +ഫോട്ടോ',
+    },
+    'pending_sync_queued_prefix': {
+      AppLanguage.en: 'Queued',
+      AppLanguage.hi: 'कतार में',
+      AppLanguage.ml: 'ക്യൂവിലായത്',
+    },
+
+    // Community Compose
+    'compose_edit': {
+      AppLanguage.en: 'Edit',
+      AppLanguage.hi: 'संपादित करें',
+      AppLanguage.ml: 'മാറ്റം വരുത്തുക',
+    },
+    'compose_new': {
+      AppLanguage.en: 'New',
+      AppLanguage.hi: 'नया',
+      AppLanguage.ml: 'പുതിയ',
+    },
+    'compose_voice_dictate': {
+      AppLanguage.en: 'Voice Dictate Post',
+      AppLanguage.hi: 'बोलकर पोस्ट लिखें',
+      AppLanguage.ml: 'ശബ്ദം വഴി എഴുതുക',
+    },
+    'compose_title': {
+      AppLanguage.en: 'Title',
+      AppLanguage.hi: 'शीर्षक',
+      AppLanguage.ml: 'തലക്കെട്ട്',
+    },
+    'compose_poll_question': {
+      AppLanguage.en: 'Poll question',
+      AppLanguage.hi: 'पोल प्रश्न',
+      AppLanguage.ml: 'വോട്ടെടുപ്പ് ചോദ്യം',
+    },
+    'compose_details': {
+      AppLanguage.en: 'Details',
+      AppLanguage.hi: 'विवरण',
+      AppLanguage.ml: 'വിശദാംശങ്ങൾ',
+    },
+    'compose_say_more': {
+      AppLanguage.en: 'Say more (optional)',
+      AppLanguage.hi: 'अधिक विवरण (वैकल्पिक)',
+      AppLanguage.ml: 'കൂടുതൽ വിവരങ്ങൾ (ഓപ്ഷണൽ)',
+    },
+    'compose_options': {
+      AppLanguage.en: 'Options',
+      AppLanguage.hi: 'विकल्प',
+      AppLanguage.ml: 'ഓപ്ഷനുകൾ',
+    },
+    'compose_option_num': {
+      AppLanguage.en: 'Option',
+      AppLanguage.hi: 'विकल्प',
+      AppLanguage.ml: 'ഓപ്ഷൻ',
+    },
+    'compose_add_option': {
+      AppLanguage.en: 'Add option',
+      AppLanguage.hi: 'विकल्प जोड़ें',
+      AppLanguage.ml: 'ഓപ്ഷൻ ചേർക്കുക',
+    },
+    'compose_open_until': {
+      AppLanguage.en: 'Open until (optional)',
+      AppLanguage.hi: 'अंतिम तिथि (वैकल्पिक)',
+      AppLanguage.ml: 'അവസാന തീയതി (ഓപ്ഷണൽ)',
+    },
+    'compose_reach_location': {
+      AppLanguage.en: 'Reach & location',
+      AppLanguage.hi: 'पहुंच और स्थान',
+      AppLanguage.ml: 'ദൂരപരിധിയും സ്ഥലവും',
+    },
+    'compose_location': {
+      AppLanguage.en: 'Location',
+      AppLanguage.hi: 'स्थान',
+      AppLanguage.ml: 'സ്ഥലം',
+    },
+    'compose_limit_nearby': {
+      AppLanguage.en: 'Limit to a nearby area',
+      AppLanguage.hi: 'निकटवर्ती क्षेत्र तक सीमित रखें',
+      AppLanguage.ml: 'സമീപ പ്രദേശങ്ങളിൽ മാത്രമാക്കുക',
+    },
+    'compose_nearby_sub': {
+      AppLanguage.en: 'Only shown to people within the radius below',
+      AppLanguage.hi: 'केवल नीचे दिए गए दायरे के लोगों को दिखेगा',
+      AppLanguage.ml: 'താഴെ നൽകിയ ദൂരപരിധിയിലുള്ളവർക്ക് മാത്രം കാണാം',
+    },
+    'compose_citywide_sub': {
+      AppLanguage.en: 'Visible to everyone in the city',
+      AppLanguage.hi: 'शहर के सभी लोगों को दिखेगा',
+      AppLanguage.ml: 'നഗരത്തിലെ എല്ലാവർക്കും കാണാം',
+    },
+    'compose_visible_within': {
+      AppLanguage.en: 'Visible within',
+      AppLanguage.hi: 'दायरा',
+      AppLanguage.ml: 'ദൂരപരിധി',
+    },
+    'compose_landmark': {
+      AppLanguage.en: 'Landmark / area (optional)',
+      AppLanguage.hi: 'लैंडमार्क / क्षेत्र (वैकल्पिक)',
+      AppLanguage.ml: 'പ്രദേശം / അടയാളം (ഓപ്ഷണൽ)',
+    },
+    'compose_add_contact': {
+      AppLanguage.en: 'Add a contact',
+      AppLanguage.hi: 'संपर्क विवरण जोड़ें',
+      AppLanguage.ml: 'ബന്ധപ്പെടാനുള്ള വഴി നൽകുക',
+    },
+    'compose_contact_sub': {
+      AppLanguage.en: 'A one-tap way for people to reach you',
+      AppLanguage.hi: 'लोगों को आपसे आसानी से संपर्क करने का विकल्प',
+      AppLanguage.ml: 'ആളുകൾക്ക് നിങ്ങളെ എളുപ്പത്തിൽ ബന്ധപ്പെടാം',
+    },
+    'compose_contact_via': {
+      AppLanguage.en: 'Contact via',
+      AppLanguage.hi: 'संपर्क माध्यम',
+      AppLanguage.ml: 'ബന്ധപ്പെടേണ്ടത്',
+    },
+    'compose_photo_optional': {
+      AppLanguage.en: 'Photo (optional)',
+      AppLanguage.hi: 'फोटो (वैकल्पिक)',
+      AppLanguage.ml: 'ഫോട്ടോ (ഓപ്ഷണൽ)',
+    },
+    'compose_take_photo': {
+      AppLanguage.en: 'Take a photo',
+      AppLanguage.hi: 'फोटो खींचें',
+      AppLanguage.ml: 'ഫോട്ടോ എടുക്കുക',
+    },
+    'compose_choose_gallery': {
+      AppLanguage.en: 'Choose from gallery',
+      AppLanguage.hi: 'गैलरी से चुनें',
+      AppLanguage.ml: 'ഗ്യാലറിയിൽ നിന്ന് തിരഞ്ഞെടുക്കുക',
+    },
+    'compose_post_to_community': {
+      AppLanguage.en: 'Post to community',
+      AppLanguage.hi: 'समुदाय में पोस्ट करें',
+      AppLanguage.ml: 'പോസ്റ്റ് ചെയ്യുക',
+    },
+    'compose_save_changes': {
+      AppLanguage.en: 'Save changes',
+      AppLanguage.hi: 'बदलाव सहेजें',
+      AppLanguage.ml: 'മാറ്റങ്ങൾ സൂക്ഷിക്കുക',
+    },
+    'compose_saving': {
+      AppLanguage.en: 'Saving…',
+      AppLanguage.hi: 'सहेजा जा रहा है…',
+      AppLanguage.ml: 'സൂക്ഷിക്കുന്നു…',
+    },
+    'compose_banner_general': {
+      AppLanguage.en: 'Share news, a question, or a heads-up with people around you.',
+      AppLanguage.hi: 'आस-पास के लोगों के साथ समाचार, प्रश्न या सूचना साझा करें।',
+      AppLanguage.ml: 'സമീപവാസികളുമായി വാർത്തകളോ ചോദ്യങ്ങളോ പങ്കുവെക്കൂ.',
+    },
+    'compose_banner_poll': {
+      AppLanguage.en: 'Ask a question and let neighbours vote. Results update live.',
+      AppLanguage.hi: 'एक प्रश्न पूछें और पड़ोसियों को वोट करने दें। परिणाम तुरंत दिखेंगे।',
+      AppLanguage.ml: 'ചോദ്യം ചോദിക്കൂ, അയൽവാസികൾ വോട്ട് ചെയ്യട്ടെ. ഫലങ്ങൾ തത്സമയം കാണാം.',
+    },
+    'compose_banner_job': {
+      AppLanguage.en: 'List work you need done. Add a contact so people can reach you.',
+      AppLanguage.hi: 'आवश्यक कार्य की सूची बनाएं और संपर्क विवरण दें।',
+      AppLanguage.ml: 'നിങ്ങൾക്ക് ചെയ്യേണ്ട ജോലി ലിസ്റ്റ് ചെയ്യൂ, ബന്ധപ്പെടാനുള്ള വഴിയും നൽകൂ.',
+    },
+    'compose_banner_announcement': {
+      AppLanguage.en: 'Broadcast something people nearby should know.',
+      AppLanguage.hi: 'महत्वपूर्ण सूचना आस-पास के लोगों तक पहुंचाएं।',
+      AppLanguage.ml: 'സമീപവാസികൾ അറിയേണ്ട പ്രധാന വിവരങ്ങൾ അറിയിക്കൂ.',
+    },
+
+    // Profile & Shift
+    'worker_shift_status': {
+      AppLanguage.en: 'FIELD SHIFT STATUS',
+      AppLanguage.hi: 'फील्ड शिफ्ट स्थिति',
+      AppLanguage.ml: 'ഫീൽഡ് ഷിഫ്റ്റ് വിവരങ്ങൾ',
+    },
+    'worker_mark_leave': {
+      AppLanguage.en: 'Mark leave',
+      AppLanguage.hi: 'अवकाश दर्ज करें',
+      AppLanguage.ml: 'അവധി എടുക്കുക',
+    },
+    'worker_mark_leave_sub': {
+      AppLanguage.en: 'Active & ready for task dispatch — toggle to take leave',
+      AppLanguage.hi: 'सक्रिय एवं तैयार — अवकाश के लिए टॉगल चालू करें',
+      AppLanguage.ml: 'സജീവം — അവധിയെടുക്കാൻ ടോഗിൾ ചെയ്യുക',
+    },
+    'worker_on_leave': {
+      AppLanguage.en: 'On leave',
+      AppLanguage.hi: 'अवकाश पर',
+      AppLanguage.ml: 'അവധിയിലാണ്',
+    },
+    'worker_on_leave_sub': {
+      AppLanguage.en: 'Currently on leave — no new tasks dispatched',
+      AppLanguage.hi: 'वर्तमान में अवकाश पर — कोई नया कार्य नहीं भेजा जाएगा',
+      AppLanguage.ml: 'നിലവിൽ അവധിയിലാണ് — പുതിയ ചുമതലകൾ ലഭിക്കില്ല',
     },
   };
 

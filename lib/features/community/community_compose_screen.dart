@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../core/constants.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/offline_queue_service.dart';
 import '../../core/supabase_client.dart';
@@ -19,6 +20,7 @@ import '../../models/community_post.dart';
 import '../../models/enums.dart';
 import '../auth/auth_controller.dart';
 import '../lostfound/lf_contact.dart';
+import '../settings/language_controller.dart';
 import '../voice_reporting/models/voice_reporting_models.dart';
 import '../voice_reporting/presentation/voice_dictation_button.dart';
 import 'community_tab.dart' show communityTypeColor, communityTypeIcon;
@@ -175,6 +177,7 @@ class _CommunityComposeScreenState
   }
 
   void _choosePhotoSource() {
+    final lang = ref.read(languageControllerProvider);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -184,7 +187,7 @@ class _CommunityComposeScreenState
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Take a photo'),
+              title: Text(NivaraStrings.tr('compose_take_photo', lang)),
               onTap: () {
                 Navigator.pop(context);
                 _pickPhoto(ImageSource.camera);
@@ -192,7 +195,7 @@ class _CommunityComposeScreenState
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from gallery'),
+              title: Text(NivaraStrings.tr('compose_choose_gallery', lang)),
               onTap: () {
                 Navigator.pop(context);
                 _pickPhoto(ImageSource.gallery);
@@ -205,13 +208,14 @@ class _CommunityComposeScreenState
   }
 
   Future<void> _pickValidUntil() async {
+    final lang = ref.read(languageControllerProvider);
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: _validUntil ?? now.add(const Duration(days: 14)),
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
-      helpText: 'Open until',
+      helpText: NivaraStrings.tr('compose_open_until', lang),
     );
     if (picked != null && mounted) setState(() => _validUntil = picked);
   }
@@ -364,22 +368,42 @@ class _CommunityComposeScreenState
   @override
   Widget build(BuildContext context) {
     final color = communityTypeColor(_type);
+    final currentLang = ref.watch(languageControllerProvider);
+    final actionPrefix = _isEdit
+        ? NivaraStrings.tr('compose_edit', currentLang)
+        : NivaraStrings.tr('compose_new', currentLang);
+    final typeLabel = switch (currentLang) {
+      AppLanguage.ml => switch (_type) {
+          CommunityPostType.announcement => 'അറിയിപ്പ്',
+          CommunityPostType.poll => 'വോട്ടെടുപ്പ്',
+          CommunityPostType.job => 'ജോലി/സേവനം',
+          CommunityPostType.general => 'പോസ്റ്റ്',
+        },
+      AppLanguage.hi => switch (_type) {
+          CommunityPostType.announcement => 'घोषणा',
+          CommunityPostType.poll => 'पोल',
+          CommunityPostType.job => 'नौकरी/सेवा',
+          CommunityPostType.general => 'पोस्ट',
+        },
+      _ => _type.label,
+    };
+
     return Scaffold(
-      appBar: AppBar(title: Text('${_isEdit ? 'Edit' : 'New'} ${_type.label}')),
+      appBar: AppBar(title: Text('$actionPrefix $typeLabel')),
       body: WithConnectivityBanner(
         child: AbsorbPointer(
           absorbing: _submitting,
           child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _Banner(type: _type, color: color),
+            _Banner(type: _type, color: color, currentLang: currentLang),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
               child: VoiceDictationButton(
                 mode: VoiceReportMode.community,
                 isCompact: true,
-                tooltip: 'Voice Dictate Post',
+                tooltip: NivaraStrings.tr('compose_voice_dictate', currentLang),
                 onPayloadReceived: (payload) {
                   setState(() {
                     if (payload.title.isNotEmpty) _titleCtrl.text = payload.title;
@@ -398,7 +422,9 @@ class _CommunityComposeScreenState
               controller: _titleCtrl,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                labelText: _isPoll ? 'Poll question' : 'Title',
+                labelText: _isPoll
+                    ? NivaraStrings.tr('compose_poll_question', currentLang)
+                    : NivaraStrings.tr('compose_title', currentLang),
                 hintText: switch (_type) {
                   CommunityPostType.poll => 'e.g. Should we add a speed bump?',
                   CommunityPostType.job => 'e.g. Need an electrician this week',
@@ -415,7 +441,9 @@ class _CommunityComposeScreenState
                 maxLines: 5,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  labelText: _isJob ? 'Details' : 'Say more (optional)',
+                  labelText: _isJob
+                      ? NivaraStrings.tr('compose_details', currentLang)
+                      : NivaraStrings.tr('compose_say_more', currentLang),
                   alignLabelWithHint: true,
                   hintText: _isJob
                       ? 'Scope, timing, budget, how to reach you.'
@@ -425,7 +453,7 @@ class _CommunityComposeScreenState
             ],
             if (_isPoll) ...[
               const SizedBox(height: 20),
-              const _SectionLabel('Options'),
+              _SectionLabel(NivaraStrings.tr('compose_options', currentLang)),
               const SizedBox(height: 8),
               for (var i = 0; i < _pollCtrls.length; i++)
                 Padding(
@@ -437,7 +465,8 @@ class _CommunityComposeScreenState
                           controller: _pollCtrls[i],
                           textCapitalization: TextCapitalization.sentences,
                           decoration: InputDecoration(
-                            labelText: 'Option ${i + 1}',
+                            labelText:
+                                '${NivaraStrings.tr('compose_option_num', currentLang)} ${i + 1}',
                             isDense: true,
                           ),
                         ),
@@ -457,13 +486,13 @@ class _CommunityComposeScreenState
                   child: TextButton.icon(
                     onPressed: _addPollOption,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add option'),
+                    label: Text(NivaraStrings.tr('compose_add_option', currentLang)),
                   ),
                 ),
             ],
             if (_isJob) ...[
               const SizedBox(height: 20),
-              const _SectionLabel('Open until (optional)'),
+              _SectionLabel(NivaraStrings.tr('compose_open_until', currentLang)),
               const SizedBox(height: 8),
               _ValidUntilCard(
                 date: _validUntil,
@@ -472,7 +501,9 @@ class _CommunityComposeScreenState
               ),
             ],
             const SizedBox(height: 20),
-            _SectionLabel(_allowsPhoto ? 'Reach & location' : 'Location'),
+            _SectionLabel(_allowsPhoto
+                ? NivaraStrings.tr('compose_reach_location', currentLang)
+                : NivaraStrings.tr('compose_location', currentLang)),
             const SizedBox(height: 8),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
@@ -481,11 +512,11 @@ class _CommunityComposeScreenState
                 setState(() => _locationOn = v);
                 if (v && _pos == null && !_isEdit) _fetchLocation();
               },
-              title: const Text('Limit to a nearby area'),
+              title: Text(NivaraStrings.tr('compose_limit_nearby', currentLang)),
               subtitle: Text(
                 _locationOn
-                    ? 'Only shown to people within the radius below'
-                    : 'Visible to everyone in the city',
+                    ? NivaraStrings.tr('compose_nearby_sub', currentLang)
+                    : NivaraStrings.tr('compose_citywide_sub', currentLang),
               ),
             ),
             if (_locationOn) ...[
@@ -499,7 +530,7 @@ class _CommunityComposeScreenState
                 children: [
                   const Icon(Icons.social_distance, size: 20),
                   const SizedBox(width: 8),
-                  Text('Visible within ${_radiusKm.round()} km'),
+                  Text('${NivaraStrings.tr('compose_visible_within', currentLang)} ${_radiusKm.round()} km'),
                 ],
               ),
               Slider(
@@ -513,9 +544,9 @@ class _CommunityComposeScreenState
               TextField(
                 controller: _labelCtrl,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Landmark / area (optional)',
-                  prefixIcon: Icon(Icons.place_outlined),
+                decoration: InputDecoration(
+                  labelText: NivaraStrings.tr('compose_landmark', currentLang),
+                  prefixIcon: const Icon(Icons.place_outlined),
                 ),
               ),
             ],
@@ -524,13 +555,13 @@ class _CommunityComposeScreenState
               contentPadding: EdgeInsets.zero,
               value: _contactOn,
               onChanged: (v) => setState(() => _contactOn = v),
-              title: const Text('Add a contact'),
-              subtitle: const Text('A one-tap way for people to reach you'),
+              title: Text(NivaraStrings.tr('compose_add_contact', currentLang)),
+              subtitle: Text(NivaraStrings.tr('compose_contact_sub', currentLang)),
             ),
-            if (_contactOn) _contactFields(),
+            if (_contactOn) _contactFields(currentLang),
             if (_allowsPhoto) ...[
               const SizedBox(height: 20),
-              const _SectionLabel('Photo (optional)'),
+              _SectionLabel(NivaraStrings.tr('compose_photo_optional', currentLang)),
               const SizedBox(height: 8),
               _PhotoStrip(
                 existing: _keptPhotos,
@@ -557,10 +588,10 @@ class _CommunityComposeScreenState
                   : Icon(_isEdit ? Icons.save : Icons.send),
               label: Text(
                 _submitting
-                    ? 'Saving…'
+                    ? NivaraStrings.tr('compose_saving', currentLang)
                     : _isEdit
-                    ? 'Save changes'
-                    : 'Post to community',
+                    ? NivaraStrings.tr('compose_save_changes', currentLang)
+                    : NivaraStrings.tr('compose_post_to_community', currentLang),
               ),
             ),
             const SizedBox(height: 12),
@@ -571,14 +602,14 @@ class _CommunityComposeScreenState
     );
   }
 
-  Widget _contactFields() {
+  Widget _contactFields(AppLanguage currentLang) {
     return Column(
       children: [
         const SizedBox(height: 4),
         InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'Contact via',
-            prefixIcon: Icon(Icons.contact_page_outlined),
+          decoration: InputDecoration(
+            labelText: NivaraStrings.tr('compose_contact_via', currentLang),
+            prefixIcon: const Icon(Icons.contact_page_outlined),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<LFContactMethod>(
@@ -624,21 +655,26 @@ class _CommunityComposeScreenState
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({required this.type, required this.color});
+  const _Banner({
+    required this.type,
+    required this.color,
+    required this.currentLang,
+  });
   final CommunityPostType type;
   final Color color;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
     final blurb = switch (type) {
       CommunityPostType.general =>
-        'Share news, a question, or a heads-up with people around you.',
+        NivaraStrings.tr('compose_banner_general', currentLang),
       CommunityPostType.poll =>
-        'Ask a question and let neighbours vote. Results update live.',
+        NivaraStrings.tr('compose_banner_poll', currentLang),
       CommunityPostType.job =>
-        'List work you need done. Add a contact so people can reach you.',
+        NivaraStrings.tr('compose_banner_job', currentLang),
       CommunityPostType.announcement =>
-        'Broadcast something people nearby should know.',
+        NivaraStrings.tr('compose_banner_announcement', currentLang),
     };
     return Container(
       padding: const EdgeInsets.all(14),

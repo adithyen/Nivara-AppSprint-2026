@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/localization/app_localizations.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../models/enums.dart';
 import '../../models/user_profile.dart';
 import '../auth/auth_controller.dart';
+import '../settings/language_controller.dart';
 
 // ── Activity entry model ────────────────────────────────────────────────────
 
@@ -26,6 +28,7 @@ class ActivityEntry {
   const ActivityEntry({
     required this.id,
     required this.title,
+    this.titleKey,
     required this.subtitle,
     required this.category,
     required this.at,
@@ -34,10 +37,16 @@ class ActivityEntry {
 
   final String id;
   final String title;
+  final String? titleKey;
   final String subtitle;
   final ActivityCategory category;
   final DateTime at;
   final String? status;
+
+  String localizedTitle(AppLanguage lang) {
+    if (titleKey != null) return NivaraStrings.tr(titleKey!, lang);
+    return title;
+  }
 
   IconData get icon => switch (category) {
     ActivityCategory.report => Icons.report_problem_outlined,
@@ -143,6 +152,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         entries.add(ActivityEntry(
           id: r['id'] as String,
           title: isSensor ? '🔊 Sensor Detection' : '📋 Manual Report',
+          titleKey: isSensor ? 'activity_sensor_detection' : 'activity_manual_report',
           subtitle: (r['title'] as String?) ??
               (cat?.label ?? (r['category'] as String? ?? 'Issue')),
           category: isSensor
@@ -164,9 +174,11 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
           .limit(30);
 
       for (final lf in lfItems) {
+        final isLost = lf['item_type'] == 'LOST';
         entries.add(ActivityEntry(
           id: lf['id'] as String,
-          title: lf['item_type'] == 'LOST' ? '🔍 Lost Report' : '📦 Found Report',
+          title: isLost ? '🔍 Lost Report' : '📦 Found Report',
+          titleKey: isLost ? 'activity_lost_report' : 'activity_found_report',
           subtitle: lf['title'] as String? ?? 'L&F item',
           category: ActivityCategory.lostFound,
           at: DateTime.parse(lf['created_at'] as String),
@@ -184,9 +196,11 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
           .limit(30);
 
       for (final c in confirms) {
+        final isConfirm = c['type'] == 'CONFIRM';
         entries.add(ActivityEntry(
           id: c['id'] as String,
-          title: c['type'] == 'CONFIRM' ? '👍 Confirmed a report' : '🚩 Disputed a report',
+          title: isConfirm ? '👍 Confirmed a report' : '🚩 Disputed a report',
+          titleKey: isConfirm ? 'activity_confirmed_report' : 'activity_disputed_report',
           subtitle: 'Report ID: ${(c['report_id'] as String).substring(0, 8)}…',
           category: ActivityCategory.confirmation,
           at: DateTime.parse(c['created_at'] as String),
@@ -208,6 +222,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         entries.add(ActivityEntry(
           id: p['id'] as String,
           title: '💬 Community Post',
+          titleKey: 'activity_community_post',
           subtitle: (p['title'] as String?)?.isNotEmpty == true
               ? p['title'] as String
               : postType,
@@ -232,7 +247,8 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
           final cat = _parseEnum(t['category'] as String?, ReportCategory.values) as ReportCategory?;
           entries.add(ActivityEntry(
             id: '${t['id']}_task',
-            title: '🔧 Task Assigned',
+            title: '🔨 Assigned task',
+            titleKey: 'activity_assigned_task',
             subtitle: (t['title'] as String?) ?? cat?.label ?? 'Task',
             category: ActivityCategory.task,
             at: DateTime.parse(t['updated_at'] as String),
@@ -253,7 +269,8 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         for (final n in notes) {
           entries.add(ActivityEntry(
             id: n['id'] as String,
-            title: '📝 Progress Note',
+            title: '📝 Progress update',
+            titleKey: 'activity_progress_note',
             subtitle: (n['note'] as String? ?? '').length > 60
                 ? '${(n['note'] as String).substring(0, 60)}…'
                 : n['note'] as String? ?? '',
@@ -280,6 +297,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
           entries.add(ActivityEntry(
             id: h['id'] as String,
             title: _adminActionTitle(status),
+            titleKey: _adminActionTitleKey(status),
             subtitle: 'Report: ${(h['report_id'] as String).substring(0, 8)}…',
             category: ActivityCategory.assignment,
             at: DateTime.parse(h['created_at'] as String),
@@ -291,6 +309,13 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
 
     return entries;
   }
+
+  String _adminActionTitleKey(String status) => switch (status.toUpperCase()) {
+    'ACKNOWLEDGED' => 'activity_acknowledged',
+    'IN_PROGRESS' => 'activity_assigned_worker',
+    'RESOLVED' => 'activity_marked_resolved',
+    _ => 'activity_status_update',
+  };
 
   String _adminActionTitle(String status) => switch (status.toUpperCase()) {
     'ACKNOWLEDGED' => '✅ Acknowledged report',
@@ -312,11 +337,14 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Activity'),
+        title: Text(NivaraStrings.tr('activity_my_activity', currentLang)),
         actions: [
           IconButton(
+            tooltip: NivaraStrings.tr('pending_sync_refresh', currentLang),
             icon: const Icon(Icons.refresh),
             onPressed: _load,
           ),
@@ -327,7 +355,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
           : _error != null
           ? _ErrorView(message: _error!, onRetry: _load)
           : _entries.isEmpty
-          ? const _EmptyView()
+          ? _EmptyView(currentLang: currentLang)
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView.builder(
@@ -341,8 +369,8 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (showDate) _DateHeader(entry.at),
-                      _ActivityTile(entry: entry),
+                      if (showDate) _DateHeader(date: entry.at, currentLang: currentLang),
+                      _ActivityTile(entry: entry, currentLang: currentLang),
                     ],
                   );
                 },
@@ -358,8 +386,9 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
 // ── Sub-widgets ───────────────────────────────────────────────────────────
 
 class _DateHeader extends StatelessWidget {
-  const _DateHeader(this.date);
+  const _DateHeader({required this.date, required this.currentLang});
   final DateTime date;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -367,10 +396,10 @@ class _DateHeader extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     final d = DateTime(date.year, date.month, date.day);
     final label = d == today
-        ? 'Today'
+        ? NivaraStrings.tr('today', currentLang)
         : d == today.subtract(const Duration(days: 1))
-            ? 'Yesterday'
-            : _fmt(date);
+            ? NivaraStrings.tr('yesterday', currentLang)
+            : _fmt(date, currentLang);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 6),
@@ -385,8 +414,20 @@ class _DateHeader extends StatelessWidget {
     );
   }
 
-  String _fmt(DateTime d) =>
-      '${d.day} ${_months[d.month - 1]} ${d.year}';
+  String _fmt(DateTime d, AppLanguage lang) {
+    final monthNames = switch (lang) {
+      AppLanguage.ml => [
+        'ജനു', 'ഫെബ്രു', 'മാർച്ച്', 'ഏപ്രിൽ', 'മേയ്', 'ജൂൺ',
+        'ജൂലൈ', 'ഓഗസ്റ്റ്', 'സെപ്റ്റം', 'ഒക്ടോ', 'നവം', 'ഡിസം'
+      ],
+      AppLanguage.hi => [
+        'जन', 'फर', 'मार्च', 'अप्रै', 'मई', 'जून',
+        'जुलै', 'अग', 'सितं', 'अक्टू', 'नव', 'दिसं'
+      ],
+      _ => _months,
+    };
+    return '${d.day} ${monthNames[d.month - 1]} ${d.year}';
+  }
 
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -395,8 +436,9 @@ class _DateHeader extends StatelessWidget {
 }
 
 class _ActivityTile extends StatelessWidget {
-  const _ActivityTile({required this.entry});
+  const _ActivityTile({required this.entry, required this.currentLang});
   final ActivityEntry entry;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -432,7 +474,7 @@ class _ActivityTile extends StatelessWidget {
           child: Icon(entry.icon, color: color, size: 20),
         ),
         title: Text(
-          entry.title,
+          entry.localizedTitle(currentLang),
           style: TextStyle(
             color: isDark ? Colors.white : const Color(0xFF0F172A),
             fontWeight: FontWeight.w700,
@@ -534,7 +576,8 @@ class _ErrorView extends StatelessWidget {
 }
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+  const _EmptyView({required this.currentLang});
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -549,12 +592,12 @@ class _EmptyView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'No activity yet',
+            NivaraStrings.tr('activity_empty_title', currentLang),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Your reports, posts, and tasks will appear here.',
+            NivaraStrings.tr('activity_empty_sub', currentLang),
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

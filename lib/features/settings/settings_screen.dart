@@ -91,7 +91,13 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   settings.themeMode == ThemeMode.system
                       ? NivaraStrings.tr('theme_system_desc', currentLang)
-                      : '${themeModeLabel(settings.themeMode)} theme active.',
+                      : switch (currentLang) {
+                          AppLanguage.ml =>
+                            '${settings.themeMode == ThemeMode.light ? "ലൈറ്റ്" : "ഡാർക്ക്"} ${NivaraStrings.tr('theme_active_suffix', currentLang)}',
+                          AppLanguage.hi =>
+                            '${settings.themeMode == ThemeMode.light ? "लाइट" : "डार्क"} ${NivaraStrings.tr('theme_active_suffix', currentLang)}',
+                          _ => '${themeModeLabel(settings.themeMode)} theme active.',
+                        },
                   style: TextStyle(
                     color: isDark ? Colors.white54 : const Color(0xFF64748B),
                     fontSize: 12,
@@ -118,6 +124,7 @@ class SettingsScreen extends ConsumerWidget {
                     for (final accent in AppAccent.values)
                       _AccentSwatch(
                         accent: accent,
+                        lang: currentLang,
                         selected: settings.accent == accent,
                         onTap: () {
                           if (a11y.hapticsEnabled) HapticFeedback.selectionClick();
@@ -192,17 +199,31 @@ class _SectionHeader extends StatelessWidget {
 class _AccentSwatch extends StatelessWidget {
   const _AccentSwatch({
     required this.accent,
+    required this.lang,
     required this.selected,
     required this.onTap,
   });
 
   final AppAccent accent;
+  final AppLanguage lang;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = accent.color;
+    final colorKey = switch (accent) {
+      AppAccent.civicBlue => 'color_civic_blue',
+      AppAccent.teal => 'color_teal',
+      AppAccent.indigo => 'color_indigo',
+      AppAccent.violet => 'color_violet',
+      AppAccent.magenta => 'color_magenta',
+      AppAccent.emerald => 'color_emerald',
+      AppAccent.sunset => 'color_sunset',
+      AppAccent.crimson => 'color_crimson',
+    };
+    final localizedLabel = NivaraStrings.tr(colorKey, lang);
+
     return SizedBox(
       width: 68,
       child: Column(
@@ -236,7 +257,7 @@ class _AccentSwatch extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            accent.label,
+            localizedLabel,
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

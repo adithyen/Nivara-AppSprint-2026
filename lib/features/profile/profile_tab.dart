@@ -182,20 +182,24 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   }
 
   Future<void> _signOut() async {
+    final currentLang = ref.read(languageControllerProvider);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text('You will need to sign in again to file and manage reports.'),
+        title: Text(NivaraStrings.tr('sign_out_title', currentLang)),
+        content: Text(NivaraStrings.tr('sign_out_confirm', currentLang)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(NivaraStrings.tr('btn_cancel', currentLang)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NivaraColors.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign out', style: TextStyle(color: Colors.white)),
+            child: Text(
+              NivaraStrings.tr('btn_sign_out', currentLang),
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -232,6 +236,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               onLeave: _onLeave,
               working: _leaveWorking,
               profile: profile,
+              currentLang: currentLang,
               onToggleLeave: _toggleLeave,
               onResign: _resign,
             ),
@@ -354,6 +359,7 @@ class _WorkStatusCard extends StatelessWidget {
     required this.onLeave,
     required this.working,
     required this.profile,
+    required this.currentLang,
     required this.onToggleLeave,
     required this.onResign,
   });
@@ -361,6 +367,7 @@ class _WorkStatusCard extends StatelessWidget {
   final bool onLeave;
   final bool working;
   final UserProfile? profile;
+  final AppLanguage currentLang;
   final VoidCallback onToggleLeave;
   final VoidCallback onResign;
 
@@ -371,8 +378,14 @@ class _WorkStatusCard extends StatelessWidget {
     final dept = profile?.department?.label ?? 'Field Team';
     final workerNum = profile?.workerNumber;
     final statusColor = onLeave ? NivaraColors.accent : NivaraColors.success;
-    final statusLabel = onLeave ? 'On Leave' : 'Available for Work';
+    final statusLabel = onLeave
+        ? NivaraStrings.tr('worker_on_leave', currentLang)
+        : NivaraStrings.tr('worker_mark_leave', currentLang);
+    final statusSubtitle = onLeave
+        ? NivaraStrings.tr('worker_on_leave_sub', currentLang)
+        : NivaraStrings.tr('worker_mark_leave_sub', currentLang);
     final statusIcon = onLeave ? Icons.beach_access_rounded : Icons.check_circle_rounded;
+    final shiftStatusHeader = NivaraStrings.tr('worker_shift_status', currentLang);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -380,7 +393,7 @@ class _WorkStatusCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'FIELD SHIFT STATUS',
+            shiftStatusHeader,
             style: TextStyle(
               color: isDark ? Colors.white60 : const Color(0xFF6B7280),
               letterSpacing: 1.2,
@@ -433,9 +446,7 @@ class _WorkStatusCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            onLeave
-                                ? 'No new tasks will be dispatched to you'
-                                : 'Active & ready for task dispatch',
+                            statusSubtitle,
                             style: TextStyle(
                               color: isDark ? Colors.white54 : const Color(0xFF6B7280),
                               fontSize: 11.5,
@@ -714,21 +725,32 @@ class _CitizenImpactCard extends ConsumerWidget {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(
-                NivaraStrings.tr('civic_standing', currentLang),
-                style: TextStyle(
-                  color: isDark ? Colors.white : const Color(0xFF111827),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
+              Expanded(
+                child: Text(
+                  NivaraStrings.tr('civic_standing', currentLang),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF111827),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                loading ? '—' : '$score XP',
-                style: TextStyle(
-                  color: primary,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  loading ? '—' : '$score XP',
+                  style: TextStyle(
+                    color: primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14.5,
+                  ),
                 ),
               ),
             ],

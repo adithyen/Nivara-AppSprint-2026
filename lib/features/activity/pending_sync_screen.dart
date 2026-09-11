@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/localization/app_localizations.dart';
 import '../../core/services/offline_queue_service.dart';
 import '../../core/theme.dart';
+import '../settings/language_controller.dart';
 
 /// **Pending Sync** — shows everything queued offline waiting to sync.
 ///
@@ -60,23 +62,21 @@ class _PendingSyncScreenState extends ConsumerState<PendingSyncScreen> {
   }
 
   Future<void> _clearAll() async {
+    final currentLang = ref.read(languageControllerProvider);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Clear pending sync?'),
-        content: const Text(
-          'All queued items will be discarded and will NOT be submitted. '
-          'This cannot be undone.',
-        ),
+        title: Text(NivaraStrings.tr('pending_sync_clear_title', currentLang)),
+        content: Text(NivaraStrings.tr('pending_sync_clear_body', currentLang)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(NivaraStrings.tr('sign_out_cancel', currentLang)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NivaraColors.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear all'),
+            child: Text(NivaraStrings.tr('pending_sync_clear', currentLang)),
           ),
         ],
       ),
@@ -88,18 +88,20 @@ class _PendingSyncScreenState extends ConsumerState<PendingSyncScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageControllerProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pending Sync'),
+        title: Text(NivaraStrings.tr('pending_sync_title', currentLang)),
         actions: [
           if (_entries.isNotEmpty)
             IconButton(
-              tooltip: 'Clear all',
+              tooltip: NivaraStrings.tr('pending_sync_clear', currentLang),
               icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: _clearAll,
             ),
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: NivaraStrings.tr('pending_sync_refresh', currentLang),
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
           ),
@@ -108,13 +110,13 @@ class _PendingSyncScreenState extends ConsumerState<PendingSyncScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _entries.isEmpty
-          ? _EmptyView(onRefresh: _load)
+          ? _EmptyView(onRefresh: _load, currentLang: currentLang)
           : RefreshIndicator(
               onRefresh: _load,
               child: Column(
                 children: [
                   // Summary banner
-                  _SummaryBanner(count: _entries.length),
+                  _SummaryBanner(count: _entries.length, currentLang: currentLang),
                   Expanded(
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
@@ -122,6 +124,7 @@ class _PendingSyncScreenState extends ConsumerState<PendingSyncScreen> {
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (_, i) => _QueueTile(
                         entry: _entries[i],
+                        currentLang: currentLang,
                         onDismiss: () => _remove(_entries[i].id),
                       ),
                     ),
@@ -142,7 +145,9 @@ class _PendingSyncScreenState extends ConsumerState<PendingSyncScreen> {
                       ),
                     )
                   : const Icon(Icons.cloud_upload_outlined),
-              label: Text(_draining ? 'Syncing…' : 'Sync now'),
+              label: Text(_draining
+                  ? NivaraStrings.tr('pending_sync_syncing', currentLang)
+                  : NivaraStrings.tr('pending_sync_now', currentLang)),
               backgroundColor:
                   _draining ? Colors.grey : NivaraColors.primary,
             )
@@ -154,11 +159,18 @@ class _PendingSyncScreenState extends ConsumerState<PendingSyncScreen> {
 // ── Sub-widgets ───────────────────────────────────────────────────────────
 
 class _SummaryBanner extends StatelessWidget {
-  const _SummaryBanner({required this.count});
+  const _SummaryBanner({required this.count, required this.currentLang});
   final int count;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
+    final titleText = switch (currentLang) {
+      AppLanguage.ml => '$count ഇനങ്ങൾ സിങ്ക് ചെയ്യാൻ കാത്തിരിക്കുന്നു',
+      AppLanguage.hi => '$count आइटम सिंक के लिए कतार में',
+      _ => '$count item${count == 1 ? '' : 's'} waiting to sync',
+    };
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -176,14 +188,14 @@ class _SummaryBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$count item${count == 1 ? '' : 's'} waiting to sync',
+                  titleText,
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     color: NivaraColors.accent,
                   ),
                 ),
                 Text(
-                  'These will be submitted automatically when you\'re back online.',
+                  NivaraStrings.tr('pending_sync_banner_sub', currentLang),
                   style: TextStyle(
                     color: NivaraColors.accent.withValues(alpha: 0.8),
                     fontSize: 12,
@@ -199,8 +211,13 @@ class _SummaryBanner extends StatelessWidget {
 }
 
 class _QueueTile extends StatelessWidget {
-  const _QueueTile({required this.entry, required this.onDismiss});
+  const _QueueTile({
+    required this.entry,
+    required this.currentLang,
+    required this.onDismiss,
+  });
   final QueueEntry entry;
+  final AppLanguage currentLang;
   final VoidCallback onDismiss;
 
   String get _typeLabel => switch (entry.type) {
@@ -283,7 +300,7 @@ class _QueueTile extends StatelessWidget {
                 ),
               ),
               subtitle: Text(
-                'Queued ${fmt.format(entry.queuedAt)}',
+                '${NivaraStrings.tr('pending_sync_queued_prefix', currentLang)} ${fmt.format(entry.queuedAt)}',
                 style: TextStyle(
                   color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
                   fontSize: 12,
@@ -305,7 +322,9 @@ class _QueueTile extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  entry.localPhotoPaths.isNotEmpty ? '📷 +photo' : 'Text only',
+                  entry.localPhotoPaths.isNotEmpty
+                      ? NivaraStrings.tr('pending_sync_with_photo', currentLang)
+                      : NivaraStrings.tr('pending_sync_text_only', currentLang),
                   style: TextStyle(
                     color: entry.localPhotoPaths.isNotEmpty
                         ? NivaraColors.primary
@@ -327,18 +346,18 @@ class _QueueTile extends StatelessWidget {
                     color: NivaraColors.danger.withValues(alpha: 0.35),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.photo_camera_outlined,
                       color: NivaraColors.danger,
                       size: 18,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Photo cleared from temp storage. Submitted as text-only.',
-                        style: TextStyle(
+                        NivaraStrings.tr('pending_sync_photo_error', currentLang),
+                        style: const TextStyle(
                           color: NivaraColors.danger,
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
@@ -356,8 +375,9 @@ class _QueueTile extends StatelessWidget {
 }
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView({required this.onRefresh});
+  const _EmptyView({required this.onRefresh, required this.currentLang});
   final VoidCallback onRefresh;
+  final AppLanguage currentLang;
 
   @override
   Widget build(BuildContext context) {
@@ -372,7 +392,7 @@ class _EmptyView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'All synced!',
+            NivaraStrings.tr('pending_sync_empty_title', currentLang),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: NivaraColors.success,
               fontWeight: FontWeight.w700,
@@ -380,7 +400,7 @@ class _EmptyView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'No pending items. Everything has been submitted.',
+            NivaraStrings.tr('pending_sync_empty_sub', currentLang),
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -390,7 +410,7 @@ class _EmptyView extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onRefresh,
             icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
+            label: Text(NivaraStrings.tr('pending_sync_refresh', currentLang)),
           ),
         ],
       ),
