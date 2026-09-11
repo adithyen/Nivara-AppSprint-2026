@@ -1204,6 +1204,36 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
 
   Widget _buildPhotoProofSection(bool isDark, ColorScheme scheme) {
     final isCivic = _mode == VoiceReportMode.civic;
+    final isLostFound = _mode == VoiceReportMode.lostFound;
+
+    final String sectionTitle;
+    final String emptySubtitle;
+    final String readyTitle;
+    final String attachedBadgeText;
+    final IconData sectionIcon;
+
+    if (isCivic) {
+      sectionTitle = 'Hazard Photo Proof';
+      emptySubtitle = 'Attach photo evidence so municipal field teams can locate & verify the hazard.';
+      readyTitle = 'Hazard photo proof ready';
+      attachedBadgeText = 'Proof Attached';
+      sectionIcon = Icons.verified_user_outlined;
+    } else if (isLostFound) {
+      sectionTitle = 'Item Photo';
+      emptySubtitle = 'Add a clear photo of the item to help neighbors identify and claim it.';
+      readyTitle = 'Item photo ready';
+      attachedBadgeText = 'Photo Attached';
+      sectionIcon = Icons.inventory_2_outlined;
+    } else {
+      // Community post
+      sectionTitle = 'Attach Post Image';
+      emptySubtitle = 'Add an image to accompany your community announcement, poll, or discussion.';
+      readyTitle = 'Post image ready';
+      attachedBadgeText = 'Image Attached';
+      sectionIcon = Icons.image_outlined;
+    }
+
+    final String unattachedBadgeText = isCivic ? 'Required for Civic' : 'Optional';
 
     return Container(
       margin: const EdgeInsets.only(top: 14),
@@ -1227,13 +1257,13 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
               Row(
                 children: [
                   Icon(
-                    _attachedPhotoPath != null ? Icons.check_circle_rounded : Icons.photo_camera_rounded,
+                    _attachedPhotoPath != null ? Icons.check_circle_rounded : sectionIcon,
                     size: 16,
                     color: _attachedPhotoPath != null ? Colors.teal : (isCivic ? Colors.amber : scheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'Photo Proof Evidence',
+                    sectionTitle,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -1251,8 +1281,8 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                 ),
                 child: Text(
                   _attachedPhotoPath != null
-                      ? 'Attached'
-                      : (isCivic ? 'Required for Civic' : 'Optional'),
+                      ? attachedBadgeText
+                      : unattachedBadgeText,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -1281,7 +1311,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Photo proof ready',
+                        readyTitle,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -1313,9 +1343,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             ),
           ] else ...[
             Text(
-              isCivic
-                  ? 'Attach photo evidence so field workers and civic admins can locate & resolve the issue faster.'
-                  : 'Add a photo to help provide visual context for this report.',
+              emptySubtitle,
               style: TextStyle(
                 fontSize: 12,
                 color: scheme.onSurfaceVariant,

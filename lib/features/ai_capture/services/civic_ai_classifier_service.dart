@@ -115,7 +115,7 @@ class CivicAiClassifierService {
         'Live scan dispatching: original=${originalBytes.lengthInBytes}B, prepared=${prepared.bytes.lengthInBytes}B (${prepared.mimeType}), hint=${hintCategory?.wire ?? "auto"}',
       );
 
-      return await _callNimVision(
+      final result = await _callNimVision(
         prepared.bytes,
         nimKey,
         hintCategory,
@@ -123,6 +123,10 @@ class CivicAiClassifierService {
         minConfidence: 0.50,
         mimeType: prepared.mimeType,
       );
+      if (result != null && result.isHazardDetected) {
+        return result;
+      }
+      return null;
     } catch (e, stack) {
       DebugLogger.instance.error('NIM-SCAN', e, stack);
       return null;
@@ -139,6 +143,7 @@ class CivicAiClassifierService {
     // (within the last 8 seconds) and it's a specific civic hazard, use it immediately!
     // This makes review sheet presentation instantaneous (< 200ms) with zero timeout risk.
     if (_lastConfirmedDetection != null &&
+        _lastConfirmedDetection!.isHazardDetected &&
         _lastConfirmedDetection!.category != ReportCategory.other &&
         _lastConfirmedDetection!.confidence >= 0.50) {
       final age = DateTime.now().difference(_lastConfirmedDetection!.timestamp).inSeconds;
@@ -174,7 +179,7 @@ class CivicAiClassifierService {
         if (result != null) {
           DebugLogger.instance.log(
             'NIM-CAP',
-            'Capture classified: ${result.category.wire} (conf: ${result.confidence.toStringAsFixed(2)}, sev: ${result.severity.wire})',
+            'Capture classified: ${result.category.wire} (hazard: ${result.isHazardDetected}, conf: ${result.confidence.toStringAsFixed(2)}, sev: ${result.severity.wire})',
           );
           return result;
         }
@@ -182,11 +187,11 @@ class CivicAiClassifierService {
         DebugLogger.instance.error('NIM-CAP', e, stack);
       }
     } else {
-      DebugLogger.instance.log('NIM-CAP', 'NVIDIA_NIM_API_KEY is empty/null, using fallback');
+      DebugLogger.instance.log('NIM-CAP', 'NVIDIA_NIM_API_KEY is empty/null');
     }
 
-    // Fallback: use the last live detection if available
-    if (_lastConfirmedDetection != null) {
+    // Fallback: use the last live detection if available AND it was a genuine confirmed hazard
+    if (_lastConfirmedDetection != null && _lastConfirmedDetection!.isHazardDetected) {
       DebugLogger.instance.log(
         'NIM-CAP',
         'Using last confirmed live detection fallback: ${_lastConfirmedDetection!.category.wire}',
@@ -197,21 +202,31 @@ class CivicAiClassifierService {
       );
     }
 
-    final category = hintCategory ?? ReportCategory.pothole;
-    final preset = getPresetMetadata(category);
-    DebugLogger.instance.log('NIM-CAP', 'Using preset metadata fallback for: ${category.wire}');
-    return CivicAiDetection(
-      category: category,
-      confidence: 0.85,
-      severity: Severity.medium,
-      title: preset.title,
-      description: preset.description,
-      titleMl: preset.titleMl,
-      descriptionMl: preset.descriptionMl,
-      boundingBox: const Rect.fromLTWH(0.2, 0.25, 0.6, 0.5),
-      visualEvidenceTags: preset.defaultTags,
-      timestamp: DateTime.now(),
-      isSteady: true,
+    // If the user explicitly picked a category tab (e.g. Broken Footpath),
+    // provide manual preset detection without pretending high AI confidence.
+    if (hintCategory != null) {
+      final preset = getPresetMetadata(hintCategory);
+      DebugLogger.instance.log('NIM-CAP', 'Using targeted hint category: ${hintCategory.wire}');
+      return CivicAiDetection(
+        category: hintCategory,
+        confidence: 0.50,
+        severity: Severity.medium,
+        title: preset.title,
+        description: preset.description,
+        titleMl: preset.titleMl,
+        descriptionMl: preset.descriptionMl,
+        boundingBox: const Rect.fromLTWH(0.2, 0.25, 0.6, 0.5),
+        visualEvidenceTags: preset.defaultTags,
+        timestamp: DateTime.now(),
+        isSteady: true,
+        isHazardDetected: true,
+      );
+    }
+
+    // In Auto mode: if no hazard was recognized, NEVER default to Pothole!
+    DebugLogger.instance.log('NIM-CAP', 'No municipal hazard detected in image. Returning noHazard.');
+    return CivicAiDetection.noHazard(
+      reason: 'No municipal hazard detected. Camera appears to be pointing at a non-civic or indoor scene.',
     );
   }
 
@@ -328,6 +343,43 @@ Respond ONLY with this raw JSON:
       final titleMl = (parsed['title_ml']?.toString() ?? '').trim();
       final descMl = (parsed['description_ml']?.toString() ?? '').trim();
       final tags = (parsed['tags'] as List?)?.map((t) => t.toString().trim()).toList() ?? [];
+      final reasoning = (parsed['reasoning']?.toString() ?? '').trim();
+
+      // Check for explicit negative/non-civic signals from NIM
+      final isExplicitNegative = rawCat.toLowerCase() == 'not_a_civic_issue' ||
+          rawCat.toLowerCase() == 'none' ||
+          rawCat.toLowerCase() == 'null' ||
+          rawCat.toLowerCase() == 'clear' ||
+          rawCat.toLowerCase() == 'no_issue' ||
+          rawCat.toLowerCase() == 'not_civic';
+
+      final allText = '${rawCat.toLowerCase()} ${titleEn.toLowerCase()} ${descEn.toLowerCase()} ${reasoning.toLowerCase()}';
+      final isIndoorOrNonHazard = allText.contains('laptop') ||
+          allText.contains('desk') ||
+          allText.contains('table') ||
+          allText.contains('room') ||
+          allText.contains('computer') ||
+          allText.contains('study table') ||
+          allText.contains('keyboard') ||
+          allText.contains('monitor') ||
+          allText.contains('not a civic') ||
+          allText.contains('not a municipal') ||
+          allText.contains('not a hazard') ||
+          allText.contains('no civic') ||
+          allText.contains('indoor');
+
+      if (isExplicitNegative || isIndoorOrNonHazard) {
+        DebugLogger.instance.log(
+          'NIM-API',
+          'Negative civic confirmation in ${elapsed}ms: $rawCat ($reasoning)',
+        );
+        final cleanReason = reasoning.isNotEmpty
+            ? reasoning
+            : 'No municipal hazard detected in this frame (indoor or non-civic scene).';
+        return CivicAiDetection.noHazard(
+          reason: cleanReason,
+        );
+      }
 
       // Intelligently resolve the exact civic category using both raw category & title/desc/tags
       final category = resolveCivicCategory(
@@ -337,17 +389,16 @@ Respond ONLY with this raw JSON:
         tags: tags,
       );
 
-      // Explicitly bail out on genuine non-civic scenes
-      if (category == ReportCategory.other &&
-          (rawCat.toLowerCase() == 'not_a_civic_issue' ||
-              rawCat.toLowerCase() == 'none' ||
-              rawCat.toLowerCase() == 'null' ||
-              rawCat.toLowerCase() == 'clear')) {
+      if (category == ReportCategory.other) {
         DebugLogger.instance.log(
           'NIM-API',
-          'Negative civic confirmation in ${elapsed}ms: $rawCat (${parsed['reasoning']})',
+          'Could not map to official civic category: rawCat="$rawCat", title="$titleEn"',
         );
-        return null;
+        return CivicAiDetection.noHazard(
+          reason: reasoning.isNotEmpty
+              ? reasoning
+              : 'The scene does not match any official municipal hazard category.',
+        );
       }
 
       final sevWire = parsed['severity']?.toString();
@@ -363,7 +414,9 @@ Respond ONLY with this raw JSON:
       // Filter out low confidence detections
       if (conf < minConfidence) {
         DebugLogger.instance.log('NIM-API', 'Confidence $conf below threshold $minConfidence, discarded.');
-        return null;
+        return CivicAiDetection.noHazard(
+          reason: 'Hazard detected with low confidence (${(conf * 100).toInt()}%). Please capture closer.',
+        );
       }
 
       final preset = getPresetMetadata(category);
@@ -380,6 +433,7 @@ Respond ONLY with this raw JSON:
         visualEvidenceTags: tags.isNotEmpty ? tags : preset.defaultTags,
         timestamp: DateTime.now(),
         isSteady: false,
+        isHazardDetected: true,
       );
 
       // Cache for display continuity and instant review sheet launch

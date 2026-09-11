@@ -23,15 +23,44 @@ class LocationService {
       p == LocationPermission.always || p == LocationPermission.whileInUse;
 
   /// A single best-effort fix, or null if it fails/permission is missing.
-  Future<Position?> current() async {
+  Future<Position?> current({Duration timeout = const Duration(seconds: 5)}) async {
     try {
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
+      final perm = await ensurePermission();
+      if (!isGranted(perm)) {
+        return await Geolocator.getLastKnownPosition();
+      }
+
+      // Fast check for cached position first
+      final lastKnown = await Geolocator.getLastKnownPosition();
+
+      try {
+        final cur = await Geolocator.getCurrentPosition(
+          locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: timeout,
+          ),
+        );
+        return cur;
+      } catch (_) {
+        if (lastKnown != null) return lastKnown;
+        // Fallback to medium accuracy if high accuracy timed out (e.g. indoors)
+        try {
+          return await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 3),
+            ),
+          );
+        } catch (_) {
+          return null;
+        }
+      }
     } catch (_) {
-      return null;
+      try {
+        return await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        return null;
+      }
     }
   }
 

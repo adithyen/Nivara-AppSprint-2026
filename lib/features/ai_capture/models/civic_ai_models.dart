@@ -14,6 +14,8 @@ class CivicAiDetection {
   final List<String> visualEvidenceTags;
   final DateTime timestamp;
   final bool isSteady;
+  final bool isHazardDetected;
+  final String? noHazardReason;
 
   const CivicAiDetection({
     required this.category,
@@ -27,10 +29,34 @@ class CivicAiDetection {
     this.visualEvidenceTags = const [],
     required this.timestamp,
     this.isSteady = false,
+    this.isHazardDetected = true,
+    this.noHazardReason,
   });
 
+  /// Factory constructor representing a frame where NO civic hazard was detected
+  /// (e.g. clean indoor room, laptop on desk, or non-municipal scene).
+  factory CivicAiDetection.noHazard({
+    String reason = 'No municipal road defect or civic hazard detected in this frame.',
+    DateTime? timestamp,
+  }) {
+    return CivicAiDetection(
+      category: ReportCategory.other,
+      confidence: 0.0,
+      severity: Severity.low,
+      title: 'No Civic Hazard Detected',
+      description: reason,
+      titleMl: 'സിവിക് തകരാറുകൾ ഒന്നും കണ്ടെത്തിയില്ല',
+      descriptionMl: reason,
+      isSteady: true,
+      isHazardDetected: false,
+      noHazardReason: reason,
+      timestamp: timestamp ?? DateTime.now(),
+      visualEvidenceTags: const ['no_hazard'],
+    );
+  }
+
   /// True if confidence is high enough for automatic lock & capture (>= 85%).
-  bool get isHighConfidence => confidence >= 0.85;
+  bool get isHighConfidence => isHazardDetected && confidence >= 0.85;
 
   CivicAiDetection copyWith({
     ReportCategory? category,
@@ -44,6 +70,8 @@ class CivicAiDetection {
     List<String>? visualEvidenceTags,
     DateTime? timestamp,
     bool? isSteady,
+    bool? isHazardDetected,
+    String? noHazardReason,
   }) {
     return CivicAiDetection(
       category: category ?? this.category,
@@ -57,6 +85,8 @@ class CivicAiDetection {
       visualEvidenceTags: visualEvidenceTags ?? this.visualEvidenceTags,
       timestamp: timestamp ?? this.timestamp,
       isSteady: isSteady ?? this.isSteady,
+      isHazardDetected: isHazardDetected ?? this.isHazardDetected,
+      noHazardReason: noHazardReason ?? this.noHazardReason,
     );
   }
 }

@@ -140,6 +140,10 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
 
   Future<void> _initPermissionsAndCamera() async {
     final status = await Permission.camera.request();
+    // Ensure location permission is requested and warmed up
+    await const LocationService().ensurePermission();
+    _fetchLocation();
+
     if (status.isGranted) {
       setState(() {
         _permissionDenied = false;
@@ -216,17 +220,28 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
     if (_isDeviceSteady) {
       _steadyTicks++;
       // Progress increment per 250ms tick:
-      // - Standard steady hold: 0.08 (~3.1s to 100%)
-      // - Targeted category mode: 0.10 (~2.5s to 100%)
-      // - NIM live detection confirmed: 0.18 (~1.4s to 100%)
-      final double step = (_currentDetection != null && _currentDetection!.confidence >= 0.50)
-          ? 0.18
-          : (_targetedCategory != null ? 0.10 : 0.08);
+      // - In Auto mode: only advance steady lock if a hazard is detected by live scan!
+      //   If no hazard is detected (e.g. laptop on table), do NOT auto-capture into a false positive!
+      // - In Targeted Category mode: advance steady lock because user is explicitly targeting that hazard.
+      final bool hasLiveHazard = _currentDetection != null &&
+          _currentDetection!.isHazardDetected &&
+          _currentDetection!.confidence >= 0.45;
 
-      _steadyLockProgress = (_steadyLockProgress + step).clamp(0.0, 1.0);
+      final double step = hasLiveHazard
+          ? 0.18
+          : (_targetedCategory != null ? 0.10 : 0.0);
+
+      if (step > 0) {
+        _steadyLockProgress = (_steadyLockProgress + step).clamp(0.0, 1.0);
+      } else {
+        // No hazard in Auto mode - decay steady lock progress back to 0
+        if (_steadyLockProgress > 0) {
+          _steadyLockProgress = (_steadyLockProgress - 0.15).clamp(0.0, 1.0);
+        }
+      }
       if (mounted) setState(() {});
 
-      if (_steadyTicks % 4 == 0) {
+      if (_steadyTicks % 4 == 0 && step > 0) {
         DebugLogger.instance.log(
           'STEADY',
           'Aim steady: g=${_currentGForce.toStringAsFixed(3)}, progress=${(_steadyLockProgress * 100).toInt()}%, ticks=$_steadyTicks',
@@ -334,6 +349,19 @@ class _CivicAiCameraScreenState extends ConsumerState<CivicAiCameraScreen>
         'CAPTURE',
         'Classification complete: ${finalDetection.category.wire} (conf: ${finalDetection.confidence})',
       );
+
+      // Ensure we have a fresh, accurate GPS position before opening review sheet
+      if (_currentPosition == null) {
+        try {
+          _currentPosition = await const LocationService().current(timeout: const Duration(seconds: 3));
+          if (_currentPosition != null && _currentAddress == null) {
+            _currentAddress = await OlaMapsService.instance.reverseGeocode(
+              lat: _currentPosition!.latitude,
+              lng: _currentPosition!.longitude,
+            );
+          }
+        } catch (_) {}
+      }
 
       final payload = CivicAiCapturePayload(
         photoPath: photo.path,
