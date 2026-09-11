@@ -20,6 +20,7 @@ class VoiceIntentParserService {
   Future<VoiceReportPayload> parseTranscript(
     String transcript, {
     VoiceReportMode? forcedMode,
+    CommunityPostType? forcedCommunityType,
     VoiceLanguage language = VoiceLanguage.auto,
     bool enableAiRefinement = false,
   }) async {
@@ -27,6 +28,7 @@ class VoiceIntentParserService {
     if (cleanText.isEmpty) {
       return VoiceReportPayload(
         mode: forcedMode ?? VoiceReportMode.civic,
+        communityType: forcedCommunityType ?? CommunityPostType.general,
         title: 'Spoken Complaint',
         description: 'No speech content recorded.',
         rawTranscript: transcript,
@@ -47,7 +49,7 @@ class VoiceIntentParserService {
         payload = _extractLostFoundSlots(cleanText, language);
         break;
       case VoiceReportMode.community:
-        payload = _extractCommunitySlots(cleanText, language);
+        payload = _extractCommunitySlots(cleanText, language, forcedType: forcedCommunityType);
         break;
     }
 
@@ -253,31 +255,64 @@ class VoiceIntentParserService {
   }
 
   /// Extracts Community post type, title, and body.
-  VoiceReportPayload _extractCommunitySlots(String text, VoiceLanguage lang) {
+  VoiceReportPayload _extractCommunitySlots(
+    String text,
+    VoiceLanguage lang, {
+    CommunityPostType? forcedType,
+  }) {
     final lower = text.toLowerCase();
-    CommunityPostType type = CommunityPostType.general;
+    CommunityPostType type = forcedType ?? CommunityPostType.general;
     final List<String> tags = [];
 
-    if (_containsAny(lower, ['poll', 'vote', 'survey', 'opinion', 'വോട്ട്', 'പോൾ', 'അഭിപ്രായം', 'मतदान', 'राय'])) {
-      type = CommunityPostType.poll;
-      tags.addAll(['poll', 'community_voice']);
-    } else if (_containsAny(lower, ['announcement', 'notice', 'alert', 'information', 'അറിയിപ്പ്', 'ശ്രദ്ധിക്കുക', 'വിവരം', 'घोषणा', 'सूचना'])) {
-      type = CommunityPostType.announcement;
-      tags.addAll(['announcement', 'official']);
-    } else if (_containsAny(lower, ['job', 'hiring', 'work', 'plumber needed', 'mechanic', 'maid', 'ജോലി', 'പ്ലംബർ', 'ആവശ്യമുണ്ട്', 'नौकरी', 'काम'])) {
-      type = CommunityPostType.job;
-      tags.addAll(['jobs', 'services']);
-    } else {
-      type = CommunityPostType.general;
-      tags.addAll(['neighbourhood', 'discussion']);
+    if (forcedType == null) {
+      if (_containsAny(lower, [
+        'poll', 'vote', 'survey', 'opinion', 'voting',
+        'വോട്ട്', 'പോൾ', 'അഭിപ്രായം', 'വോട്ടെടുപ്പ്',
+        'मतदान', 'राय', 'वोट', 'पोल'
+      ])) {
+        type = CommunityPostType.poll;
+      } else if (_containsAny(lower, [
+        'announcement', 'notice', 'alert', 'information', 'meeting', 'event',
+        'cleanliness drive', 'circular', 'warning', 'news',
+        'അറിയിപ്പ്', 'ശ്രദ്ധിക്കുക', 'വിവരം', 'യോഗം', 'കൂട്ടായ്മ', 'ക്ലീനിംഗ്', 'പരിപാടി',
+        'घोषणा', 'सूचना', 'बैठक', 'कार्यक्रम', 'सफाई अभियान'
+      ])) {
+        type = CommunityPostType.announcement;
+      } else if (_containsAny(lower, [
+        'job', 'hiring', 'work', 'plumber', 'electrician', 'mechanic', 'maid',
+        'driver', 'carpenter', 'painter', 'cook', 'service needed', 'help needed', 'vacancy',
+        'ജോലി', 'പ്ലംബർ', 'ഇലക്ട്രീഷ്യൻ', 'ഡ്രൈവർ', 'ആവശ്യമുണ്ട്', 'സഹായം', 'തൊഴിൽ',
+        'नौकरी', 'काम', 'इलेक्ट्रीशियन', 'प्लंबर', 'मदद', 'चालक'
+      ])) {
+        type = CommunityPostType.job;
+      } else {
+        type = CommunityPostType.general;
+      }
+    }
+
+    switch (type) {
+      case CommunityPostType.poll:
+        tags.addAll(['poll', 'community_voice']);
+        break;
+      case CommunityPostType.announcement:
+        tags.addAll(['announcement', 'official', 'alert']);
+        break;
+      case CommunityPostType.job:
+        tags.addAll(['jobs', 'services', 'neighbourhood_help']);
+        break;
+      case CommunityPostType.general:
+        tags.addAll(['neighbourhood', 'discussion']);
+        break;
     }
 
     final landmark = _extractLandmark(text);
-    String title = text.length > 50 ? '${text.substring(0, 48)}...' : text;
-    if (type == CommunityPostType.announcement) {
+    String title = text.length > 60 ? '${text.substring(0, 57)}...' : text;
+    if (type == CommunityPostType.announcement && !title.toLowerCase().startsWith('announcement:')) {
       title = 'Announcement: $title';
-    } else if (type == CommunityPostType.poll) {
+    } else if (type == CommunityPostType.poll && !title.toLowerCase().startsWith('poll:')) {
       title = 'Poll: $title';
+    } else if (type == CommunityPostType.job && !title.toLowerCase().startsWith('job:')) {
+      title = 'Job/Service: $title';
     }
 
     return VoiceReportPayload(

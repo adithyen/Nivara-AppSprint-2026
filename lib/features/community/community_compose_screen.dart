@@ -402,6 +402,7 @@ class _CommunityComposeScreenState
               alignment: Alignment.centerRight,
               child: VoiceDictationButton(
                 mode: VoiceReportMode.community,
+                initialCommunityType: _type,
                 isCompact: true,
                 tooltip: NivaraStrings.tr('compose_voice_dictate', currentLang),
                 onPayloadReceived: (payload) {

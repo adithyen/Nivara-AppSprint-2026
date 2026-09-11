@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme.dart';
+import '../../../models/enums.dart';
 import '../models/voice_reporting_models.dart';
 import 'voice_reporting_sheet.dart';
 
@@ -9,6 +10,7 @@ import 'voice_reporting_sheet.dart';
 /// Implements Emil Kowalski scale-down spring bounce on tap.
 class VoiceDictationButton extends StatefulWidget {
   final VoiceReportMode mode;
+  final CommunityPostType? initialCommunityType;
   final String? tooltip;
   final Function(VoiceReportPayload)? onPayloadReceived;
   final bool isCompact;
@@ -16,6 +18,7 @@ class VoiceDictationButton extends StatefulWidget {
   const VoiceDictationButton({
     super.key,
     required this.mode,
+    this.initialCommunityType,
     this.tooltip,
     this.onPayloadReceived,
     this.isCompact = false,
@@ -58,6 +61,7 @@ class _VoiceDictationButtonState extends State<VoiceDictationButton>
     showVoiceReportingSheet(
       context,
       initialMode: widget.mode,
+      initialCommunityType: widget.initialCommunityType,
       onPayloadReady: widget.onPayloadReceived,
     );
   }

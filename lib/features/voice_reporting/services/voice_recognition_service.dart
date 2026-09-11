@@ -91,7 +91,8 @@ class VoiceRecognitionService {
 
   void _scheduleAutoResume() {
     _resumeDebounceTimer?.cancel();
-    _resumeDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+    if (!_isListening) return;
+    _resumeDebounceTimer = Timer(const Duration(milliseconds: 300), () {
       if (_isListening && !_speech.isListening) {
         // Commit current phrase to accumulated buffer
         if (_currentSessionText.trim().isNotEmpty) {
@@ -105,41 +106,13 @@ class VoiceRecognitionService {
     });
   }
 
-  /// Resolves the optimal installed locale on the device.
-  Future<String?> _resolveLocale(VoiceLanguage language) async {
-    try {
-      final systemLoc = await _speech.systemLocale();
-      final locales = await _speech.locales();
-
-      if (language == VoiceLanguage.auto) {
-        return systemLoc?.localeId;
-      }
-
-      final targetClean = language.localeId.toLowerCase().replaceAll('-', '_');
-      final targetPrefix = targetClean.split('_').first;
-
-      // 1. Exact match (e.g. en_in, ml_in, hi_in)
-      for (final loc in locales) {
-        final clean = loc.localeId.toLowerCase().replaceAll('-', '_');
-        if (clean == targetClean) {
-          return loc.localeId;
-        }
-      }
-
-      // 2. Language prefix match (e.g. any en_* like en_US, en_GB)
-      for (final loc in locales) {
-        final clean = loc.localeId.toLowerCase().replaceAll('-', '_');
-        if (clean.startsWith(targetPrefix)) {
-          return loc.localeId;
-        }
-      }
-
-      // 3. Fallback to system locale
-      return systemLoc?.localeId;
-    } catch (e) {
-      debugPrint('[VoiceRecognitionService] Error resolving locale: $e');
+  /// Resolves the optimal speech locale immediately without blocking broadcasts.
+  String? _resolveLocale(VoiceLanguage language) {
+    if (language == VoiceLanguage.auto) {
+      // Return null so Android SpeechRecognizer uses the device default system locale immediately!
       return null;
     }
+    return language.localeId;
   }
 
   /// Starts listening to microphone input in the specified language.
@@ -172,11 +145,14 @@ class VoiceRecognitionService {
     if (!_isListening) return false;
 
     try {
-      final resolvedLocale = await _resolveLocale(_activeLanguage);
-      debugPrint('[VoiceRecognitionService] Starting listen (lang: ${_activeLanguage.name}, localeId: $resolvedLocale)');
+      final localeId = _resolveLocale(_activeLanguage);
+      debugPrint('[VoiceRecognitionService] Starting listen (lang: ${_activeLanguage.name}, localeId: $localeId)');
+
+      _resumeDebounceTimer?.cancel();
 
       await _speech.listen(
         onResult: (result) {
+          debugPrint('[VoiceRecognitionService] onResult: "${result.recognizedWords}", final: ${result.finalResult}');
           _currentSessionText = result.recognizedWords;
           final fullText = _accumulatedText.isEmpty
               ? _currentSessionText
@@ -185,18 +161,18 @@ class VoiceRecognitionService {
           _activeOnResult?.call(fullText, result.finalResult);
 
           if (result.finalResult) {
-            _accumulatedText = fullText;
+            _accumulatedText = fullText.trim();
             _currentSessionText = '';
           }
         },
         onSoundLevelChange: _activeOnSoundLevel,
         listenOptions: stt.SpeechListenOptions(
           partialResults: true,
-          cancelOnError: false, // Don't abort on transient pauses
-          listenMode: stt.ListenMode.dictation,
-          localeId: resolvedLocale,
+          cancelOnError: false,
+          listenMode: stt.ListenMode.confirmation,
+          localeId: localeId,
           listenFor: const Duration(seconds: 90),
-          pauseFor: const Duration(seconds: 8), // 8 seconds breathing room
+          pauseFor: const Duration(seconds: 4),
         ),
       );
 
@@ -227,21 +203,5 @@ class VoiceRecognitionService {
     await _speech.cancel();
     _state = VoiceState.idle;
     _activeOnStateChanged?.call(_state);
-  }
-
-  /// Simulates speech input for testing or platforms without active speech recognition hardware.
-  Future<void> simulateDictation({
-    required String text,
-    required Function(String text, bool isFinal) onResult,
-    Function(double soundLevel)? onSoundLevel,
-  }) async {
-    final words = text.split(' ');
-    String current = '';
-    for (int i = 0; i < words.length; i++) {
-      await Future.delayed(const Duration(milliseconds: 140));
-      current += (i == 0 ? '' : ' ') + words[i];
-      onSoundLevel?.call((i % 5 + 3) * 1.6);
-      onResult(current, i == words.length - 1);
-    }
   }
 }

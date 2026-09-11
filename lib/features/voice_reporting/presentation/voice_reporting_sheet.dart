@@ -29,6 +29,7 @@ import 'voice_visualizer_orb.dart';
 Future<void> showVoiceReportingSheet(
   BuildContext context, {
   VoiceReportMode? initialMode,
+  CommunityPostType? initialCommunityType,
   Function(VoiceReportPayload)? onPayloadReady,
 }) {
   return showModalBottomSheet(
@@ -37,6 +38,7 @@ Future<void> showVoiceReportingSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => VoiceReportingSheet(
       initialMode: initialMode,
+      initialCommunityType: initialCommunityType,
       onPayloadReady: onPayloadReady,
     ),
   );
@@ -47,11 +49,13 @@ Future<void> showVoiceReportingSheet(
 /// Civic, Lost & Found, and Community reporting workflows.
 class VoiceReportingSheet extends ConsumerStatefulWidget {
   final VoiceReportMode? initialMode;
+  final CommunityPostType? initialCommunityType;
   final Function(VoiceReportPayload)? onPayloadReady;
 
   const VoiceReportingSheet({
     super.key,
     this.initialMode,
+    this.initialCommunityType,
     this.onPayloadReady,
   });
 
@@ -61,6 +65,7 @@ class VoiceReportingSheet extends ConsumerStatefulWidget {
 
 class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   late VoiceReportMode _mode;
+  late CommunityPostType _selectedCommunityType;
   VoiceLanguage _language = VoiceLanguage.auto;
   VoiceState _voiceState = VoiceState.idle;
   double _soundLevel = 0.0;
@@ -81,6 +86,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   void initState() {
     super.initState();
     _mode = widget.initialMode ?? VoiceReportMode.civic;
+    _selectedCommunityType = widget.initialCommunityType ?? CommunityPostType.general;
     _transcriptController = TextEditingController();
     _transcriptFocusNode = FocusNode();
 
@@ -139,13 +145,11 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         if (!mounted) return;
         _liveTranscript = text;
 
-        // Auto-type words into the text box if the user isn't typing manually
-        if (!_transcriptFocusNode.hasFocus) {
-          _transcriptController.value = TextEditingValue(
-            text: text,
-            selection: TextSelection.collapsed(offset: text.length),
-          );
-        }
+        // Auto-update controller directly so real spoken words appear in the text field immediately
+        _transcriptController.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
         setState(() {});
 
         if (text.trim().isNotEmpty) {
@@ -153,6 +157,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
           final payload = await parser.parseTranscript(
             text,
             forcedMode: _mode,
+            forcedCommunityType: _mode == VoiceReportMode.community ? _selectedCommunityType : null,
             language: _language,
             enableAiRefinement: isFinal,
           );
@@ -161,6 +166,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
               _parsedPayload = payload;
               if (payload.mode != _mode && widget.initialMode == null) {
                 _mode = payload.mode;
+              }
+              if (_mode == VoiceReportMode.community) {
+                _selectedCommunityType = payload.communityType;
               }
             });
           }
@@ -184,6 +192,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         final payload = await parser.parseTranscript(
           val,
           forcedMode: _mode,
+          forcedCommunityType: _mode == VoiceReportMode.community ? _selectedCommunityType : null,
           language: _language,
           enableAiRefinement: false,
         );
@@ -192,6 +201,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             _parsedPayload = payload;
             if (payload.mode != _mode && widget.initialMode == null) {
               _mode = payload.mode;
+            }
+            if (_mode == VoiceReportMode.community) {
+              _selectedCommunityType = payload.communityType;
             }
           });
         }
@@ -229,46 +241,6 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     }
   }
 
-  Future<void> _runSimulation(String sampleText) async {
-    setState(() {
-      _liveTranscript = sampleText;
-      _transcriptController.text = sampleText;
-      _voiceState = VoiceState.listening;
-    });
-
-    await ref.read(voiceRecognitionServiceProvider).simulateDictation(
-      text: sampleText,
-      onSoundLevel: (level) {
-        if (mounted) setState(() => _soundLevel = level);
-      },
-      onResult: (text, isFinal) async {
-        if (!mounted) return;
-        _liveTranscript = text;
-        _transcriptController.text = text;
-        setState(() {});
-
-        if (text.trim().isNotEmpty) {
-          final parser = ref.read(voiceIntentParserServiceProvider);
-          final payload = await parser.parseTranscript(
-            text,
-            forcedMode: _mode,
-            language: _language,
-            enableAiRefinement: isFinal,
-          );
-          if (mounted) {
-            setState(() {
-              _parsedPayload = payload;
-              if (payload.mode != _mode && widget.initialMode == null) {
-                _mode = payload.mode;
-              }
-              if (isFinal) _voiceState = VoiceState.completed;
-            });
-          }
-        }
-      },
-    );
-  }
-
   Future<void> _submit1Tap() async {
     final text = _transcriptController.text.trim();
     if (text.isEmpty) return;
@@ -278,6 +250,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
       _parsedPayload = await parser.parseTranscript(
         text,
         forcedMode: _mode,
+        forcedCommunityType: _mode == VoiceReportMode.community ? _selectedCommunityType : null,
         language: _language,
         enableAiRefinement: false,
       );
@@ -458,13 +431,13 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         case VoiceReportMode.community:
           final postMap = {
             'user_id': uid,
-            'post_type': _parsedPayload!.communityType.wire,
-            'title': _parsedPayload!.title,
-            'body': _parsedPayload!.description,
+            'post_type': _selectedCommunityType.wire,
+            'title': _parsedPayload?.title ?? _liveTranscript,
+            'body': _parsedPayload?.description ?? _liveTranscript,
             if (photoUrls != null && photoUrls.isNotEmpty) 'photo_urls': photoUrls,
             'lat': _currentPosition?.latitude ?? kDefaultLat,
             'lng': _currentPosition?.longitude ?? kDefaultLng,
-            'location_label': _parsedPayload!.extractedLandmark ?? _currentAddress,
+            'location_label': _parsedPayload?.extractedLandmark ?? _currentAddress,
             'created_at': DateTime.now().toIso8601String(),
           };
           await supabase.from(kTableCommunityPosts).insert(postMap);
@@ -498,10 +471,10 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   }
 
   void _openInFullForm() {
-    if (_parsedPayload == null) return;
+    if (_parsedPayload == null && _liveTranscript.trim().isEmpty) return;
     Navigator.of(context).pop();
 
-    if (widget.onPayloadReady != null) {
+    if (widget.onPayloadReady != null && _parsedPayload != null) {
       widget.onPayloadReady!(_parsedPayload!);
       return;
     }
@@ -511,11 +484,11 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         context.push(
           '/report',
           extra: {
-            'category': _parsedPayload!.civicCategory,
-            'title': _parsedPayload!.title,
-            'description': _parsedPayload!.description,
-            'severity': _parsedPayload!.severity,
-            'address': _parsedPayload!.extractedLandmark ?? _currentAddress,
+            'category': _parsedPayload?.civicCategory,
+            'title': _parsedPayload?.title ?? _liveTranscript,
+            'description': _parsedPayload?.description ?? _liveTranscript,
+            'severity': _parsedPayload?.severity ?? Severity.medium,
+            'address': _parsedPayload?.extractedLandmark ?? _currentAddress,
             'lat': _currentPosition?.latitude ?? kDefaultLat,
             'lng': _currentPosition?.longitude ?? kDefaultLng,
             if (_attachedPhotoPath != null) 'photoPath': _attachedPhotoPath,
@@ -525,7 +498,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         break;
 
       case VoiceReportMode.lostFound:
-        if (_parsedPayload!.lfItemType == LFItemType.lost) {
+        if ((_parsedPayload?.lfItemType ?? LFItemType.lost) == LFItemType.lost) {
           context.push('/lostfound/lost');
         } else {
           context.push('/lostfound/found');
@@ -533,7 +506,16 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         break;
 
       case VoiceReportMode.community:
-        context.push('/community/compose');
+        context.push(
+          '/community/compose',
+          extra: {
+            'type': _selectedCommunityType,
+            'title': _parsedPayload?.title ?? _liveTranscript,
+            'body': _parsedPayload?.description ?? _liveTranscript,
+            'description': _parsedPayload?.description ?? _liveTranscript,
+            'address': _parsedPayload?.extractedLandmark ?? _currentAddress,
+          },
+        );
         break;
     }
   }
@@ -678,7 +660,12 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                           if (_liveTranscript.isNotEmpty) {
                             ref
                                 .read(voiceIntentParserServiceProvider)
-                                .parseTranscript(_liveTranscript, forcedMode: mode, language: _language)
+                                .parseTranscript(
+                                  _liveTranscript,
+                                  forcedMode: mode,
+                                  forcedCommunityType: mode == VoiceReportMode.community ? _selectedCommunityType : null,
+                                  language: _language,
+                                )
                                 .then((p) => setState(() => _parsedPayload = p));
                           }
                         });
@@ -725,7 +712,11 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
               ),
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
+
+            // Community Post Category Selector Prompt Card (When Community Mode is active)
+            if (_mode == VoiceReportMode.community)
+              _buildCommunityCategoryPrompt(isDark, scheme),
 
             // Pulsing Voice Orb & Sound Visualizer
             Center(
@@ -741,9 +732,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             // Status Caption
             Center(
               child: Text(
-                _voiceState == VoiceState.listening
-                    ? 'Listening... speak your issue naturally'
-                    : 'Tap microphone to speak or resume',
+                _getStatusCaption(),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -791,6 +780,39 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                               color: scheme.onSurfaceVariant,
                             ),
                           ),
+                          if (_voiceState == VoiceState.listening) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FFCC).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF00FFCC).withValues(alpha: 0.5)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF00FFCC),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'REC',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF00FFCC),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       if (_transcriptController.text.isNotEmpty)
@@ -838,7 +860,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                       height: 1.4,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Speak or type here... (e.g. "Huge pothole near East Fort bus stand with water leaking")',
+                      hintText: _getTranscriptHint(),
                       hintStyle: TextStyle(
                         fontSize: 13,
                         fontStyle: FontStyle.italic,
@@ -946,20 +968,6 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             // Photo Proof Evidence Section
             _buildPhotoProofSection(isDark, scheme),
 
-            // Quick Demo Chips
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 30,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _buildDemoChip('Huge pothole near East Fort junction'),
-                  _buildDemoChip('കിഴക്കേകോട്ടയിൽ വാലറ്റ് നഷ്ടപ്പെട്ടു'),
-                  _buildDemoChip('Ward 12 cleanliness drive this Sunday'),
-                ],
-              ),
-            ),
-
             const SizedBox(height: 18),
 
             // Action Buttons
@@ -1033,30 +1041,165 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     );
   }
 
-  Widget _buildDemoChip(String text) {
-    return GestureDetector(
-      onTap: () => _runSimulation(text),
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.play_arrow_rounded, size: 14, color: Color(0xFF00FFCC)),
-            const SizedBox(width: 4),
-            Text(
-              text,
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ],
+  Widget _buildCommunityCategoryPrompt(bool isDark, ColorScheme scheme) {
+    final categories = [
+      (CommunityPostType.announcement, Icons.campaign_rounded, 'Announcement', 'അറിയിപ്പ്', const Color(0xFF00FFCC)),
+      (CommunityPostType.poll, Icons.poll_rounded, 'Poll', 'പോൾ', const Color(0xFFFFB703)),
+      (CommunityPostType.job, Icons.work_rounded, 'Job / Service', 'ജോലി/സേവനം', const Color(0xFF00B4D8)),
+      (CommunityPostType.general, Icons.forum_rounded, 'General Post', 'പൊതു പോസ്റ്റ്', NivaraColors.primary),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131F37) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: NivaraColors.primary.withValues(alpha: 0.35),
+          width: 1.2,
         ),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: NivaraColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.help_outline_rounded, size: 14, color: NivaraColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Which category of community post?',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Select below or speak your category (Announcement, Poll, Job, General):',
+            style: TextStyle(
+              fontSize: 11,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: categories.map((cat) {
+              final isSelected = _selectedCommunityType == cat.$1;
+              final color = cat.$5;
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _selectedCommunityType = cat.$1;
+                    if (_liveTranscript.isNotEmpty) {
+                      ref.read(voiceIntentParserServiceProvider).parseTranscript(
+                        _liveTranscript,
+                        forcedMode: VoiceReportMode.community,
+                        forcedCommunityType: cat.$1,
+                        language: _language,
+                      ).then((p) {
+                        if (mounted) setState(() => _parsedPayload = p);
+                      });
+                    }
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? color.withValues(alpha: isDark ? 0.25 : 0.15)
+                        : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? color : (isDark ? Colors.white12 : Colors.black12),
+                      width: isSelected ? 1.8 : 1.0,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.25),
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(cat.$2, size: 14, color: isSelected ? color : scheme.onSurfaceVariant),
+                      const SizedBox(width: 5),
+                      Text(
+                        _language == VoiceLanguage.ml ? cat.$4 : cat.$3,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected ? (isDark ? Colors.white : color) : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.check_circle_rounded, size: 13, color: color),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
+  }
+
+  String _getStatusCaption() {
+    if (_voiceState == VoiceState.listening) {
+      if (_mode == VoiceReportMode.community) {
+        return 'Listening... speak your ${_selectedCommunityType.label} naturally';
+      } else if (_mode == VoiceReportMode.lostFound) {
+        return 'Listening... speak what was lost or found';
+      } else {
+        return 'Listening... speak your civic issue naturally';
+      }
+    } else {
+      if (_mode == VoiceReportMode.community) {
+        return 'Tap microphone to speak ${_selectedCommunityType.label}';
+      } else {
+        return 'Tap microphone to speak or resume';
+      }
+    }
+  }
+
+  String _getTranscriptHint() {
+    if (_mode == VoiceReportMode.civic) {
+      return 'Speak your issue naturally... (e.g. "Huge pothole near East Fort bus stand with water leaking")';
+    } else if (_mode == VoiceReportMode.lostFound) {
+      return 'Speak what was lost or found... (e.g. "Lost brown leather wallet near Museum junction with ID card")';
+    } else {
+      switch (_selectedCommunityType) {
+        case CommunityPostType.announcement:
+          return 'Speak your announcement... (e.g. "Water supply maintenance this Sunday from 9 AM to 2 PM")';
+        case CommunityPostType.poll:
+          return 'Speak your poll question and choices... (e.g. "Should we fix the park swings? Yes, No")';
+        case CommunityPostType.job:
+          return 'Speak job or service needed... (e.g. "Need experienced electrician for house wiring in Kowdiar")';
+        case CommunityPostType.general:
+          return 'Speak your community discussion or question for neighbours...';
+      }
+    }
   }
 
   Widget _buildPhotoProofSection(bool isDark, ColorScheme scheme) {
