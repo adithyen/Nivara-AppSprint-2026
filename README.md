@@ -271,10 +271,10 @@ https://youtube.com/watch?v=YOUR_DEMO_VIDEO_LINK
 
 The production-ready, signed release APK is built and hosted directly on GitHub Releases:
 
-🔗 **[Download Nivara v1.0.60 Release APK (Latest)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.60)**
+🔗 **[Download Nivara v1.0.63 Release APK (Latest)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/)**
 
 ```
-Release Version : 1.0.60 (Build 60)
+Release Version : 1.0.63 (Build 63)
 Artifact Name   : app-release.apk
 File Size       : ~105.9 MB
 Target Platform : Android 7.0+ (API Level 24 to 34)
