@@ -44,7 +44,7 @@
 
 | Name | Role | Contact & Profiles |
 |---|---|---|
-| **Adithyan H** | Lead Full-Stack Architect, AI & Mobile Systems Engineer | [GitHub](https://github.com/adithyen) · [Email](mailto:adityenh@gmail.com) |
+| **Adithyan H** | Developer | [GitHub](https://github.com/adithyen) · [Email](mailto:adityenh@gmail.com) |
 
 ## Challenge Track
 
@@ -510,10 +510,14 @@ Lost identity credentials require zero-trust physical return protocols:
 # 🔮 Future Improvements & Scalability
 
 * [ ] **DigiLocker-Based Verified Profile Login**: Integrate DigiLocker / MeriPehchan authentication for verified profile creation, ensuring only authenticated citizens and municipal staff can access verified voting, official triage, and anti-fraud civic actions.
+* [ ] **Citizen Civic Rewards & Municipal Perks**: Convert earned Civic XP points into tangible municipal incentives — such as property tax rebates, subsidized public transit passes, and monthly "Top Ward Contributor" recognition badges.
+* [ ] **Municipal Field Worker Awards & Merit Badges**: Monthly merit recognition system for top-performing municipal field crews and volunteers based on community confirmation scores, resolution speed, and photographic remediation quality.
+* [ ] **Instant Gig-Worker Direct Payouts (DBT / UPI)**: Direct Benefit Transfer (DBT) and UPI escrow payouts for verified community contractors and freelance workers upon 3-citizen confirmation of completed remediation tasks.
 * [ ] **Municipal ERP & Smart City Portal Sync**: Direct two-way API connectors to synchronize Nivara field dispatches with existing government grievance redressal systems (e.g., CPGRAMS, Kerala CM Helpline, Smart City ICCC dashboards).
 * [ ] **WhatsApp & SMS Grievance Bridge**: Enable citizens without app storage or feature-phone users to submit voice notes/photos and receive complaint status alerts directly via WhatsApp and SMS in regional languages.
-* [ ] **Predictive Asphalt Wear Analytics**: Aggregate recurring micro-vibration clusters across commute routes to identify deteriorating road patches before severe potholes form.
-
+* [ ] **Public Transit & Bus Telemetry**: Partner with municipal transport corporations to install Nivara SensorWatch background daemons on city buses for continuous, whole-city road quality heatmaps.
+* [ ] **Web3 Municipal Remediation Bounty Contracts**: Escrow municipal repair funds in transparent smart contracts that disburse payments to certified contractors only upon validated community confirmation.
+* [ ] **Offline Bluetooth Mesh Network**: Allow citizens in zero-cellular disaster areas to relay emergency hazard alerts across peer-to-peer device mesh networks.
 ---
 
 # 📊 Impact & Social Value
