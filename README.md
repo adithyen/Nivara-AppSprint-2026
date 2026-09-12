@@ -136,9 +136,10 @@ graph TD
 ---
 
 ### 🌐 1. Native Multilingual Experience (App Language)
-* **Persistent Bilingual UI**: Seamless one-tap toggle between **English** and **Malayalam (`മലയാളം`)** (`AppLanguage.en` / `AppLanguage.ml`) with instant state propagation across all tabs without app restarts.
-* **Authentic Terminology**: Complete localization covering all 19 civic hazard categories, severity ratings, forms, and dialogs.
-* **Bilingual AI Processing**: Speech-to-Text (`ml-IN`) and NVIDIA NIM Vision models understand regional Malayalam vernacular and generate localized titles and descriptions alongside English summaries.
+* **Persistent Tri-Lingual UI**: Seamless one-tap toggle between **English**, **Hindi (`हिंदी`)**, and **Malayalam (`മലയാളം`)** (`AppLanguage.en` / `AppLanguage.hi` / `AppLanguage.ml`) with instant reactive state propagation across all tabs without app restarts.
+* **Authentic Regional Terminology**: Complete localization covering all 19 civic hazard categories, severity ratings, forms, community polls, and system dialogs in English, Hindi, and Malayalam.
+* **Multilingual AI Processing**: Speech-to-Text (`en-IN`, `hi-IN`, `ml-IN`) and NVIDIA NIM Vision models understand regional vernacular and generate localized titles and descriptions alongside English summaries.
+* **Pan-Indian Inclusivity**: Dedicated language portal supporting all 22 recognized official languages of India with native typography and search.
 
 ---
 
