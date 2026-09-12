@@ -509,10 +509,10 @@ Lost identity credentials require zero-trust physical return protocols:
 
 # 🔮 Future Improvements & Scalability
 
-* [ ] **Automated Municipal Drone Dispatch**: Integrate autonomous drone survey APIs to capture aerial photogrammetry of reported flood zones and landslides.
-* [ ] **Public Transit & Bus Telemetry**: Partner with municipal transport corporations to install Nivara SensorWatch background daemons on city buses for continuous, whole-city road quality heatmaps.
-* [ ] **Web3 Municipal Remediation Bounty Contracts**: Escrow municipal repair funds in transparent smart contracts that disburse payments to certified contractors only upon validated community confirmation.
-* [ ] **Offline Bluetooth Mesh Network**: Allow citizens in zero-cellular disaster areas to relay emergency hazard alerts across peer-to-peer device mesh networks.
+* [ ] **DigiLocker-Based Verified Profile Login**: Integrate DigiLocker / MeriPehchan authentication for verified profile creation, ensuring only authenticated citizens and municipal staff can access verified voting, official triage, and anti-fraud civic actions.
+* [ ] **Municipal ERP & Smart City Portal Sync**: Direct two-way API connectors to synchronize Nivara field dispatches with existing government grievance redressal systems (e.g., CPGRAMS, Kerala CM Helpline, Smart City ICCC dashboards).
+* [ ] **WhatsApp & SMS Grievance Bridge**: Enable citizens without app storage or feature-phone users to submit voice notes/photos and receive complaint status alerts directly via WhatsApp and SMS in regional languages.
+* [ ] **Predictive Asphalt Wear Analytics**: Aggregate recurring micro-vibration clusters across commute routes to identify deteriorating road patches before severe potholes form.
 
 ---
 
