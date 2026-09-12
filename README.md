@@ -33,6 +33,10 @@
 
 # 👥 Team Information
 
+<p align="center">
+  <img src="assets/participant.png" alt="App Development Bootcamp - App Sprint Participant Badge" width="100%"/>
+</p>
+
 ## Team Name
 `Team Nivara`
 
@@ -531,6 +535,10 @@ This project is open-source and licensed under the **MIT License**. See the [LIC
 ---
 
 # 🏆 AppSprint Solution Challenge 2026
+
+<p align="center">
+  <img src="assets/participant.png" alt="App Development Bootcamp - App Sprint Participant Badge" width="100%"/>
+</p>
 
 Built with ❤️ and extreme engineering dedication during **AppSprint Solution Challenge 2026**.
 
