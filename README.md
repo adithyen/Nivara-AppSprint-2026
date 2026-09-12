@@ -9,9 +9,9 @@
   <img src="https://img.shields.io/badge/Challenge%20Track-CivicTech-0D9488?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Framework-Flutter%203.x%20%7C%20Dart%203.12-02569B?style=for-the-badge&logo=flutter"/>
   <img src="https://img.shields.io/badge/Backend-Supabase%20%7C%20PostgreSQL%2015-3ECF8E?style=for-the-badge&logo=supabase"/>
-  <img src="https://img.shields.io/badge/AI%20Vision-NVIDIA%20NIM%20%7C%20Llama--3.2--90B-76B900?style=for-the-badge&logo=nvidia"/>
+  <img src="https://img.shields.io/badge/AI%20Vision-NVIDIA%20NIM%20%7C%20Llama--3.2--11B-76B900?style=for-the-badge&logo=nvidia"/>
   <img src="https://img.shields.io/badge/Maps-Ola%20Maps%20Vector-E11D48?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Release-v1.0.60%20(Production)-16A34A?style=for-the-badge&logo=android"/>
+  <img src="https://img.shields.io/badge/Release-v1.0.63%20(Production)-16A34A?style=for-the-badge&logo=android"/>
 </p>
 
 <p align="center">
@@ -21,6 +21,7 @@
 
 <p align="center">
   <a href="#-apk-download"><strong>📦 Download APK</strong></a> ·
+  <a href="#-bonus-point-features-added"><strong>🎁 Bonus Features</strong></a> ·
   <a href="#-key-highlights"><strong>🌟 Key Innovations</strong></a> ·
   <a href="#-solution"><strong>💡 Architecture</strong></a> ·
   <a href="#-features"><strong>✨ Feature Matrix</strong></a> ·
@@ -33,13 +34,13 @@
 # 👥 Team Information
 
 ## Team Name
-`[Team Nivara / Insert Your Team Name]`
+`Team Nivara`
 
 ## Members
 
 | Name | Role | Contact & Profiles |
 |---|---|---|
-| **Adithyan H** | Lead Full-Stack Architect, AI & Mobile Systems Engineer | [GitHub](https://github.com/adithyen) |
+| **Adithyan H** | Lead Full-Stack Architect, AI & Mobile Systems Engineer | [GitHub](https://github.com/adithyen) · [Email](mailto:adityenh@gmail.com) |
 
 ## Challenge Track
 
@@ -117,51 +118,102 @@ graph TD
 
 ---
 
-# ✨ Features
+# ✨ Features & Architectural Matrix
 
-### 🏛️ 1. Civic Hazard & Infrastructure Reporting
-- **19 Granular Civic Categories**: Roads (Potholes, Broken Footpaths, Open Manholes), Utilities (Street Lights, Damaged Poles, Power Outages, Pipe Leaks), Sanitation (Garbage Dumps, Blocked Drains, Open Sewage), Environment (Fallen Trees, Waterlogging), and Public Safety (Stray Animals, Encroachments).
-- **Physical SensorWatch Pothole Auto-Detection**:
-  - Monitors `userAccelerometerEventStream` at 50Hz with gravity removed.
-  - Linear acceleration spike detection ($\ge 2.5g$) with a 1500ms debounce cooldown and 3 km/h GPS jitter deadband.
-  - Generates tamper-proof SHA-256 evidence payload containing raw accelerometer peaks, GPS coordinates, speed, and device metadata.
-- **Continuous AI Voice Assistant**:
-  - Seamless speech recognition in English, Malayalam (`ml-IN`), and Hindi (`hi-IN`).
-  - Interactive transcript text box allowing instant typing, editing, and slot correction.
-  - Auto-extracts category, severity (`LOW`, `MEDIUM`, `HIGH`, `EMERGENCY`), and landmark location.
-  - Mandatory photographic proof validation prior to one-tap submission.
-- **NVIDIA NIM Vision AI Camera**:
-  - Powered by Meta's Llama-3.2-90B Vision Instruct model.
-  - Real-time physical steady-lock stabilization gate (prevents blurry in-motion photos).
-  - On-screen diagnostic console displaying Euler rotation angles, sensor variance, and model inference confidence.
+### 🎁 Bonus Point Features Added
+* **App Store Publication Link**: `<fill it later>` *(Production APK signed and distributed via GitHub Releases & APK Mirror)*
+* **Comprehensive Accessibility Features**:
+  * **Screen Reader & TalkBack Semantics**: Every interactive control, status badge, camera HUD overlay, and map layer is equipped with declarative `Semantics(...)` metadata, providing an effortless experience for visually impaired users.
+  * **Dynamic Typography & Fluid Font Scaling**: Fluid responsive layouts that adapt cleanly to system-level font scaling and text accessibility configurations without truncation or layout clipping.
+  * **High-Contrast Dark Aesthetics (WCAG AAA)**: Precision dark theme (`#0B0F17`, `#162032`) designed with luminous neon accents (`#00FFCC`, `#3ECF8E`, `#F59E0B`), guaranteeing high readability and contrast in direct sunlight or during nighttime transit.
+  * **Emil Kowalski Physical Spring Dynamics & Haptics**: Native tactile feedback pulses (`HapticFeedback.mediumImpact()`, `heavyImpact()`) synchronized with camera steady-lock, voice dictation toggle, and form validation, creating a tangible physical interface.
+  * **Multilingual Text-to-Speech (TTS) Guidance**: Built-in voice synthesis prompts (`flutter_tts`) that read out hazard verification statuses, emergency instructions, and voice assistant responses in regional languages.
+* **Resilient Offline-First Support**:
+  * **Zero-Data-Loss Local Queue**: Powered by `OfflineQueueService` with persistent disk storage (`offline_reports_queue.json`) and local media caching.
+  * **Optimistic Local Execution**: When reports, photo evidence, sensor telemetry, or community votes are generated in cellular dead zones or transit tunnels, they are cached instantly on-device and displayed optimistically.
+  * **Autonomous Background Sync**: As soon as internet connectivity is restored, an autonomous synchronization engine automatically flushes the queue with exponential backoff and retries, preserving original capture timestamps and awarding civic XP retroactively.
 
-### 🔍 2. Proximity Lost & Found Network
-- **PostGIS Spatial Matching**: Automatically pairs opposite-type reports (`LOST` vs. `FOUND`) within a 2,000-metre radius and a 14-day temporal window.
-- **Dynamic Handover Pass (QR / PIN Verification)**:
-  - Eliminates risky public exchanges with mutual in-person cryptographic verification.
-  - Generates a dynamic single-use QR token (`NIVARA-LF-...`) and a random 6-digit PIN.
-  - Private Supabase Realtime broadcast channel (`handover:{claimId}`) automatically syncs verification states between claimant and owner.
-- **Account & Ownership Transparency**: Prominent context cards explicitly show the report creator vs. the currently logged-in account, active claim status, and direct one-tap navigation to personal listings.
+---
 
-### 👷 3. Multi-Role Municipal Dispatch & Field Work
-- **Citizen Portal**: Personal report history, civic score XP gamification, community confirmation voting, and nearby hazard alerts.
-- **Municipal Administrator Console**:
-  - Jurisdiction-based routing (city-wide or ward-level for General, Roads, Sanitation, Water, Electricity, Parks, Enforcement).
-  - Real-time task triage, status lifecycle management (`SUBMITTED` $\rightarrow$ `ACKNOWLEDGED` $\rightarrow$ `IN_PROGRESS` $\rightarrow$ `RESOLVED` $\rightarrow$ `CLOSED`).
-  - Field worker dispatch, staff availability tracking, and citizen worker application reviews.
-- **Field Worker Remediation Mode**:
-  - Dedicated mobile task queue sorted by geographic proximity.
-  - Work progress logging with timestamps, remediation notes, and after-repair photo proof upload.
-  - One-tap shift status toggles (`ACTIVE`, `ON_LEAVE`, `RESIGNED`).
+### 🌐 1. Native Multilingual Experience (App Language)
+* **Persistent Bilingual UI**: Seamless one-tap toggle between **English** and **Malayalam (`മലയാളം`)** (`AppLanguage.en` / `AppLanguage.ml`) with instant state propagation across all tabs without app restarts.
+* **Authentic Terminology**: Complete localization covering all 19 civic hazard categories, severity ratings, forms, and dialogs.
+* **Bilingual AI Processing**: Speech-to-Text (`ml-IN`) and NVIDIA NIM Vision models understand regional Malayalam vernacular and generate localized titles and descriptions alongside English summaries.
 
-### 🗳️ 4. Community Board & Decentralized Governance
-- **Neighbourhood Civic Feed**: Verified local announcements, community discussions, and municipal emergency advisories.
-- **Anti-Fraud Civic Polls**: Cryptographically secured voter registry preventing duplicate votes; live optimistic vote tallying.
-- **Civic Jobs & Volunteer Requests**: Hyperlocal micro-task boards for neighbourhood clean-up drives, volunteer tree planting, and local services.
+---
 
-### 🔔 5. Real-Time Cross-Role Notifications
-- Native Android notification channels (`civic_alerts`, `work_dispatch`, `community_updates`) with sound and vibration.
-- Automated PostgreSQL database triggers for instant cross-role alerts (admin acknowledgment, worker dispatch, work completion proof, and Lost & Found matches).
+### 🏛️ 2. Civic Hazard & Infrastructure Reporting
+* **19 Granular Civic Categories**: Roads (Potholes, Broken Footpaths, Open Manholes), Utilities (Street Lights, Damaged Poles, Power Outages, Pipe Leaks, Water Shortage), Sanitation (Garbage Dumps, Blocked Drains, Open Sewage), Environment (Fallen Trees, Waterlogging), and Public Safety (Stray Animals, Encroachments, Public Property Damage, Noise Pollution).
+* **Physical SensorWatch Pothole Auto-Detection**:
+  * Monitors `userAccelerometerEventStream` at 50Hz with gravity removed by hardware fusion.
+  * Linear acceleration spike detection ($\ge 2.5g$) with a 1500ms debounce cooldown and 3 km/h GPS jitter deadband.
+  * Generates tamper-proof SHA-256 evidence payload containing raw accelerometer peaks, GPS coordinates, speed, and device metadata.
+* **Continuous AI Voice Assistant**:
+  * Continuous speech recognition in English, Malayalam (`ml-IN`), and Hindi (`hi-IN`) with real-time waveform visualization.
+  * Interactive transcript text box allowing instant typing, editing, and slot correction.
+  * Auto-extracts category, severity (`LOW`, `MEDIUM`, `HIGH`, `EMERGENCY`), and landmark location.
+  * Contextual photo attachment cards (Hazard Photo Proof for Civic, Item Photo for Lost & Found, Post Image for Community).
+* **NVIDIA NIM Vision AI Camera**:
+  * Powered by NVIDIA NIM Vision Instruct (Meta Llama-3.2-11B Vision).
+  * Real-time physical steady-lock stabilization gate (prevents blurry in-motion photos).
+  * **Negative Hazard Detection Guard**: Distinguishes non-civic/indoor scenes (e.g. laptops, study tables, clean rooms) from genuine municipal hazards, alerting users with a clear **"No Civic Hazard Detected"** card and retake prompt instead of forcing false category mappings.
+  * On-screen diagnostic console displaying live sensor variance and model inference confidence.
+
+---
+
+### 🗺️ 3. Civic Map & Nearby Municipal Services
+* **Interactive Ola Maps Dark Vector Engine**: High-performance vector tile rendering with custom dark styling, spatial clustering, and real-time user location telemetry.
+* **Civic Hazard Heatmaps**: Color-coded status pins (Pothole, Sewage, Open Drain, Fallen Tree) with severity indicators and instant bottom-sheet inspection.
+* **Nearby Essential Public Services**: Hyperlocal proximity discovery for critical public infrastructure:
+  * 🏥 **Emergency Medical Hubs & Hospitals**
+  * 👮 **Police Stations & Kiosks**
+  * 🚒 **Fire & Disaster Response Stations**
+  * 🚻 **Public Restrooms & Toilets**
+  * 🚰 **Clean Drinking Water Supply Points**
+  * 🚌 **Bus Stops & Public Transit Live Tracking**
+* **Emergency SOS Beacon**: One-tap emergency beacon broadcasting coordinates to local contacts with automated turn-by-turn routing via Ola Maps.
+
+---
+
+### ⏳ 4. Activity Timeline (Closed-Loop 6-Stage Governance)
+Transparent end-to-end lifecycle tracking for every reported civic hazard:
+1. 📝 **Reported**: Instant timestamp and GPS coordinates logged via citizen submission or SensorWatch auto-capture.
+2. 🔍 **Under Review**: Municipal admin triage, severity verification, and department assignment.
+3. 👷 **Assigned**: Dispatched to certified municipal field crew in the specific ward.
+4. 🛠️ **Work in Progress**: Field team acknowledges task and commences on-site remediation.
+5. 📸 **Resolved with Photo Proof**: Field worker uploads after-repair photographic proof and completion notes.
+6. 🗳️ **Community Confirmed**: Decentralized citizen verification gate requiring 3 independent neighborhood confirmations before permanent case closure.
+
+---
+
+### 🤝 5. Work with Nivara (Volunteer & Worker Portal)
+* **Civic Volunteer & Municipal Worker Onboarding**: Dedicated application portal for citizens to register as verified municipal field workers or community volunteers.
+* **Multi-Department Skill Profiling**: Road repairs, sanitation, electrical utilities, water supply & plumbing, tree management, and general civic upkeep.
+* **Administrative Credential Review**: Municipal admins review applicant credentials, inspect documentation, and assign official municipal roles.
+* **Field Worker Task Dashboard**: Location-sorted task queues, remediation checklists, progress notes, and before/after repair photo proof upload.
+
+---
+
+### 🔍 6. Proximity Lost & Found Network
+* **PostGIS Spatial Matching**: Automatically pairs opposite-type reports (`LOST` vs. `FOUND`) within a 2,000-metre radius and a 14-day temporal window.
+* **Dynamic Handover Pass (QR / PIN Verification)**:
+  * Eliminates risky public exchanges with mutual in-person cryptographic verification.
+  * Generates a dynamic single-use QR token (`NIVARA-LF-...`) and a random 6-digit PIN.
+  * Private Supabase Realtime broadcast channel (`handover:{claimId}`) automatically syncs verification states between claimant and owner.
+* **Account & Ownership Transparency**: Prominent context cards explicitly show the report creator vs. the currently logged-in account, active claim status, and direct one-tap navigation to personal listings.
+
+---
+
+### 🗳️ 7. Community Board & Decentralized Governance
+* **Neighbourhood Civic Feed**: Verified local announcements, community discussions, and municipal emergency advisories.
+* **Anti-Fraud Civic Polls**: Cryptographically secured voter registry preventing duplicate votes; live optimistic vote tallying.
+* **Civic Jobs & Volunteer Requests**: Hyperlocal micro-task boards for neighbourhood clean-up drives, volunteer tree planting, and local services.
+
+---
+
+### 🔔 8. Real-Time Cross-Role Notifications
+* Native Android notification channels (`civic_alerts`, `work_dispatch`, `community_updates`) with sound and vibration.
+* Automated PostgreSQL database triggers for instant cross-role alerts (admin acknowledgment, worker dispatch, work completion proof, and Lost & Found matches).
 
 ---
 
