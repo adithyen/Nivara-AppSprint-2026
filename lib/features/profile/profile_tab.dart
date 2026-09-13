@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/civic_level.dart';
@@ -21,6 +22,7 @@ import '../../router.dart';
 import '../auth/auth_controller.dart';
 import '../settings/language_controller.dart';
 import '../worker/worker_repo.dart';
+import 'widgets/app_update_sheet.dart';
 
 /// 2026-Level Flagship Profile Dashboard.
 class ProfileTab extends ConsumerStatefulWidget {
@@ -344,6 +346,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             subtitle: 'Bug reports, feature suggestions, and developer email',
             onTap: () => context.push(Routes.feedback),
           ),
+          const SizedBox(height: 12),
+
+          _AppVersionUpdateCard(currentLang: currentLang),
           const SizedBox(height: 12),
 
           _ActionTile(
@@ -2388,4 +2393,229 @@ class _AppLockTileState extends State<_AppLockTile> {
     );
   }
 }
+
+class _AppVersionUpdateCard extends StatefulWidget {
+  const _AppVersionUpdateCard({required this.currentLang});
+  final AppLanguage currentLang;
+
+  @override
+  State<_AppVersionUpdateCard> createState() => _AppVersionUpdateCardState();
+}
+
+class _AppVersionUpdateCardState extends State<_AppVersionUpdateCard> {
+  String _version = '1.0.64';
+  String _buildNumber = '64';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _version = info.version;
+          _buildNumber = info.buildNumber;
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final cardBg = isDark ? const Color(0xFF10161E) : Colors.white;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white60 : const Color(0xFF64748B);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      primary.withValues(alpha: isDark ? 0.22 : 0.14),
+                      const Color(0xFF00E676).withValues(alpha: isDark ? 0.18 : 0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: primary.withValues(alpha: isDark ? 0.35 : 0.3),
+                  ),
+                ),
+                child: Icon(
+                  Icons.system_update_rounded,
+                  color: primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Nivara v$_version',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            letterSpacing: -0.2,
+                            color: primaryText,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E676).withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF00E676),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'PROD',
+                                style: TextStyle(
+                                  color: Color(0xFF00E676),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Build $_buildNumber • Official GitHub Releases',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: BouncyTap(
+                  onTap: () => AppUpdateSheet.show(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: isDark ? 0.14 : 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: primary.withValues(alpha: isDark ? 0.3 : 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.cloud_sync_rounded,
+                          size: 17,
+                          color: primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Check for Updates',
+                          style: TextStyle(
+                            color: primary,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              BouncyTap(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Clipboard.setData(ClipboardData(text: 'Nivara v$_version+$_buildNumber'));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Version copied to clipboard'),
+                      duration: Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.black.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.black.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.copy_rounded,
+                    size: 18,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 

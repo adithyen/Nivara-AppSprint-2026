@@ -25,6 +25,9 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29"
         tools:replace="android:maxSdkVersion"/>
+    <!-- In-app OTA package installer for downloading and installing official GitHub releases -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
 
     <!-- Package visibility queries for Android 11+ SpeechRecognizer services -->
     <queries>
@@ -66,6 +69,16 @@
                 <data android:scheme="in.adithyen.nivara" android:host="login-callback"/>
             </intent-filter>
         </activity>
+        <!-- FileProvider for sharing downloaded APKs securely with the Android Package Installer -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
