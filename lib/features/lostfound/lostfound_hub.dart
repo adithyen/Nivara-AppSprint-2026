@@ -12,6 +12,7 @@ import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/connectivity_banner.dart';
+import '../../core/widgets/interactive_info_guide_sheet.dart';
 import '../../models/enums.dart';
 import '../../models/lf_item.dart';
 import '../../router.dart';
@@ -38,6 +39,71 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
     super.initState();
     _loadCache();
     _load();
+
+    // Auto-pop information guide if not yet permanently acknowledged
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final acknowledged = prefs.getBool('has_acknowledged_lf_guide') ?? false;
+      if (!acknowledged && mounted) {
+        _showInfoGuide();
+      }
+    });
+  }
+
+  void _showInfoGuide() {
+    InteractiveInfoGuideSheet.show(
+      context,
+      preferenceKey: 'has_acknowledged_lf_guide',
+      icon: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF818CF8), Color(0xFF4F46E5)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF818CF8).withValues(alpha: 0.35),
+              blurRadius: 18,
+            ),
+          ],
+        ),
+        child: const Icon(Icons.radar_rounded, size: 36, color: Colors.white),
+      ),
+      title: 'Community Lost & Found Radar',
+      subtitle: 'Crowdsourced Recovery & Secure Claims Verification',
+      actionLabel: 'Explore Listings',
+      items: const [
+        GuideInfoCardItem(
+          icon: Icons.search_off_rounded,
+          iconColor: NivaraColors.danger,
+          title: 'Broadcast Lost Belongings Instantly',
+          description:
+              'Report lost valuables with exact descriptions, landmark markers, and reward details. Nearby citizens receive instant radar alerts.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.inventory_2_rounded,
+          iconColor: NivaraColors.primary,
+          title: 'Secure Custody of Found Items',
+          description:
+              'When you spot an abandoned bag, wallet, or phone, document it here without revealing sensitive personal IDs.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.verified_user_rounded,
+          iconColor: Color(0xFF00FFCC),
+          title: 'Cryptographic Ownership Verification',
+          description:
+              'Claimants must prove verifiable unique ownership markers (lock screen preview, engraving, secret serial numbers) before handover.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.mic_rounded,
+          iconColor: Color(0xFF818CF8),
+          title: 'Hands-Free Multilingual Voice Reporting',
+          description:
+              'Speak naturally in Malayalam, English, or Hindi to dictate title, category, and landmark location in seconds.',
+        ),
+      ],
+    );
   }
 
   @override
@@ -179,6 +245,20 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          IconButton(
+            tooltip: 'Lost & Found Info',
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : const Color(0xFFE2E8F0),
+              ),
+              child: const Icon(Icons.info_outline_rounded, size: 20),
+            ),
+            onPressed: _showInfoGuide,
+          ),
           IconButton(
             tooltip: NivaraStrings.tr('my_listings', currentLang),
             icon: const Icon(Icons.inbox_outlined),

@@ -278,46 +278,13 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  NivaraStrings.tr('ai_autocapture_title', currentLang),
-                                  style: TextStyle(
-                                    color: isDark ? Colors.white : scheme.onSurface,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? const Color(0xFF00FFCC).withValues(alpha: 0.2)
-                                        : const Color(0xFF00BFA5).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? const Color(0xFF00FFCC)
-                                          : const Color(0xFF00BFA5),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    '19 HAZARDS',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? const Color(0xFF00FFCC)
-                                          : const Color(0xFF00897B),
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              NivaraStrings.tr('ai_autocapture_title', currentLang),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : scheme.onSurface,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -408,46 +375,13 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  NivaraStrings.tr('voice_reporter_title', currentLang),
-                                  style: TextStyle(
-                                    color: isDark ? Colors.white : scheme.onSurface,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? const Color(0xFF818CF8).withValues(alpha: 0.2)
-                                        : const Color(0xFF6366F1).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? const Color(0xFF818CF8)
-                                          : const Color(0xFF6366F1),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'VOICE AI',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? const Color(0xFFC7D2FE)
-                                          : const Color(0xFF4F46E5),
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              NivaraStrings.tr('voice_reporter_title', currentLang),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : scheme.onSurface,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(

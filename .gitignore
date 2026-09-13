@@ -16,10 +16,11 @@ doc/api/
 .env.*
 !.env.example
 
-# Android signing — never commit keystores or key credentials
+# Android signing & credentials — never commit keystores or client secret JSON files
 *.jks
 *.keystore
 key.properties
+client_secret*.json
 android/app/upload-keystore.jks
 
 # Avoid committing generated Javascript files:

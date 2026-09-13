@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:simple_icons/simple_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
-import '../../core/widgets/glass_card.dart';
 import '../../router.dart';
 import 'auth_controller.dart';
 
@@ -40,29 +40,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _mode = mode;
       _error = null;
-      switch (mode) {
-        case _LoginMode.citizen:
-          _email.clear();
-          _password.clear();
-          break;
-        case _LoginMode.worker:
-          _email.text = 'pothole_worker1@nivara.app';
-          _password.text = 'worker123';
-          break;
-        case _LoginMode.official:
-          _email.text = kDemoAdminEmail;
-          _password.text = kDemoAdminPassword;
-          break;
-      }
+      _email.clear();
+      _password.clear();
     });
   }
 
-  void _fillWorker({required String email, required String password}) {
+  Future<void> _signInWithGoogle() async {
     setState(() {
-      _email.text = email;
-      _password.text = password;
+      _loading = true;
       _error = null;
     });
+    try {
+      await ref.read(authControllerProvider.notifier).signInWithGoogle();
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Google Sign-In failed: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -236,17 +230,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
 
-                      if (_mode == _LoginMode.worker) ...[
-                        const SizedBox(height: 16),
-                        _WorkerDemoBox(
-                          currentEmail: _email.text.trim(),
-                          onSelect: _fillWorker,
-                        ),
-                      ] else if (_mode == _LoginMode.official) ...[
-                        const SizedBox(height: 16),
-                        const _OfficialDemoBox(),
-                      ],
-
                       const SizedBox(height: 20),
 
                       // Email / Username input
@@ -398,6 +381,80 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
 
+                      // Continue with Google Button (for Citizens)
+                      if (!isStaff) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Divider(
+                                color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'OR',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: secondaryText,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Divider(
+                                color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        BouncyTap(
+                          onTap: _loading ? null : _signInWithGoogle,
+                          child: Container(
+                            width: double.infinity,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.15)
+                                    : const Color(0xFFCBD5E1),
+                                width: 1.2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  SimpleIcons.google,
+                                  size: 18,
+                                  color: Color(0xFFEA4335),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Continue with Google',
+                                  style: TextStyle(
+                                    color: primaryText,
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 20),
 
                       // Create Account Link
@@ -480,229 +537,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Stylized labeled card detailing worker username/password logic and 3 quick-fill examples.
-class _WorkerDemoBox extends StatelessWidget {
-  const _WorkerDemoBox({
-    required this.currentEmail,
-    required this.onSelect,
-  });
-
-  final String currentEmail;
-  final void Function({required String email, required String password}) onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final examples = [
-      (
-        title: 'Pothole Worker #1',
-        dept: 'Roads Dept',
-        email: 'pothole_worker1@nivara.app',
-        icon: Icons.edit_road_rounded,
-        color: const Color(0xFFFF9100),
-      ),
-      (
-        title: 'Street Light Worker #1',
-        dept: 'Electricity Dept',
-        email: 'street_light_worker1@nivara.app',
-        icon: Icons.lightbulb_rounded,
-        color: const Color(0xFFFFD600),
-      ),
-      (
-        title: 'Garbage Worker #1',
-        dept: 'Sanitation Dept',
-        email: 'garbage_worker1@nivara.app',
-        icon: Icons.delete_sweep_rounded,
-        color: const Color(0xFF00E676),
-      ),
-    ];
-
-    return GlassCard(
-      padding: const EdgeInsets.all(14),
-      borderRadius: 18,
-      borderColor: const Color(0xFF00B0FF).withValues(alpha: 0.35),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00B0FF).withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.engineering_rounded,
-                  color: Color(0xFF00B0FF),
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Worker Login Format & Demo Credentials',
-                  style: TextStyle(
-                    color: Color(0xFF00B0FF),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF080D14) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Format: <category_key>_worker<1-5>@nivara.app',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                    color: isDark ? Colors.white70 : const Color(0xFF334155),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Default Password: worker123',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                    color: isDark ? Colors.white70 : const Color(0xFF334155),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Tap any example below to 1-tap prefill and test:',
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white60 : const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          for (final ex in examples) ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: BouncyTap(
-                onTap: () => onSelect(email: ex.email, password: 'worker123'),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: currentEmail == ex.email
-                        ? ex.color.withValues(alpha: isDark ? 0.2 : 0.14)
-                        : (isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC)),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: currentEmail == ex.email
-                          ? ex.color
-                          : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-                      width: currentEmail == ex.email ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(ex.icon, color: ex.color, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ex.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11.5,
-                                color: currentEmail == ex.email
-                                    ? ex.color
-                                    : (isDark ? Colors.white : const Color(0xFF0F172A)),
-                              ),
-                            ),
-                            Text(
-                              '${ex.dept} • ${ex.email}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (currentEmail == ex.email)
-                        Icon(Icons.check_circle_rounded, color: ex.color, size: 16),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _OfficialDemoBox extends StatelessWidget {
-  const _OfficialDemoBox();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GlassCard(
-      padding: const EdgeInsets.all(14),
-      borderRadius: 16,
-      borderColor: NivaraColors.accent.withValues(alpha: 0.35),
-      child: Row(
-        children: [
-          const Icon(Icons.shield_rounded, color: NivaraColors.accent, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Municipal Official Pre-filled (admin@nivara.app)',
-                  style: TextStyle(
-                    color: NivaraColors.accent,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Password: admin123 • Full command & dispatch authority',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white70 : const Color(0xFF475569),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

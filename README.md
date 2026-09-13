@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/Backend-Supabase%20%7C%20PostgreSQL%2015-3ECF8E?style=for-the-badge&logo=supabase"/>
   <img src="https://img.shields.io/badge/AI%20Vision-NVIDIA%20NIM%20%7C%20Llama--3.2--11B-76B900?style=for-the-badge&logo=nvidia"/>
   <img src="https://img.shields.io/badge/Maps-Ola%20Maps%20Vector-E11D48?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Release-v1.0.63%20(Production)-16A34A?style=for-the-badge&logo=android"/>
+  <img src="https://img.shields.io/badge/Release-v1.0.64%20(Production)-16A34A?style=for-the-badge&logo=android"/>
 </p>
 
 <p align="center">
@@ -125,7 +125,24 @@ graph TD
 # ✨ Features & Architectural Matrix
 
 ### 🎁 Bonus Point Features Added
-* **App Store Publication Link**: `<fill it later>` *(Production APK signed and distributed via GitHub Releases & APK Mirror)*
+* **App Store Publication Link**: [GitHub Releases (Direct APK Download)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.64) *(Production APK signed and distributed directly for instant installation)*
+* **Native Biometric App Lock & Device Security Failsafe**:
+  * **Hardware-Backed Biometrics**: Native fingerprint and face authentication via `local_auth` with seamless fallback to device PIN / Pattern / Passcode (`biometricOnly: false`) guaranteeing device-agnostic security.
+  * **First-Launch Security Consent**: A person freshly installing the app is seamlessly prompted with an interactive setup dialog to opt into native app security.
+  * **Role-Wide Profile Settings**: Biometric app lock toggle is fully configurable within the Profile settings tab across all 3 user categories: **Citizen**, **Municipal Field Worker**, and **Municipal Admin**.
+  * **App Lifecycle Resume Guard**: Automatically shields sensitive municipal dispatch orders, triage queues, and personal lost-item handover credentials whenever the app is minimized or the screen is locked.
+* **Emil Kowalski Interactive Physical Guidance Sheets**:
+  * **Kinetic Physics & Haptic Micro-Interactions**: Custom modal guidance sheets (`InteractiveInfoGuideSheet`) implemented in **SensorWatch** and **Lost & Found Hub** designed according to Emil Kowalski motion design principles.
+  * **Auto-Discovery Modal Gate**: Automatically surfaces on entry to guide first-time users through complex sensor telemetry and proximity handshakes until acknowledged.
+  * **Interactive Slide-to-Confirm Gesture**: Features a tactile *"I understand how this works"* checkbox which physically expands into a fluid spring-physics slider (*"Understood, don't show again"*), persistent in local storage with permanent AppBar `(i)` access.
+* **Real-World Enterprise Authentication & Google OAuth**:
+  * **Production-Grade Credential Integrity**: Eliminated pre-filled and guided demo credentials across Field Worker and Admin portals to satisfy real-world security evaluation standards.
+  * **"Continue with Google" Integration**: Seamless native Google OAuth sign-in powered by Supabase Auth and Android custom-scheme deep-link redirection (`in.adithyen.nivara://login-callback`).
+* **Dual-Mode Lost & Found Voice Assistant**:
+  * **Physical Segmented Mode Switcher**: Integrated physical segmented toggle (`[ 🔴 I Lost an Item ]` | `[ 🟢 I Found an Item ]`) directly into the Voice Reporting Sheet.
+  * **Multilingual Keyword Auto-Classification**: Dynamic natural speech analysis that automatically detects whether the user is reporting a lost possession or a discovered item across English, Malayalam, and Hindi.
+* **Harmonized Design System & Card Consistency**:
+  * Clean visual hierarchy eliminating duplicate badge tags (`'19 HAZARDS'`, `'VOICE AI'`) and aligning form category cards with the Home screen's dark glassmorphic palette and typography.
 * **Comprehensive Accessibility Features**:
   * **Screen Reader & TalkBack Semantics**: Every interactive control, status badge, camera HUD overlay, and map layer is equipped with declarative `Semantics(...)` metadata, providing an effortless experience for visually impaired users.
   * **Dynamic Typography & Fluid Font Scaling**: Fluid responsive layouts that adapt cleanly to system-level font scaling and text accessibility configurations without truncation or layout clipping.
@@ -271,12 +288,11 @@ https://youtube.com/watch?v=YOUR_DEMO_VIDEO_LINK
 
 The production-ready, signed release APK is built and hosted directly on GitHub Releases:
 
-🔗 **[Download Nivara v1.0.63 Release APK (Latest)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/)**
+🔗 **[Download Nivara v1.0.64 Release APK (Latest)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.64)**
 
 ```
-Release Version : 1.0.63 (Build 63)
+Release Version : 1.0.64 (Build 64)
 Artifact Name   : app-release.apk
-File Size       : ~105.9 MB
 Target Platform : Android 7.0+ (API Level 24 to 34)
 Architecture    : arm64-v8a, armeabi-v7a, x86_64
 Verification    : Fully signed, tree-shaken release build with zero analyzer warnings
@@ -518,6 +534,7 @@ Lost identity credentials require zero-trust physical return protocols:
 * [ ] **Public Transit & Bus Telemetry**: Partner with municipal transport corporations to install Nivara SensorWatch background daemons on city buses for continuous, whole-city road quality heatmaps.
 * [ ] **Web3 Municipal Remediation Bounty Contracts**: Escrow municipal repair funds in transparent smart contracts that disburse payments to certified contractors only upon validated community confirmation.
 * [ ] **Offline Bluetooth Mesh Network**: Allow citizens in zero-cellular disaster areas to relay emergency hazard alerts across peer-to-peer device mesh networks.
+
 ---
 
 # 📊 Impact & Social Value

@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- Required on Android 13+ (API 33+) for notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Biometric authentication for native app lock -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <!-- Camera for QR code scanning in Lost & Found handover verification and AI Auto-Capture -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Microphone for Voice-Based Reporting across Civic, Lost & Found, and Community -->
@@ -55,6 +57,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Supabase / Google OAuth redirect callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="in.adithyen.nivara" android:host="login-callback"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

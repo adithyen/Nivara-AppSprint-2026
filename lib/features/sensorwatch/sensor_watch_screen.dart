@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/categorize.dart';
 import '../../core/constants.dart';
 import '../../core/localization/app_localizations.dart';
@@ -17,6 +19,7 @@ import '../../core/utils.dart';
 import '../../core/widgets/accessible_widgets.dart';
 import '../../core/widgets/bouncy_tap.dart';
 import '../../core/widgets/connectivity_banner.dart';
+import '../../core/widgets/interactive_info_guide_sheet.dart';
 import '../../core/widgets/pulsing_badge.dart';
 import '../../models/enums.dart';
 import '../../models/evidence_package.dart';
@@ -76,6 +79,15 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
         }
       });
     }
+
+    // Auto-pop information guide if not yet permanently acknowledged by user
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final acknowledged = prefs.getBool('has_acknowledged_sensorwatch_guide') ?? false;
+      if (!acknowledged && mounted) {
+        _showCrowdsourceInfoSheet();
+      }
+    });
   }
 
   @override
@@ -163,22 +175,62 @@ class _SensorWatchScreenState extends ConsumerState<SensorWatchScreen> {
 
   void _showCrowdsourceInfoSheet() {
     HapticFeedback.selectionClick();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF10161E) : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    InteractiveInfoGuideSheet.show(
+      context,
+      preferenceKey: 'has_acknowledged_sensorwatch_guide',
+      icon: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00E676).withValues(alpha: 0.35),
+              blurRadius: 18,
+            ),
+          ],
+        ),
+        child: const Icon(Icons.sensors_rounded, size: 36, color: Colors.black),
       ),
-      showDragHandle: true,
-      builder: (_) => _CrowdsourceInfoSheet(
-        onStartMonitoring: () {
-          Navigator.pop(context);
-          final svc = ref.read(sensorWatchServiceProvider);
-          if (!svc.isMonitoring) _toggle();
-        },
-      ),
+      title: 'Autonomous Road Telemetry',
+      subtitle: 'Zero-Touch Highway Intelligence & Consensus Verification',
+      actionLabel: 'Start Autonomous Monitoring',
+      onActionTap: () {
+        final currentSvc = ref.read(sensorWatchServiceProvider);
+        if (!currentSvc.isMonitoring) _toggle();
+      },
+      items: const [
+        GuideInfoCardItem(
+          icon: Icons.directions_car_filled_rounded,
+          iconColor: Color(0xFF00E676),
+          title: 'Start When Travelling Highways & State Roads',
+          description:
+              'Turn on SensorWatch whenever you drive on arterial roads or highways. All pothole shocks and road anomalies are recorded continuously in the background.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.shield_rounded,
+          iconColor: Color(0xFF00B0FF),
+          title: 'Zero-Hazard Reporting (No Photo Required)',
+          description:
+              'Stopping in the middle of highway traffic to snap photos is dangerous. SensorWatch logs high-precision accelerometer and GPS telemetry automatically.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.group_work_rounded,
+          iconColor: Color(0xFFFF9100),
+          title: 'Multi-User Consensus Verification',
+          description:
+              'To prevent accidental phone drops from raising false alarms, road defects are only escalated once confirmed by multiple independent drivers.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.lock_outline_rounded,
+          iconColor: Color(0xFF7B4BC4),
+          title: 'Tamper-Proof Cryptographic Record',
+          description:
+              'Each jolt is cryptographically signed with a SHA-256 seal containing peak g-force, 3-axis gyroscope data, Doppler speed, and GPS timestamp.',
+        ),
+      ],
     );
   }
 
@@ -580,211 +632,6 @@ class _HomeScreenWidgetCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Educational bottom sheet explaining passive highway monitoring & consensus verification.
-class _CrowdsourceInfoSheet extends StatelessWidget {
-  const _CrowdsourceInfoSheet({required this.onStartMonitoring});
-
-  final VoidCallback onStartMonitoring;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
-    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header with glowing icon
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00E676).withValues(alpha: 0.35),
-                        blurRadius: 18,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.sensors_rounded, size: 36, color: Colors.black),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Autonomous Road Telemetry',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: primaryText,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Zero-Touch Highway Intelligence & Consensus Verification',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: secondaryText,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              _InfoCard(
-                icon: Icons.directions_car_filled_rounded,
-                iconColor: const Color(0xFF00E676),
-                title: 'Start When Travelling Highways & State Roads',
-                description:
-                    'Turn on SensorWatch whenever you drive on arterial roads or highways. '
-                    'All pothole shocks, crater jolts, and damaged road surfaces are recorded continuously in the background.',
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                icon: Icons.shield_rounded,
-                iconColor: const Color(0xFF00B0FF),
-                title: 'Zero-Hazard Reporting (No Photo Required)',
-                description:
-                    'Stopping your vehicle in the middle of busy traffic to take a photo is dangerous and impractical. '
-                    'SensorWatch logs high-precision accelerometer and GPS telemetry automatically without stopping.',
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                icon: Icons.group_work_rounded,
-                iconColor: const Color(0xFFFF9100),
-                title: 'Multi-User Consensus Verification',
-                description:
-                    'To prevent accidental phone drops or deliberate shaking from raising false alarms, road defects are only '
-                    'escalated as official civic reports once a statistically convincing threshold of impacts is logged by multiple independent users at the same location.',
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                icon: Icons.lock_outline_rounded,
-                iconColor: const Color(0xFF7B4BC4),
-                title: 'Tamper-Proof Cryptographic Record',
-                description:
-                    'Each road jolt is cryptographically signed with a SHA-256 seal containing peak g-force, 3-axis gyroscope data, Doppler speed, and GPS timestamp.',
-              ),
-              const SizedBox(height: 22),
-
-              BouncyTap(
-                onTap: onStartMonitoring,
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00E676).withValues(alpha: 0.35),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Got It • Start Monitoring',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.description,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
-    final secondaryText = isDark ? Colors.white.withValues(alpha: 0.75) : const Color(0xFF475569);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: isDark ? 0.18 : 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: primaryText,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    color: secondaryText,
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -7,11 +7,11 @@ import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.os.Build
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val SHORTCUT_CHANNEL = "in.adithyen.nivara/shortcuts"
     private var pendingRoute: String? = null
     private var channel: MethodChannel? = null
@@ -35,16 +35,16 @@ class MainActivity : FlutterActivity() {
                                 putExtra("route", "/sensorwatch?autoStart=true")
                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                             }
-                            val pinShortcutInfo = ShortcutInfo.Builder(context, "sensorwatch_drive_shortcut")
+                            val pinShortcutInfo = ShortcutInfo.Builder(this, "sensorwatch_drive_shortcut")
                                 .setShortLabel("SensorWatch Drive")
                                 .setLongLabel("Instant SensorWatch Road Monitor")
-                                .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
+                                .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
                                 .setIntent(pinIntent)
                                 .build()
 
                             val pinnedShortcutCallbackIntent = shortcutManager.createShortcutResultIntent(pinShortcutInfo)
                             val successCallback = PendingIntent.getBroadcast(
-                                context,
+                                this,
                                 0,
                                 pinnedShortcutCallbackIntent,
                                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT

@@ -158,6 +158,18 @@ class AuthController extends AsyncNotifier<UserProfile?> {
     await _load();
   }
 
+  /// Sign in using Google OAuth via Supabase.
+  Future<bool> signInWithGoogle() async {
+    final res = await supabase.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: 'in.adithyen.nivara://login-callback',
+    );
+    if (res) {
+      await _load();
+    }
+    return res;
+  }
+
   /// Register a new citizen.
   Future<bool> signUp({
     required String email,

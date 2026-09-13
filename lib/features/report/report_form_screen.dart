@@ -400,9 +400,7 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                currentLang == AppLanguage.ml
-                                    ? '🤖 AI ഓട്ടോ-ക്യാപ്ചർ സ്കാനർ'
-                                    : '🤖 AI Auto-Capture Scanner',
+                                NivaraStrings.tr('ai_autocapture_title', currentLang),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,
@@ -413,7 +411,7 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                               Text(
                                 currentLang == AppLanguage.ml
                                     ? 'കുഴികളും ഡ്രെയിനേജും തനിയെ തിരിച്ചറിഞ്ഞ് 1-ടാപ്പിൽ റിപ്പോർട്ട് ചെയ്യാം'
-                                    : 'Auto-detects 19 civic issues & captures evidence with 1-tap submit',
+                                    : 'Auto-detects civic issues & captures evidence with 1-tap submit',
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 12,
@@ -461,23 +459,50 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.5) : const Color(0xFFEFF6FF),
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? const [Color(0xFF1E1B4B), Color(0xFF0F172A)]
+                            : const [Colors.white, Color(0xFFEEF2FF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFF818CF8).withValues(alpha: 0.4),
+                        color: isDark
+                            ? const Color(0xFF818CF8).withValues(alpha: 0.45)
+                            : const Color(0xFF6366F1).withValues(alpha: 0.35),
+                        width: 1.2,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? const Color(0xFF818CF8).withValues(alpha: 0.1)
+                              : Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF818CF8).withValues(alpha: 0.2),
                             shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF818CF8), Color(0xFF4F46E5)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF818CF8).withValues(alpha: 0.35),
+                                blurRadius: 8,
+                              ),
+                            ],
                           ),
                           child: const Icon(
                             Icons.mic_rounded,
-                            color: Color(0xFF818CF8),
+                            color: Colors.white,
                             size: 20,
                           ),
                         ),
@@ -487,9 +512,7 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                currentLang == AppLanguage.ml
-                                    ? '🎙️ ശബ്ദത്തിലൂടെ പരാതി നൽകാം'
-                                    : '🎙️ Voice Reporting Assistant',
+                                NivaraStrings.tr('voice_reporter_title', currentLang),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 14,

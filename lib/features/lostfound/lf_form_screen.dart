@@ -333,6 +333,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
                     showVoiceReportingSheet(
                       context,
                       initialMode: VoiceReportMode.lostFound,
+                      initialLFItemType: _isLost ? LFItemType.lost : LFItemType.found,
                       onPayloadReady: (payload) {
                         setState(() {
                           _category = payload.lfCategory ?? LFCategory.other;
@@ -351,22 +352,44 @@ class _LFFormScreenState extends State<LFFormScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isDark
-                            ? [const Color(0xFF1E1B4B), const Color(0xFF0F172A)]
-                            : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
+                            ? const [Color(0xFF1E1B4B), Color(0xFF0F172A)]
+                            : const [Colors.white, Color(0xFFEEF2FF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFF818CF8).withValues(alpha: 0.5),
+                        color: isDark
+                            ? const Color(0xFF818CF8).withValues(alpha: 0.45)
+                            : const Color(0xFF6366F1).withValues(alpha: 0.35),
                         width: 1.2,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? const Color(0xFF818CF8).withValues(alpha: 0.1)
+                              : Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF818CF8),
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF818CF8), Color(0xFF4F46E5)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF818CF8).withValues(alpha: 0.35),
+                                blurRadius: 8,
+                              ),
+                            ],
                           ),
                           child: const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
                         ),
@@ -376,7 +399,7 @@ class _LFFormScreenState extends State<LFFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '🎙️ Voice Report ${widget.itemType.label} Item',
+                                'Voice Report ${widget.itemType.label} Item',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 14,
@@ -384,7 +407,9 @@ class _LFFormScreenState extends State<LFFormScreen> {
                                 ),
                               ),
                               Text(
-                                'Speak naturally (e.g. "Lost black wallet at bus stand")',
+                                _isLost
+                                    ? 'Speak naturally (e.g. "Lost black wallet at bus stand")'
+                                    : 'Speak naturally (e.g. "Found black wallet at bus stand")',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Theme.of(context).colorScheme.onSurfaceVariant,

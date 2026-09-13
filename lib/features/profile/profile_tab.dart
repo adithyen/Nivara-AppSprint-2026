@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/civic_level.dart';
 import '../../core/constants.dart';
 import '../../core/localization/app_localizations.dart';
+import '../../core/services/app_lock_service.dart';
 import '../../core/services/offline_queue_service.dart';
 import '../../core/supabase_client.dart';
 import '../../core/theme.dart';
@@ -271,6 +273,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             ),
             const SizedBox(height: 12),
           ],
+
+          _AppLockTile(currentLang: currentLang),
+          const SizedBox(height: 12),
 
           _ActionTile(
             icon: Icons.palette_outlined,
@@ -2248,3 +2253,139 @@ class _AdminInfoCard extends StatelessWidget {
     );
   }
 }
+
+class _AppLockTile extends StatefulWidget {
+  const _AppLockTile({required this.currentLang});
+  final AppLanguage currentLang;
+
+  @override
+  State<_AppLockTile> createState() => _AppLockTileState();
+}
+
+class _AppLockTileState extends State<_AppLockTile> {
+  bool _enabled = false;
+  bool _supported = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
+  Future<void> _loadStatus() async {
+    final supported = await AppLockService.instance.canAuthenticate();
+    final enabled = await AppLockService.instance.isLockEnabled();
+    if (mounted) {
+      setState(() {
+        _supported = supported;
+        _enabled = enabled;
+      });
+    }
+  }
+
+  Future<void> _toggleLock(bool val) async {
+    HapticFeedback.selectionClick();
+    final success = await AppLockService.instance.authenticate(
+      localizedReason: val
+          ? 'Verify biometric or phone passcode to enable App Lock'
+          : 'Verify biometric or phone passcode to disable App Lock',
+    );
+    if (!mounted) return;
+
+    if (success) {
+      HapticFeedback.mediumImpact();
+      await AppLockService.instance.setLockEnabled(val);
+      if (!mounted) return;
+      setState(() => _enabled = val);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(val ? 'Biometric App Lock enabled' : 'Biometric App Lock disabled'),
+          backgroundColor: val ? const Color(0xFF00FFCC) : Colors.grey,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      HapticFeedback.heavyImpact();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF10161E) : Colors.white;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryText = isDark ? Colors.white60 : const Color(0xFF64748B);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _enabled
+              ? const Color(0xFF00FFCC).withValues(alpha: isDark ? 0.35 : 0.6)
+              : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+          width: _enabled ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _enabled
+                ? const Color(0xFF00FFCC).withValues(alpha: isDark ? 0.08 : 0.04)
+                : Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00FFCC).withValues(alpha: isDark ? 0.18 : 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.fingerprint_rounded,
+              color: Color(0xFF00BFA5),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Native Biometric App Lock',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: primaryText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _supported
+                      ? 'Fingerprint, Face ID & phone passcode security'
+                      : 'Biometric hardware unavailable on this device',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: _enabled,
+            activeTrackColor: const Color(0xFF00FFCC),
+            activeThumbColor: Colors.black,
+            onChanged: _supported ? _toggleLock : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+

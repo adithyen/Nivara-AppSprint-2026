@@ -14,6 +14,9 @@ import 'features/settings/settings_controller.dart';
 import 'models/enums.dart';
 import 'router.dart';
 
+import 'core/services/app_lock_service.dart';
+import 'features/auth/app_lock_screen.dart';
+
 /// Root widget: wires the router, theme, and accessibility pipeline into [MaterialApp.router].
 /// Theme mode and accent colour follow the user's [AppSettings], while font scaling,
 /// motion reduction, and high contrast follow [AccessibilityState].
@@ -24,15 +27,21 @@ class NivaraApp extends ConsumerStatefulWidget {
   ConsumerState<NivaraApp> createState() => _NivaraAppState();
 }
 
-class _NivaraAppState extends ConsumerState<NivaraApp> {
+class _NivaraAppState extends ConsumerState<NivaraApp> with WidgetsBindingObserver {
   bool _prevOnline = true;
   StreamSubscription? _notifClickSub;
   final Set<String> _seenNotificationIds = {};
   bool _initialNotifLoadDone = false;
+  bool _isAppLocked = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Check App Lock on startup
+    _initAppLock();
+
     // On app startup, immediately drain any pending offline items if online
     WidgetsBinding.instance.addPostFrameCallback((_) {
       OfflineQueueService.drainAll();
@@ -44,8 +53,47 @@ class _NivaraAppState extends ConsumerState<NivaraApp> {
     });
   }
 
+  Future<void> _initAppLock() async {
+    final enabled = await AppLockService.instance.isLockEnabled();
+    if (mounted) {
+      setState(() {
+        _isAppLocked = enabled;
+      });
+    }
+
+    // After splash, if fresh user hasn't been prompted, show prompt
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prompted = await AppLockService.instance.hasBeenPrompted();
+      if (!prompted && mounted) {
+        // Wait a small moment for initial route to stabilize
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted && !_isAppLocked) {
+          final navCtx = ref.read(routerProvider).routerDelegate.navigatorKey.currentContext;
+          if (navCtx != null && navCtx.mounted) {
+            final turnedOn = await showFreshAppLockSetupDialog(navCtx);
+            if (turnedOn == true && mounted) {
+              setState(() => _isAppLocked = false);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      AppLockService.instance.isLockEnabled().then((enabled) {
+        if (enabled && mounted) {
+          setState(() => _isAppLocked = true);
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notifClickSub?.cancel();
     super.dispose();
   }
@@ -107,7 +155,7 @@ class _NivaraAppState extends ConsumerState<NivaraApp> {
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();
         final currentMq = MediaQuery.of(context);
-        return MediaQuery(
+        final responsiveChild = MediaQuery(
           data: currentMq.copyWith(
             textScaler: TextScaler.linear(a11y.textScaleFactor),
             disableAnimations: a11y.removeAnimations || currentMq.disableAnimations,
@@ -121,6 +169,20 @@ class _NivaraAppState extends ConsumerState<NivaraApp> {
             hapticsEnabled: a11y.hapticsEnabled,
             child: child,
           ),
+        );
+
+        return Stack(
+          children: [
+            responsiveChild,
+            if (_isAppLocked)
+              Positioned.fill(
+                child: AppLockScreen(
+                  onUnlocked: () {
+                    if (mounted) setState(() => _isAppLocked = false);
+                  },
+                ),
+              ),
+          ],
         );
       },
     );

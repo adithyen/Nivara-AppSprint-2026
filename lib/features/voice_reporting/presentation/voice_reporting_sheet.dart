@@ -29,6 +29,7 @@ import 'voice_visualizer_orb.dart';
 Future<void> showVoiceReportingSheet(
   BuildContext context, {
   VoiceReportMode? initialMode,
+  LFItemType? initialLFItemType,
   CommunityPostType? initialCommunityType,
   Function(VoiceReportPayload)? onPayloadReady,
 }) {
@@ -38,6 +39,7 @@ Future<void> showVoiceReportingSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => VoiceReportingSheet(
       initialMode: initialMode,
+      initialLFItemType: initialLFItemType,
       initialCommunityType: initialCommunityType,
       onPayloadReady: onPayloadReady,
     ),
@@ -49,12 +51,14 @@ Future<void> showVoiceReportingSheet(
 /// Civic, Lost & Found, and Community reporting workflows.
 class VoiceReportingSheet extends ConsumerStatefulWidget {
   final VoiceReportMode? initialMode;
+  final LFItemType? initialLFItemType;
   final CommunityPostType? initialCommunityType;
   final Function(VoiceReportPayload)? onPayloadReady;
 
   const VoiceReportingSheet({
     super.key,
     this.initialMode,
+    this.initialLFItemType,
     this.initialCommunityType,
     this.onPayloadReady,
   });
@@ -65,6 +69,7 @@ class VoiceReportingSheet extends ConsumerStatefulWidget {
 
 class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   late VoiceReportMode _mode;
+  late LFItemType _selectedLFItemType;
   late CommunityPostType _selectedCommunityType;
   VoiceLanguage _language = VoiceLanguage.auto;
   VoiceState _voiceState = VoiceState.idle;
@@ -86,6 +91,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   void initState() {
     super.initState();
     _mode = widget.initialMode ?? VoiceReportMode.civic;
+    _selectedLFItemType = widget.initialLFItemType ?? LFItemType.lost;
     _selectedCommunityType = widget.initialCommunityType ?? CommunityPostType.general;
     _transcriptController = TextEditingController();
     _transcriptFocusNode = FocusNode();
@@ -153,6 +159,20 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         setState(() {});
 
         if (text.trim().isNotEmpty) {
+          // Auto-detect Lost vs Found from keywords if spoken
+          final lower = text.toLowerCase();
+          if (_hasMatch(lower, const ['found', 'picked up', 'saw', 'got', 'spotted', 'കണ്ടെത്തി', 'കിട്ടി', 'ലഭിച്ചു', 'കണ്ടു', 'मिला', 'पाया'])) {
+            if (_selectedLFItemType != LFItemType.found) {
+              _selectedLFItemType = LFItemType.found;
+              HapticFeedback.mediumImpact();
+            }
+          } else if (_hasMatch(lower, const ['lost', 'missing', 'dropped', 'misplaced', 'left behind', 'നഷ്ടപ്പെട്ടു', 'പോയി', 'കളഞ്ഞു', 'खो गया', 'गुम'])) {
+            if (_selectedLFItemType != LFItemType.lost) {
+              _selectedLFItemType = LFItemType.lost;
+              HapticFeedback.mediumImpact();
+            }
+          }
+
           final parser = ref.read(voiceIntentParserServiceProvider);
           final payload = await parser.parseTranscript(
             text,
@@ -163,7 +183,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
           );
           if (mounted) {
             setState(() {
-              _parsedPayload = payload;
+              _parsedPayload = (_mode == VoiceReportMode.lostFound)
+                  ? payload.copyWith(lfItemType: _selectedLFItemType)
+                  : payload;
               if (payload.mode != _mode && widget.initialMode == null) {
                 _mode = payload.mode;
               }
@@ -183,11 +205,31 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     }
   }
 
+  bool _hasMatch(String text, List<String> needles) {
+    for (final n in needles) {
+      if (text.contains(n)) return true;
+    }
+    return false;
+  }
+
   void _onTranscriptChanged(String val) {
     _liveTranscript = val;
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       if (val.trim().isNotEmpty) {
+        final lower = val.toLowerCase();
+        if (_hasMatch(lower, const ['found', 'picked up', 'saw', 'got', 'spotted', 'കണ്ടെത്തി', 'കിട്ടി', 'ലഭിച്ചു', 'കണ്ടു', 'मिला', 'पाया'])) {
+          if (_selectedLFItemType != LFItemType.found) {
+            _selectedLFItemType = LFItemType.found;
+            HapticFeedback.mediumImpact();
+          }
+        } else if (_hasMatch(lower, const ['lost', 'missing', 'dropped', 'misplaced', 'left behind', 'നഷ്ടപ്പെട്ടു', 'പോയി', 'കളഞ്ഞു', 'खो गया', 'गुम'])) {
+          if (_selectedLFItemType != LFItemType.lost) {
+            _selectedLFItemType = LFItemType.lost;
+            HapticFeedback.mediumImpact();
+          }
+        }
+
         final parser = ref.read(voiceIntentParserServiceProvider);
         final payload = await parser.parseTranscript(
           val,
@@ -198,7 +240,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         );
         if (mounted) {
           setState(() {
-            _parsedPayload = payload;
+            _parsedPayload = (_mode == VoiceReportMode.lostFound)
+                ? payload.copyWith(lfItemType: _selectedLFItemType)
+                : payload;
             if (payload.mode != _mode && widget.initialMode == null) {
               _mode = payload.mode;
             }
@@ -498,7 +542,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         break;
 
       case VoiceReportMode.lostFound:
-        if ((_parsedPayload?.lfItemType ?? LFItemType.lost) == LFItemType.lost) {
+        if (_selectedLFItemType == LFItemType.lost) {
           context.push('/lostfound/lost');
         } else {
           context.push('/lostfound/found');
@@ -717,6 +761,10 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             // Community Post Category Selector Prompt Card (When Community Mode is active)
             if (_mode == VoiceReportMode.community)
               _buildCommunityCategoryPrompt(isDark, scheme),
+
+            // Lost & Found Explicit Mode Selector Prompt Card (When Lost & Found Mode is active)
+            if (_mode == VoiceReportMode.lostFound)
+              _buildLostFoundTypePrompt(isDark, scheme),
 
             // Pulsing Voice Orb & Sound Visualizer
             Center(
@@ -1159,6 +1207,178 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                 ),
               );
             }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLostFoundTypePrompt(bool isDark, ColorScheme scheme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131F37) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _selectedLFItemType == LFItemType.lost
+              ? NivaraColors.danger.withValues(alpha: 0.4)
+              : const Color(0xFF00FFCC).withValues(alpha: 0.4),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: (_selectedLFItemType == LFItemType.lost ? NivaraColors.danger : const Color(0xFF00FFCC))
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  _selectedLFItemType == LFItemType.lost ? Icons.search_off_rounded : Icons.inventory_2_rounded,
+                  size: 14,
+                  color: _selectedLFItemType == LFItemType.lost ? NivaraColors.danger : const Color(0xFF00FFCC),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Are you reporting a Lost or Found item?',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Select below or say "lost" / "found" / "കണ്ടെത്തി" / "നഷ്ടപ്പെട്ടു" in your speech:',
+            style: TextStyle(
+              fontSize: 11,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _selectedLFItemType = LFItemType.lost;
+                      if (_parsedPayload != null) {
+                        _parsedPayload = _parsedPayload!.copyWith(lfItemType: LFItemType.lost);
+                      }
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutBack,
+                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: _selectedLFItemType == LFItemType.lost
+                          ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.5) : const Color(0xFFFEE2E2))
+                          : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedLFItemType == LFItemType.lost
+                            ? NivaraColors.danger
+                            : (isDark ? Colors.white10 : Colors.black12),
+                        width: _selectedLFItemType == LFItemType.lost ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 16,
+                          color: _selectedLFItemType == LFItemType.lost
+                              ? NivaraColors.danger
+                              : scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'I Lost an Item',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: _selectedLFItemType == LFItemType.lost
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: _selectedLFItemType == LFItemType.lost
+                                ? NivaraColors.danger
+                                : scheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _selectedLFItemType = LFItemType.found;
+                      if (_parsedPayload != null) {
+                        _parsedPayload = _parsedPayload!.copyWith(lfItemType: LFItemType.found);
+                      }
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutBack,
+                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: _selectedLFItemType == LFItemType.found
+                          ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.5) : const Color(0xFFDCFCE7))
+                          : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedLFItemType == LFItemType.found
+                            ? const Color(0xFF00FFCC)
+                            : (isDark ? Colors.white10 : Colors.black12),
+                        width: _selectedLFItemType == LFItemType.found ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inventory_2_rounded,
+                          size: 16,
+                          color: _selectedLFItemType == LFItemType.found
+                              ? const Color(0xFF00FFCC)
+                              : scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'I Found an Item',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: _selectedLFItemType == LFItemType.found
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: _selectedLFItemType == LFItemType.found
+                                ? (isDark ? const Color(0xFF00FFCC) : const Color(0xFF059669))
+                                : scheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
