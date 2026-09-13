@@ -288,18 +288,18 @@ https://youtube.com/watch?v=YOUR_DEMO_VIDEO_LINK
 
 The production-ready, signed release APK is built and hosted directly on GitHub Releases:
 
-🔗 **[Download Nivara v1.0.64 Release APK (Latest)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.64)**
+🔗 **[Download Nivara v1.0.64 Release APK (nivara-v1.0.64.apk)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/download/v1.0.64/nivara-v1.0.64.apk)**
 
 ```
 Release Version : 1.0.64 (Build 64)
-Artifact Name   : app-release.apk
+Artifact Name   : nivara-v1.0.64.apk
 Target Platform : Android 7.0+ (API Level 24 to 34)
 Architecture    : arm64-v8a, armeabi-v7a, x86_64
 Verification    : Fully signed, tree-shaken release build with zero analyzer warnings
 ```
 
 ### Installation Steps:
-1. Download `app-release.apk` from the GitHub Release link on your Android device.
+1. Download `nivara-v1.0.64.apk` from the direct download link above on your Android device.
 2. Tap the downloaded file in your Notification Drawer or Downloads folder.
 3. If prompted, allow *"Install from unknown sources"* for your browser or file manager.
 4. Launch **Nivara** and grant Location, Camera, and Microphone permissions when requested.

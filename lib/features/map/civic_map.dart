@@ -6,7 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'civic_map_guide.dart';
 
 import '../../core/constants.dart';
 import '../../core/services/debug_logger.dart';
@@ -97,6 +100,15 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
     _seedFromRest();
     _subscribeRealtime();
     _trackUserLocation();
+
+    // Auto-pop map info guide if not yet permanently acknowledged by user
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final acknowledged = prefs.getBool('has_acknowledged_map_guide') ?? false;
+      if (!acknowledged && mounted) {
+        showCivicMapGuide(context);
+      }
+    });
   }
 
   @override
@@ -696,6 +708,16 @@ class _CivicMapScreenState extends ConsumerState<CivicMapScreen> {
                                   _onSearchChanged('');
                                 },
                               ),
+                            // Map Legend & Guide Info Button
+                            IconButton(
+                              tooltip: 'Map Legend & Guide',
+                              icon: const Icon(
+                                Icons.info_outline_rounded,
+                                size: 21,
+                                color: Color(0xFF00FFCC),
+                              ),
+                              onPressed: () => showCivicMapGuide(context),
+                            ),
                             // Layers Filter Button
                             IconButton(
                               tooltip: 'Map Layers',

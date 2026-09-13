@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/google_brand_button.dart';
 import '../../router.dart';
 import 'auth_controller.dart';
 
@@ -62,6 +63,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       setState(() => _error = e.message);
     } catch (_) {
       setState(() => _error = 'Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authControllerProvider.notifier).signInWithGoogle();
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Google Sign-In failed: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -276,6 +291,38 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                               ),
                       ),
                     ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'OR',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: secondaryText,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  GoogleBrandButton(
+                    onTap: _signInWithGoogle,
+                    isLoading: _loading,
                   ),
 
                   const SizedBox(height: 20),

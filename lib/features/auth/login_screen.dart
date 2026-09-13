@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:simple_icons/simple_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/bouncy_tap.dart';
+import '../../core/widgets/google_brand_button.dart';
 import '../../router.dart';
 import 'auth_controller.dart';
 
@@ -410,48 +410,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        BouncyTap(
-                          onTap: _loading ? null : _signInWithGoogle,
-                          child: Container(
-                            width: double.infinity,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.15)
-                                    : const Color(0xFFCBD5E1),
-                                width: 1.2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  SimpleIcons.google,
-                                  size: 18,
-                                  color: Color(0xFFEA4335),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Continue with Google',
-                                  style: TextStyle(
-                                    color: primaryText,
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        GoogleBrandButton(
+                          onTap: _signInWithGoogle,
+                          isLoading: _loading,
                         ),
                       ],
 

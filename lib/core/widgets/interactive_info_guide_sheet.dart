@@ -15,6 +15,7 @@ class InteractiveInfoGuideSheet extends StatefulWidget {
   final List<GuideInfoCardItem> items;
   final String actionLabel;
   final VoidCallback? onActionTap;
+  final Widget? customHeader;
 
   const InteractiveInfoGuideSheet({
     super.key,
@@ -25,6 +26,7 @@ class InteractiveInfoGuideSheet extends StatefulWidget {
     required this.items,
     this.actionLabel = 'Get Started',
     this.onActionTap,
+    this.customHeader,
   });
 
   static Future<void> show(
@@ -36,6 +38,7 @@ class InteractiveInfoGuideSheet extends StatefulWidget {
     required List<GuideInfoCardItem> items,
     String actionLabel = 'Get Started',
     VoidCallback? onActionTap,
+    Widget? customHeader,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return showModalBottomSheet<void>(
@@ -54,6 +57,7 @@ class InteractiveInfoGuideSheet extends StatefulWidget {
         items: items,
         actionLabel: actionLabel,
         onActionTap: onActionTap,
+        customHeader: customHeader,
       ),
     );
   }
@@ -123,6 +127,11 @@ class _InteractiveInfoGuideSheetState extends State<InteractiveInfoGuideSheet>
                 ),
               ),
               const SizedBox(height: 20),
+
+              if (widget.customHeader != null) ...[
+                widget.customHeader!,
+                const SizedBox(height: 16),
+              ],
 
               // Informative Cards
               for (final item in widget.items) ...[
@@ -262,12 +271,14 @@ class GuideInfoCardItem {
   final Color iconColor;
   final String title;
   final String description;
+  final Widget? trailingBadge;
 
   const GuideInfoCardItem({
     required this.icon,
     required this.iconColor,
     required this.title,
     required this.description,
+    this.trailingBadge,
   });
 }
 
@@ -304,13 +315,23 @@ class _GuideInfoCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.title,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    if (item.trailingBadge != null) ...[
+                      const SizedBox(width: 6),
+                      item.trailingBadge!,
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 3),
                 Text(

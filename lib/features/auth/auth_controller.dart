@@ -24,11 +24,16 @@ class AuthController extends AsyncNotifier<UserProfile?> {
 
   @override
   Future<UserProfile?> build() async {
-    // Safety net: if the session ends anywhere (expiry, another tab), reflect it.
-    final sub = supabase.auth.onAuthStateChange.listen((data) {
+    // Listen to all auth state changes (OAuth redirects, session expiry, token refresh).
+    final sub = supabase.auth.onAuthStateChange.listen((data) async {
+      _log.log('AUTH', 'onAuthStateChange event: ${data.event}');
       if (data.event == AuthChangeEvent.signedOut) {
         _clearCachedProfile();
         state = const AsyncData(null);
+      } else if (data.event == AuthChangeEvent.signedIn ||
+          data.event == AuthChangeEvent.tokenRefreshed ||
+          data.event == AuthChangeEvent.userUpdated) {
+        await _load();
       }
     });
     ref.onDispose(sub.cancel);
@@ -136,20 +141,48 @@ class AuthController extends AsyncNotifier<UserProfile?> {
 
   Future<void> _load() async {
     final user = supabase.auth.currentUser;
-    final uid = user?.id;
-    if (uid == null) {
+    if (user == null) {
       state = const AsyncData(null);
       return;
     }
-    state = const AsyncLoading();
+    final uid = user.id;
+
     final profile = await _fetchProfile(uid);
     if (profile != null) {
       await _saveCachedProfile(profile);
       state = AsyncData(profile);
-    } else {
-      final cached = await _getCachedProfile(uid);
-      state = AsyncData(cached);
+      return;
     }
+
+    final cached = await _getCachedProfile(uid);
+    if (cached != null) {
+      state = AsyncData(cached);
+      return;
+    }
+
+    // Google OAuth first login: construct fallback profile so user is instantly signed in
+    final metaName = (user.userMetadata?['full_name'] as String?) ??
+        (user.userMetadata?['name'] as String?) ??
+        (user.userMetadata?['display_name'] as String?) ??
+        user.email?.split('@').first ??
+        'Citizen';
+    final fallback = UserProfile(
+      id: uid,
+      displayName: metaName,
+      phone: user.phone,
+      role: UserRole.citizen,
+    );
+    await _saveCachedProfile(fallback);
+    state = AsyncData(fallback);
+
+    // Persist profile row in Supabase in background
+    try {
+      await supabase.from(kTableProfiles).upsert({
+        'id': uid,
+        'display_name': metaName,
+        'role': 'citizen',
+      });
+    } catch (_) {}
   }
 
   /// Sign in with email + password.

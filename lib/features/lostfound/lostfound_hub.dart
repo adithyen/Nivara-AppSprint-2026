@@ -75,32 +75,32 @@ class _LostFoundHubState extends ConsumerState<LostFoundHub> {
       actionLabel: 'Explore Listings',
       items: const [
         GuideInfoCardItem(
-          icon: Icons.search_off_rounded,
-          iconColor: NivaraColors.danger,
-          title: 'Broadcast Lost Belongings Instantly',
-          description:
-              'Report lost valuables with exact descriptions, landmark markers, and reward details. Nearby citizens receive instant radar alerts.',
-        ),
-        GuideInfoCardItem(
-          icon: Icons.inventory_2_rounded,
-          iconColor: NivaraColors.primary,
-          title: 'Secure Custody of Found Items',
-          description:
-              'When you spot an abandoned bag, wallet, or phone, document it here without revealing sensitive personal IDs.',
-        ),
-        GuideInfoCardItem(
-          icon: Icons.verified_user_rounded,
+          icon: Icons.qr_code_scanner_rounded,
           iconColor: Color(0xFF00FFCC),
-          title: 'Cryptographic Ownership Verification',
+          title: 'Dynamic QR & 6-Digit OTP Handshake',
           description:
-              'Claimants must prove verifiable unique ownership markers (lock screen preview, engraving, secret serial numbers) before handover.',
+              'In-person handovers are cryptographically verified using a dynamic single-use QR pass (NIVARA-LF-...) and synchronized 6-digit OTP code, ensuring items are only returned to the rightful owner.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.touch_app_rounded,
+          iconColor: Color(0xFF38BDF8),
+          title: 'One-Tap Proximity Match & Handover',
+          description:
+              'Our PostGIS spatial radar pairs opposite-type reports within a 2km radius. Tap to initiate a claim and verify item transfer in seconds over private encrypted channels.',
+        ),
+        GuideInfoCardItem(
+          icon: Icons.privacy_tip_rounded,
+          iconColor: Color(0xFF818CF8),
+          title: 'Zero-Trust Privacy & Masked Contact',
+          description:
+              'No need to reveal home addresses or personal phone numbers. Claimants verify secret markers (lock screen, engravings, serial digits) before meeting.',
         ),
         GuideInfoCardItem(
           icon: Icons.mic_rounded,
-          iconColor: Color(0xFF818CF8),
-          title: 'Hands-Free Multilingual Voice Reporting',
+          iconColor: NivaraColors.primary,
+          title: 'Hands-Free Multilingual Voice Assistant',
           description:
-              'Speak naturally in Malayalam, English, or Hindi to dictate title, category, and landmark location in seconds.',
+              'Switch between "I Lost an Item" and "I Found an Item" with speech auto-detection in Malayalam, Hindi, and English.',
         ),
       ],
     );
