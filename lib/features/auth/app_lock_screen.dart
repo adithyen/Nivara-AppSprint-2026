@@ -30,39 +30,57 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
 
-    // Auto-trigger biometric prompt after layout
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _triggerAuth();
+    // Auto-trigger biometric prompt after layout settles (500ms delay to avoid overlay collisions)
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _triggerAuth();
+      }
     });
   }
 
   @override
   void dispose() {
+    AppLockService.instance.stopAuthentication();
     _pulseController.dispose();
     super.dispose();
   }
 
   Future<void> _triggerAuth() async {
-    if (_isAuthenticating) return;
+    if (_isAuthenticating) {
+      // Force clear any stuck native prompt and re-arm
+      await AppLockService.instance.stopAuthentication();
+      if (mounted) setState(() => _isAuthenticating = false);
+      await Future.delayed(const Duration(milliseconds: 150));
+    }
+
+    if (!mounted) return;
     setState(() {
       _isAuthenticating = true;
       _errorMessage = null;
     });
 
-    final success = await AppLockService.instance.authenticate(
-      localizedReason: 'Unlock Nivara using your fingerprint, face, or phone passcode',
-    );
+    try {
+      final success = await AppLockService.instance.authenticate(
+        localizedReason: 'Unlock Nivara using your fingerprint, face, or phone passcode',
+      );
 
-    if (!mounted) return;
-    setState(() => _isAuthenticating = false);
+      if (!mounted) return;
+      setState(() => _isAuthenticating = false);
 
-    if (success) {
-      HapticFeedback.mediumImpact();
-      widget.onUnlocked();
-    } else {
-      HapticFeedback.heavyImpact();
+      if (success) {
+        HapticFeedback.mediumImpact();
+        widget.onUnlocked();
+      } else {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _errorMessage = 'Authentication cancelled or interrupted. Tap below to retry.';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'Authentication cancelled or failed. Tap below to retry.';
+        _isAuthenticating = false;
+        _errorMessage = 'Authentication error. Tap below to retry.';
       });
     }
   }
@@ -164,7 +182,7 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
 
                 const Spacer(),
 
-                // Unlock Button
+                // Unlock Button (Tap always re-arms/retries even if state was authenticating)
                 BouncyTap(
                   onTap: _triggerAuth,
                   child: Container(
@@ -186,10 +204,14 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.lock_open_rounded, color: Colors.black, size: 20),
+                        Icon(
+                          _isAuthenticating ? Icons.refresh_rounded : Icons.lock_open_rounded,
+                          color: Colors.black,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          _isAuthenticating ? 'Authenticating...' : 'Unlock with Biometrics / PIN',
+                          _isAuthenticating ? 'Tap to Verify with Biometrics / PIN' : 'Unlock with Biometrics / PIN',
                           style: const TextStyle(
                             color: Colors.black,
                             fontSize: 15,
@@ -201,7 +223,33 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
+
+                // Explicit Fallback Button
+                TextButton.icon(
+                  onPressed: () async {
+                    await AppLockService.instance.stopAuthentication();
+                    if (mounted) {
+                      setState(() => _isAuthenticating = false);
+                      _triggerAuth();
+                    }
+                  },
+                  icon: Icon(
+                    Icons.pin_rounded,
+                    size: 16,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                  label: Text(
+                    'Use Phone Passcode / Pattern',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : const Color(0xFF334155),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),

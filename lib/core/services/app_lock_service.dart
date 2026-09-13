@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -12,6 +14,10 @@ class AppLockService {
   static const String _kPromptedKey = 'nivara_app_lock_prompted';
 
   final LocalAuthentication _auth = LocalAuthentication();
+
+  /// Flag indicating that an external browser auth flow (like Google OAuth) is active.
+  /// When true, the app lifecycle should not lock the app when backgrounded.
+  bool isExternalAuthInProgress = false;
 
   /// Whether device hardware supports biometric or device-credential security.
   Future<bool> canAuthenticate() async {
@@ -59,6 +65,15 @@ class AppLockService {
     await prefs.setBool(_kPromptedKey, true);
   }
 
+  /// Cancels any active or hanging authentication session.
+  Future<void> stopAuthentication() async {
+    try {
+      await _auth.stopAuthentication();
+    } catch (e) {
+      debugPrint('[AppLockService] stopAuthentication error: $e');
+    }
+  }
+
   /// Prompt native biometric / phone passcode authentication.
   /// Uses [biometricOnly: false] to allow phone password/PIN/pattern as failsafe.
   Future<bool> authenticate({String? localizedReason}) async {
@@ -69,15 +84,27 @@ class AppLockService {
         return true;
       }
 
+      // Stop any stale or lingering native prompts before initiating
+      await stopAuthentication();
+
       final authenticated = await _auth.authenticate(
         localizedReason: localizedReason ?? 'Verify your biometric or phone passcode to access Nivara',
         biometricOnly: false, // Allows device PIN/passcode/pattern as failsafe
-        persistAcrossBackgrounding: true,
+        persistAcrossBackgrounding: false, // Critical: prevent deadlock when system dialogs overlay
         sensitiveTransaction: true,
+      ).timeout(
+        const Duration(seconds: 25),
+        onTimeout: () {
+          debugPrint('[AppLockService] Authentication timed out');
+          return false;
+        },
       );
       return authenticated;
     } on PlatformException catch (e) {
-      debugPrint('[AppLockService] Authentication error: $e');
+      debugPrint('[AppLockService] Authentication PlatformException: $e');
+      return false;
+    } catch (e) {
+      debugPrint('[AppLockService] Authentication unexpected error: $e');
       return false;
     }
   }

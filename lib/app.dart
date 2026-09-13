@@ -15,6 +15,7 @@ import 'models/enums.dart';
 import 'router.dart';
 
 import 'core/services/app_lock_service.dart';
+import 'core/supabase_client.dart';
 import 'features/auth/app_lock_screen.dart';
 
 /// Root widget: wires the router, theme, and accessibility pipeline into [MaterialApp.router].
@@ -54,10 +55,13 @@ class _NivaraAppState extends ConsumerState<NivaraApp> with WidgetsBindingObserv
   }
 
   Future<void> _initAppLock() async {
+    // Only lock on app boot if the user is ALREADY authenticated.
+    // Unauthenticated users are on the login/signup screen and should not be locked out.
+    final currentUser = supabase.auth.currentUser;
     final enabled = await AppLockService.instance.isLockEnabled();
-    if (mounted) {
+    if (mounted && currentUser != null && enabled) {
       setState(() {
-        _isAppLocked = enabled;
+        _isAppLocked = true;
       });
     }
 
@@ -83,6 +87,15 @@ class _NivaraAppState extends ConsumerState<NivaraApp> with WidgetsBindingObserv
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
+      // Do not lock the app if an external auth flow (like Google OAuth) is active
+      if (AppLockService.instance.isExternalAuthInProgress) {
+        return;
+      }
+      // Do not lock unauthenticated users attempting to log in
+      if (supabase.auth.currentUser == null) {
+        return;
+      }
+
       AppLockService.instance.isLockEnabled().then((enabled) {
         if (enabled && mounted) {
           setState(() => _isAppLocked = true);

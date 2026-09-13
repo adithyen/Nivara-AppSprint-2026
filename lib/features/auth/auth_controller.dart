@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
+import '../../core/services/app_lock_service.dart';
 import '../../core/services/debug_logger.dart';
 import '../../core/supabase_client.dart';
 import '../../models/enums.dart';
@@ -34,6 +35,10 @@ class AuthController extends AsyncNotifier<UserProfile?> {
           data.event == AuthChangeEvent.tokenRefreshed ||
           data.event == AuthChangeEvent.userUpdated) {
         await _load();
+        // Clear external auth in progress after routes settle
+        Future.delayed(const Duration(seconds: 3), () {
+          AppLockService.instance.isExternalAuthInProgress = false;
+        });
       }
     });
     ref.onDispose(sub.cancel);
@@ -193,14 +198,20 @@ class AuthController extends AsyncNotifier<UserProfile?> {
 
   /// Sign in using Google OAuth via Supabase.
   Future<bool> signInWithGoogle() async {
-    final res = await supabase.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: 'in.adithyen.nivara://login-callback',
-    );
-    if (res) {
-      await _load();
+    AppLockService.instance.isExternalAuthInProgress = true;
+    try {
+      final res = await supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'in.adithyen.nivara://login-callback',
+      );
+      if (res) {
+        await _load();
+      }
+      return res;
+    } catch (e) {
+      AppLockService.instance.isExternalAuthInProgress = false;
+      rethrow;
     }
-    return res;
   }
 
   /// Register a new citizen.
