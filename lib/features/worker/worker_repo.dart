@@ -304,6 +304,34 @@ class WorkerRepo {
     }
   }
 
+  /// Admin directly provisions/onboards a new worker or admin to the municipal team.
+  static Future<UserProfile> directOnboardStaff({
+    required String name,
+    String? email,
+    String? phone,
+    required UserRole role,
+    required AdminDepartment department,
+    String? city,
+    String? ward,
+    String? existingUserId,
+  }) async {
+    final res = await supabase.rpc(
+      'admin_direct_onboard_worker',
+      params: {
+        'p_display_name': name.trim(),
+        'p_email': (email != null && email.trim().isNotEmpty) ? email.trim() : null,
+        'p_phone': (phone != null && phone.trim().isNotEmpty) ? phone.trim() : null,
+        'p_role': role.wire,
+        'p_department': department.wire,
+        'p_city': (city != null && city.trim().isNotEmpty) ? city.trim() : null,
+        'p_ward': (ward != null && ward.trim().isNotEmpty) ? ward.trim() : null,
+        'p_existing_user_id': existingUserId,
+      },
+    );
+    final row = res is List ? res.first : res;
+    return UserProfile.fromMap(row as Map<String, dynamic>);
+  }
+
   /// Admin deletes a community post.
   static Future<void> deleteCommunityPost(String postId) async {
     await supabase.rpc(

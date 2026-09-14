@@ -145,59 +145,90 @@ class _ManageTeamScreenState extends ConsumerState<ManageTeamScreen>
     );
   }
 
-  // ── Summary stats ──────────────────────────────────────────────────
   int get _workerCount => _all.where((p) => p.isWorker).length;
   int get _availableCount =>
       _all.where((p) => p.isWorker && !p.isOnLeave).length;
   int get _onLeaveCount => _all.where((p) => p.isWorker && p.isOnLeave).length;
+
+  void _openDirectOnboardSheet() {
+    showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF10161E)
+          : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _DirectOnboardWorkerSheet(
+        allCitizens: _all.where((p) => p.role == UserRole.citizen).toList(),
+        onSuccess: () async {
+          Navigator.pop(context, true);
+          await _load();
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final pendingApps = _pendingApps;
 
-    return Column(
+    return Stack(
       children: [
-        // ── Tab bar ────────────────────────────────────────────────
-        TabBar(
-          controller: _tabs,
-          tabs: [
-            const Tab(text: 'Team'),
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Applications'),
-                  if (pendingApps > 0) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: NivaraColors.danger,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$pendingApps',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+        Column(
+          children: [
+            // ── Tab bar ────────────────────────────────────────────────
+            TabBar(
+              controller: _tabs,
+              tabs: [
+                const Tab(text: 'Team'),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Applications'),
+                      if (pendingApps > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: NivaraColors.danger,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$pendingApps',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ],
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabs,
+                children: [_buildTeamTab(scheme), _buildAppsTab(scheme)],
               ),
             ),
           ],
         ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabs,
-            children: [_buildTeamTab(scheme), _buildAppsTab(scheme)],
+        Positioned(
+          right: 16,
+          bottom: 86,
+          child: _DirectOnboardFab(
+            onTap: _openDirectOnboardSheet,
           ),
         ),
       ],
@@ -1476,6 +1507,582 @@ class _SectionHeader extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 1.2,
         fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Direct Staff Onboarding Floating Action Button
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DirectOnboardFab extends StatelessWidget {
+  const _DirectOnboardFab({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              primary,
+              const Color(0xFF2563EB),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: primary.withValues(alpha: 0.45),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+            if (isDark)
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+          ],
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.25),
+            width: 1.2,
+          ),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.mark_email_unread_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Onboard Staff',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13.5,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Direct Staff Onboarding Modal Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DirectOnboardWorkerSheet extends ConsumerStatefulWidget {
+  const _DirectOnboardWorkerSheet({
+    required this.allCitizens,
+    required this.onSuccess,
+  });
+
+  final List<UserProfile> allCitizens;
+  final VoidCallback onSuccess;
+
+  @override
+  ConsumerState<_DirectOnboardWorkerSheet> createState() =>
+      _DirectOnboardWorkerSheetState();
+}
+
+class _DirectOnboardWorkerSheetState
+    extends ConsumerState<_DirectOnboardWorkerSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabCtrl;
+
+  final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController(text: 'Thiruvananthapuram');
+  final _wardCtrl = TextEditingController(text: 'Ward 14 - Pappanamcode');
+
+  UserRole _role = UserRole.worker;
+  AdminDepartment _dept = AdminDepartment.roads;
+  UserProfile? _selectedCitizen;
+  final _citizenSearchCtrl = TextEditingController();
+
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _cityCtrl.dispose();
+    _wardCtrl.dispose();
+    _citizenSearchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_tabCtrl.index == 0) {
+      if (!_formKey.currentState!.validate()) return;
+    } else {
+      if (_selectedCitizen == null) {
+        setState(() => _error = 'Please select a registered citizen to promote.');
+        return;
+      }
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      final name = _tabCtrl.index == 0 ? _nameCtrl.text.trim() : _selectedCitizen!.displayName;
+      final email = _tabCtrl.index == 0 ? _emailCtrl.text.trim() : null;
+      final phone = _tabCtrl.index == 0 ? _phoneCtrl.text.trim() : _selectedCitizen!.phone;
+      final city = _cityCtrl.text.trim();
+      final ward = _wardCtrl.text.trim();
+
+      await WorkerRepo.directOnboardStaff(
+        name: name,
+        email: (email != null && email.isNotEmpty) ? email : null,
+        phone: (phone != null && phone.isNotEmpty) ? phone : null,
+        role: _role,
+        department: _dept,
+        city: city.isNotEmpty ? city : null,
+        ward: ward.isNotEmpty ? ward : null,
+        existingUserId: _tabCtrl.index == 1 ? _selectedCitizen!.id : null,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$name has been added to the ${_dept.label} workforce as ${_role.label}!'),
+          backgroundColor: NivaraColors.success,
+        ),
+      );
+      widget.onSuccess();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _submitting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.person_add_alt_1_rounded,
+                      color: primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Direct Staff Onboarding',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Provision staff without waiting for an application',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Mode Tabs
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: TabBar(
+                  controller: _tabCtrl,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicator: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  tabs: const [
+                    Tab(text: 'New Provision'),
+                    Tab(text: 'Promote Citizen'),
+                  ],
+                  onTap: (_) => setState(() => _error = null),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (_error != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: NivaraColors.danger.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: NivaraColors.danger.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: NivaraColors.danger, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: NivaraColors.danger, fontSize: 12.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // Tab 1: New Provision Form
+              if (_tabCtrl.index == 0) ...[
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Worker Full Name *',
+                          hintText: 'e.g. Anand Kumar',
+                          prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Please enter employee name'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Official / Login Email',
+                          hintText: 'e.g. anand.kumar@corp.kerala.gov.in',
+                          prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Contact Phone',
+                          hintText: 'e.g. +91 98470 12345',
+                          prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                // Tab 2: Promote Citizen
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _citizenSearchCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Search registered citizens...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      child: Builder(
+                        builder: (ctx) {
+                          final q = _citizenSearchCtrl.text.trim().toLowerCase();
+                          final filtered = widget.allCitizens.where((c) {
+                            if (q.isEmpty) return true;
+                            return c.displayName.toLowerCase().contains(q) ||
+                                (c.phone?.contains(q) ?? false);
+                          }).toList();
+
+                          if (filtered.isEmpty) {
+                            return Center(
+                              child: Text(
+                                'No citizens found matching "$q"',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (ctx, idx) {
+                              final c = filtered[idx];
+                              final isSelected = _selectedCitizen?.id == c.id;
+                              return ListTile(
+                                dense: true,
+                                selected: isSelected,
+                                selectedTileColor: primary.withValues(alpha: 0.12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                leading: CircleAvatar(
+                                  radius: 14,
+                                  child: Text(
+                                    c.displayName.isNotEmpty ? c.displayName[0].toUpperCase() : '?',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                title: Text(c.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: Text(c.phone ?? 'No phone registered', style: const TextStyle(fontSize: 11.5)),
+                                trailing: isSelected
+                                    ? Icon(Icons.check_circle_rounded, color: primary, size: 18)
+                                    : null,
+                                onTap: () => setState(() => _selectedCitizen = c),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 18),
+              // Role & Department Selection
+              const _SectionHeader('Designated Workforce Assignment'),
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<UserRole>(
+                      initialValue: _role,
+                      decoration: InputDecoration(
+                        labelText: 'Role',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: UserRole.worker,
+                          child: Text('Field Worker'),
+                        ),
+                        DropdownMenuItem(
+                          value: UserRole.admin,
+                          child: Text('Municipal Admin'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _role = val);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<AdminDepartment>(
+                      initialValue: _dept,
+                      decoration: InputDecoration(
+                        labelText: 'Department',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      items: AdminDepartment.values
+                          .map((d) => DropdownMenuItem(
+                                value: d,
+                                child: Text(d.label, overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _dept = val);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _cityCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Jurisdiction City',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _wardCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Assigned Ward',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Submit Button
+              BouncyTap(
+                onTap: _submitting ? null : _submit,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primary, const Color(0xFF2563EB)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primary.withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Confirm & Onboard to Team',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

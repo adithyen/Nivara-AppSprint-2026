@@ -49,11 +49,19 @@ class AuthController extends AsyncNotifier<UserProfile?> {
 
     // 1. Immediately read from local cache if available (instant offline boot)
     final cached = await _getCachedProfile(uid);
+    final metaAvatar = _extractUserAvatar(user);
 
     // 2. Fetch fresh profile asynchronously with timeout
     unawaited(_refreshInBackground(uid, user));
 
     if (cached != null) {
+      if ((cached.avatarUrl == null || cached.avatarUrl!.trim().isEmpty) &&
+          metaAvatar != null &&
+          metaAvatar.isNotEmpty) {
+        final updated = cached.copyWith(avatarUrl: metaAvatar);
+        await _saveCachedProfile(updated);
+        return updated;
+      }
       return cached;
     }
 
@@ -61,8 +69,20 @@ class AuthController extends AsyncNotifier<UserProfile?> {
     try {
       final remote = await _fetchProfile(uid).timeout(const Duration(seconds: 3));
       if (remote != null) {
-        await _saveCachedProfile(remote);
-        return remote;
+        var finalProfile = remote;
+        if ((remote.avatarUrl == null || remote.avatarUrl!.trim().isEmpty) &&
+            metaAvatar != null &&
+            metaAvatar.isNotEmpty) {
+          try {
+            await supabase
+                .from(kTableProfiles)
+                .update({'avatar_url': metaAvatar})
+                .eq('id', uid);
+          } catch (_) {}
+          finalProfile = remote.copyWith(avatarUrl: metaAvatar);
+        }
+        await _saveCachedProfile(finalProfile);
+        return finalProfile;
       }
     } catch (e) {
       _log.log('AUTH', 'Offline or fetch failed on startup: $e');
@@ -74,6 +94,7 @@ class AuthController extends AsyncNotifier<UserProfile?> {
       displayName: (user.userMetadata?['display_name'] as String?) ??
           user.email?.split('@').first ??
           'Citizen',
+      avatarUrl: metaAvatar,
       phone: user.phone,
       role: UserRole.citizen,
     );
@@ -81,12 +102,46 @@ class AuthController extends AsyncNotifier<UserProfile?> {
     return fallback;
   }
 
+  String? _extractUserAvatar(User user) {
+    final meta = user.userMetadata;
+    final direct = (meta?['avatar_url'] as String?) ??
+        (meta?['picture'] as String?) ??
+        (meta?['photoURL'] as String?);
+    if (direct != null && direct.trim().isNotEmpty) return direct.trim();
+
+    if (user.identities != null) {
+      for (final id in user.identities!) {
+        final data = id.identityData;
+        final idAvatar = (data?['avatar_url'] as String?) ??
+            (data?['picture'] as String?) ??
+            (data?['photoURL'] as String?);
+        if (idAvatar != null && idAvatar.trim().isNotEmpty) {
+          return idAvatar.trim();
+        }
+      }
+    }
+    return null;
+  }
+
   Future<void> _refreshInBackground(String uid, User user) async {
     try {
       final remote = await _fetchProfile(uid).timeout(const Duration(seconds: 4));
       if (remote != null) {
-        await _saveCachedProfile(remote);
-        state = AsyncData(remote);
+        final metaAvatar = _extractUserAvatar(user);
+        var finalProfile = remote;
+        if ((remote.avatarUrl == null || remote.avatarUrl!.trim().isEmpty) &&
+            metaAvatar != null &&
+            metaAvatar.isNotEmpty) {
+          try {
+            await supabase
+                .from(kTableProfiles)
+                .update({'avatar_url': metaAvatar})
+                .eq('id', uid);
+          } catch (_) {}
+          finalProfile = remote.copyWith(avatarUrl: metaAvatar);
+        }
+        await _saveCachedProfile(finalProfile);
+        state = AsyncData(finalProfile);
       }
     } catch (e) {
       _log.log('AUTH', 'Background profile sync skipped (offline/error): $e');
@@ -152,8 +207,24 @@ class AuthController extends AsyncNotifier<UserProfile?> {
     }
     final uid = user.id;
 
+    final metaAvatar = _extractUserAvatar(user);
+
     final profile = await _fetchProfile(uid);
     if (profile != null) {
+      if ((profile.avatarUrl == null || profile.avatarUrl!.isEmpty) &&
+          metaAvatar != null &&
+          metaAvatar.isNotEmpty) {
+        try {
+          await supabase
+              .from(kTableProfiles)
+              .update({'avatar_url': metaAvatar})
+              .eq('id', uid);
+        } catch (_) {}
+        final updated = profile.copyWith(avatarUrl: metaAvatar);
+        await _saveCachedProfile(updated);
+        state = AsyncData(updated);
+        return;
+      }
       await _saveCachedProfile(profile);
       state = AsyncData(profile);
       return;
@@ -161,6 +232,14 @@ class AuthController extends AsyncNotifier<UserProfile?> {
 
     final cached = await _getCachedProfile(uid);
     if (cached != null) {
+      if ((cached.avatarUrl == null || cached.avatarUrl!.isEmpty) &&
+          metaAvatar != null &&
+          metaAvatar.isNotEmpty) {
+        final updated = cached.copyWith(avatarUrl: metaAvatar);
+        await _saveCachedProfile(updated);
+        state = AsyncData(updated);
+        return;
+      }
       state = AsyncData(cached);
       return;
     }
@@ -174,6 +253,7 @@ class AuthController extends AsyncNotifier<UserProfile?> {
     final fallback = UserProfile(
       id: uid,
       displayName: metaName,
+      avatarUrl: metaAvatar,
       phone: user.phone,
       role: UserRole.citizen,
     );
@@ -186,6 +266,7 @@ class AuthController extends AsyncNotifier<UserProfile?> {
         'id': uid,
         'display_name': metaName,
         'role': 'citizen',
+        'avatar_url': ?metaAvatar,
       });
     } catch (_) {}
   }

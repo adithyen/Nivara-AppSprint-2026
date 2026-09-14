@@ -33,6 +33,7 @@ class CommunityPost {
 
   final CommunityPostStatus status;
   final DateTime? validUntil;
+  final bool allowsMultiple;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -52,6 +53,7 @@ class CommunityPost {
     this.contactValue,
     this.status = CommunityPostStatus.open,
     this.validUntil,
+    this.allowsMultiple = false,
     required this.createdAt,
     this.updatedAt,
   });
@@ -59,6 +61,7 @@ class CommunityPost {
   bool get hasLocation => lat != null && lng != null;
   bool get isOpen => status == CommunityPostStatus.open;
   bool get isPoll => type == CommunityPostType.poll;
+  bool get allowsMultipleVotes => isPoll && allowsMultiple;
   bool get hasContact =>
       contactMethod != null &&
       contactValue != null &&
@@ -84,6 +87,7 @@ class CommunityPost {
     contactValue: map['contact_value'] as String?,
     status: CommunityPostStatus.fromWire(map['status'] as String?),
     validUntil: toDateTimeOrNull(map['valid_until']),
+    allowsMultiple: (map['allows_multiple'] as bool?) ?? false,
     createdAt: toDateTimeOrNull(map['created_at']) ?? DateTime.now(),
     updatedAt: toDateTimeOrNull(map['updated_at']),
   );
@@ -104,5 +108,6 @@ class CommunityPost {
     if (contactMethod != null) 'contact_method': contactMethod,
     if (contactValue != null) 'contact_value': contactValue,
     if (validUntil != null) 'valid_until': validUntil!.toIso8601String(),
+    if (type == CommunityPostType.poll) 'allows_multiple': allowsMultiple,
   };
 }

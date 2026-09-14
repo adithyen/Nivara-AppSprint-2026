@@ -18,6 +18,7 @@ import '../settings/accessibility_controller.dart';
 import '../settings/language_controller.dart';
 import '../voice_reporting/presentation/voice_reporting_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'home_shell.dart';
 
 /// 2026-Level Flagship Citizen Home Dashboard with dynamic localization and accessibility contrast tokens.
 class HomeTab extends ConsumerStatefulWidget {
@@ -165,27 +166,51 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   children: [
                     const NotificationBellButton(),
                     const SizedBox(width: 10),
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: scheme.primary.withValues(alpha: isDark ? 0.15 : 0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: scheme.primary.withValues(alpha: isDark ? 0.4 : 0.5),
-                          width: a11y.highContrast ? 2.5 : 1.5,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          (profile != null && profile.displayName.trim().isNotEmpty)
-                              ? profile.displayName.trim().characters.first.toUpperCase()
-                              : 'C',
-                          style: TextStyle(
-                            color: scheme.primary,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
+                    BouncyTap(
+                      onTap: () => ref.read(homeTabIndexProvider.notifier).state = 3,
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: isDark ? 0.15 : 0.1),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: scheme.primary.withValues(alpha: isDark ? 0.4 : 0.5),
+                            width: a11y.highContrast ? 2.5 : 1.5,
                           ),
+                        ),
+                        child: ClipOval(
+                          child: (profile?.avatarUrl != null && profile!.avatarUrl!.trim().isNotEmpty)
+                              ? Image.network(
+                                  profile.avatarUrl!,
+                                  width: 42,
+                                  height: 42,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Center(
+                                    child: Text(
+                                      (profile.displayName.trim().isNotEmpty)
+                                          ? profile.displayName.trim().characters.first.toUpperCase()
+                                          : 'C',
+                                      style: TextStyle(
+                                        color: scheme.primary,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    (profile != null && profile.displayName.trim().isNotEmpty)
+                                        ? profile.displayName.trim().characters.first.toUpperCase()
+                                        : 'C',
+                                    style: TextStyle(
+                                      color: scheme.primary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                     ),

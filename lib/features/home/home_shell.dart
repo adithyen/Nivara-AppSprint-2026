@@ -14,6 +14,19 @@ import '../settings/accessibility_controller.dart';
 import '../settings/language_controller.dart';
 import 'home_tab.dart';
 
+/// Global tab index controller for HomeShell navigation.
+class HomeTabIndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  @override
+  set state(int value) => super.state = value;
+  void setIndex(int idx) => state = idx;
+}
+
+final homeTabIndexProvider =
+    NotifierProvider<HomeTabIndexNotifier, int>(HomeTabIndexNotifier.new);
+
 /// 2026-Level Flagship Citizen App Shell with dynamic localization and high-contrast styling.
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
@@ -23,10 +36,9 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  int _index = 0;
-
   @override
   Widget build(BuildContext context) {
+    final index = ref.watch(homeTabIndexProvider);
     final currentLang = ref.watch(languageControllerProvider);
     final a11y = ref.watch(accessibilityControllerProvider);
 
@@ -68,16 +80,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         child: SafeArea(
           bottom: false,
           child: IndexedStack(
-            index: _index,
+            index: index,
             children: [for (final t in tabs) t.body],
           ),
         ),
       ),
-      bottomNavigationBar: _buildGlassNavBar(tabs, a11y),
+      bottomNavigationBar: _buildGlassNavBar(tabs, a11y, index),
     );
   }
 
-  Widget _buildGlassNavBar(List<_TabSpec> tabs, AccessibilityState a11y) {
+  Widget _buildGlassNavBar(List<_TabSpec> tabs, AccessibilityState a11y, int currentIndex) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
 
@@ -123,13 +135,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: List.generate(tabs.length, (i) {
                   final t = tabs[i];
-                  final isSelected = _index == i;
+                  final isSelected = currentIndex == i;
                   return BouncyTap(
                     scaleFactor: 0.92,
                     onTap: () {
-                      if (_index != i) {
+                      if (currentIndex != i) {
                         if (a11y.hapticsEnabled) HapticFeedback.mediumImpact();
-                        setState(() => _index = i);
+                        ref.read(homeTabIndexProvider.notifier).state = i;
                       }
                     },
                     child: AnimatedContainer(

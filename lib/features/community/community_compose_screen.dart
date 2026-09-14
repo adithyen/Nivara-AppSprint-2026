@@ -82,6 +82,7 @@ class _CommunityComposeScreenState
   final _labelCtrl = TextEditingController();
   final _contactCtrl = TextEditingController();
   final _pollCtrls = <TextEditingController>[];
+  bool _allowsMultiple = false;
 
   bool _locationOn = true;
   Position? _pos;
@@ -148,6 +149,7 @@ class _CommunityComposeScreenState
       _radiusKm = e.visibilityRadiusKm.clamp(1, 50);
       _keptPhotos = [...?e.photoUrls];
       _validUntil = e.validUntil;
+      _allowsMultiple = e.allowsMultiple;
       if (e.hasContact) {
         _contactOn = true;
         _contactMethod = e.contactMethodEnum ?? LFContactMethod.phone;
@@ -347,6 +349,7 @@ class _CommunityComposeScreenState
       'contact_method': _contactOn ? _contactMethod.wire : null,
       'contact_value': contactValue,
       'valid_until': _isJob ? _validUntil?.toIso8601String() : null,
+      if (_isPoll) 'allows_multiple': _allowsMultiple,
     };
 
     try {
@@ -547,6 +550,14 @@ class _CommunityComposeScreenState
                     label: Text(NivaraStrings.tr('compose_add_option', currentLang)),
                   ),
                 ),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: _allowsMultiple,
+                onChanged: (v) => setState(() => _allowsMultiple = v),
+                title: const Text('Allow multiple choices', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Citizens can vote for more than one option'),
+              ),
             ],
             if (_isJob) ...[
               const SizedBox(height: 20),

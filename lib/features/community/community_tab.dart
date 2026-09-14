@@ -47,7 +47,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
   Position? _pos;
   List<CommunityPost> _posts = const [];
   Map<String, List<CommunityPollOption>> _pollOptions = const {};
-  Map<String, String> _myVotes = const {};
+  Map<String, Set<String>> _myVotes = const {};
 
   double get _lat => _pos?.latitude ?? kDefaultLat;
   double get _lng => _pos?.longitude ?? kDefaultLng;
@@ -72,7 +72,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
 
     List<CommunityPost> posts = const [];
     var options = <String, List<CommunityPollOption>>{};
-    var votes = <String, String>{};
+    var votes = <String, Set<String>>{};
 
     try {
       final rows = await supabase.rpc(
@@ -117,7 +117,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
     return map;
   }
 
-  Future<Map<String, String>> _fetchMyVotes(List<String> pollIds) async {
+  Future<Map<String, Set<String>>> _fetchMyVotes(List<String> pollIds) async {
     final uid = currentUserId;
     if (uid == null) return {};
     try {
@@ -126,9 +126,11 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
           .select('post_id, option_id')
           .eq('user_id', uid)
           .inFilter('post_id', pollIds);
-      final map = <String, String>{};
+      final map = <String, Set<String>>{};
       for (final r in rows as List) {
-        map[r['post_id'] as String] = r['option_id'] as String;
+        final pid = r['post_id'] as String;
+        final oid = r['option_id'] as String;
+        map.putIfAbsent(pid, () => <String>{}).add(oid);
       }
       return map;
     } catch (_) {
@@ -142,47 +144,51 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
       _snack('Sign in to vote in polls.');
       return;
     }
-    if (_myVotes.containsKey(post.id)) {
-      _snack('You have already voted in this poll.');
-      return;
-    }
+    final postVotes = _myVotes[post.id] ?? <String>{};
+    final alreadyVotedThis = postVotes.contains(option.id);
+    final allowsMultiple = post.allowsMultipleVotes;
+
     try {
-      try {
-        await supabase.rpc('community_vote', params: {
-          'p_post_id': post.id,
-          'p_option_id': option.id,
-        });
-      } catch (_) {
-        // Fallback to table insert
-        await supabase.from(kTableCommunityPollVotes).upsert({
-          'post_id': post.id,
-          'option_id': option.id,
-          'user_id': uid,
+      await supabase.rpc('community_vote', params: {
+        'p_post_id': post.id,
+        'p_option_id': option.id,
+      });
+
+      setState(() {
+        final current = Map<String, Set<String>>.from(_myVotes);
+        final updatedSet = Set<String>.from(current[post.id] ?? <String>{});
+
+        if (alreadyVotedThis) {
+          updatedSet.remove(option.id);
+          _snack('Vote removed.');
+        } else {
+          if (!allowsMultiple) {
+            updatedSet.clear();
+          }
+          updatedSet.add(option.id);
+          _snack(alreadyVotedThis || postVotes.isNotEmpty
+              ? (allowsMultiple ? 'Vote recorded.' : 'Vote changed.')
+              : 'Vote recorded.');
+        }
+
+        if (updatedSet.isEmpty) {
+          current.remove(post.id);
+        } else {
+          current[post.id] = updatedSet;
+        }
+        _myVotes = current;
+      });
+
+      final freshOpts = await _fetchPollOptions([post.id]);
+      if (mounted && freshOpts.containsKey(post.id)) {
+        setState(() {
+          final allOpts = Map<String, List<CommunityPollOption>>.from(_pollOptions);
+          allOpts[post.id] = freshOpts[post.id]!;
+          _pollOptions = allOpts;
         });
       }
-      setState(() {
-        final current = Map<String, String>.from(_myVotes);
-        current[post.id] = option.id;
-        _myVotes = current;
-
-        final opts = _pollOptions[post.id];
-        if (opts != null) {
-          final updated = opts
-              .map(
-                (o) => o.id == option.id
-                    ? o.copyWith(voteCount: o.voteCount + 1)
-                    : o,
-              )
-              .toList();
-          final allOpts =
-              Map<String, List<CommunityPollOption>>.from(_pollOptions);
-          allOpts[post.id] = updated;
-          _pollOptions = allOpts;
-        }
-      });
-      _snack('Vote recorded.');
     } catch (e) {
-      _snack('Could not vote: $e');
+      _snack('Could not update vote: $e');
     }
   }
 
@@ -336,7 +342,7 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
                   isMine: isMine,
                   distanceMeters: dist,
                   options: _pollOptions[p.id] ?? const [],
-                  myVote: _myVotes[p.id],
+                  myVotes: _myVotes[p.id] ?? const <String>{},
                   onVote: (opt) => _vote(p, opt),
                   onEdit: () => _edit(p),
                   onClose: () => _closeJob(p),
@@ -488,7 +494,7 @@ class _PostCard extends StatelessWidget {
     required this.isMine,
     required this.distanceMeters,
     required this.options,
-    required this.myVote,
+    required this.myVotes,
     required this.onVote,
     required this.onEdit,
     required this.onClose,
@@ -499,7 +505,7 @@ class _PostCard extends StatelessWidget {
   final bool isMine;
   final double? distanceMeters;
   final List<CommunityPollOption> options;
-  final String? myVote;
+  final Set<String> myVotes;
   final ValueChanged<CommunityPollOption> onVote;
   final VoidCallback onEdit;
   final VoidCallback onClose;
@@ -665,7 +671,8 @@ class _PostCard extends StatelessWidget {
                   const SizedBox(height: 14),
                   _PollWidget(
                     options: options,
-                    myVote: myVote,
+                    myVotes: myVotes,
+                    allowsMultiple: post.allowsMultipleVotes,
                     onVote: onVote,
                   ),
                 ],
@@ -706,86 +713,126 @@ class _PostCard extends StatelessWidget {
 class _PollWidget extends StatelessWidget {
   const _PollWidget({
     required this.options,
-    required this.myVote,
+    required this.myVotes,
+    required this.allowsMultiple,
     required this.onVote,
   });
 
   final List<CommunityPollOption> options;
-  final String? myVote;
+  final Set<String> myVotes;
+  final bool allowsMultiple;
   final ValueChanged<CommunityPollOption> onVote;
 
   @override
   Widget build(BuildContext context) {
     final total = options.fold<int>(0, (sum, o) => sum + o.voteCount);
-    final hasVoted = myVote != null;
+    final hasVoted = myVotes.isNotEmpty;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
 
     return Column(
-      children: options.map((opt) {
-        final isChosen = myVote == opt.id;
-        final pct = total == 0 ? 0.0 : (opt.voteCount / total);
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: BouncyTap(
-            onTap: hasVoted ? null : () => onVote(opt),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isChosen
-                      ? primary
-                      : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        opt.label,
-                        style: TextStyle(
-                          color: isChosen ? primary : (isDark ? Colors.white : const Color(0xFF111827)),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                      if (hasVoted)
-                        Text(
-                          '${(pct * 100).round()}%',
-                          style: TextStyle(
-                            color: isChosen ? primary : (isDark ? Colors.white60 : const Color(0xFF6B7280)),
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (hasVoted) ...[
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: pct,
-                        minHeight: 6,
-                        backgroundColor: isDark
-                            ? Colors.white.withValues(alpha: 0.06)
-                            : const Color(0xFFE2E8F0),
-                        color: isChosen ? primary : (isDark ? Colors.white38 : Colors.black26),
-                      ),
-                    ),
-                  ],
-                ],
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              allowsMultiple ? Icons.checklist_rounded : Icons.how_to_vote_rounded,
+              size: 14,
+              color: primary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              allowsMultiple
+                  ? 'Multiple choices allowed • Tap to select or change'
+                  : (hasVoted ? 'Tap any option to switch your vote' : 'Single choice • Tap to vote'),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: primary.withValues(alpha: 0.9),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...options.map((opt) {
+          final isChosen = myVotes.contains(opt.id);
+          final pct = total == 0 ? 0.0 : (opt.voteCount / total);
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: BouncyTap(
+              onTap: () => onVote(opt),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isChosen
+                      ? primary.withValues(alpha: isDark ? 0.18 : 0.08)
+                      : (isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isChosen
+                        ? primary
+                        : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+                    width: isChosen ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          allowsMultiple
+                              ? (isChosen ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded)
+                              : (isChosen ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded),
+                          size: 17,
+                          color: isChosen ? primary : (isDark ? Colors.white38 : Colors.black38),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            opt.label,
+                            style: TextStyle(
+                              color: isChosen ? primary : (isDark ? Colors.white : const Color(0xFF111827)),
+                              fontWeight: isChosen ? FontWeight.w800 : FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        if (hasVoted) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '${(pct * 100).round()}%',
+                            style: TextStyle(
+                              color: isChosen ? primary : (isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (hasVoted) ...[
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 5,
+                          backgroundColor: isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : const Color(0xFFE2E8F0),
+                          color: isChosen ? primary : primary.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 }

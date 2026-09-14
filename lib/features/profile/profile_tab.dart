@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/civic_level.dart';
 import '../../core/constants.dart';
@@ -591,31 +593,90 @@ class _IdentityCard extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [primary, NivaraColors.primaryBlue],
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: primary.withValues(alpha: 0.35),
-                  blurRadius: 18,
+          BouncyTap(
+            onTap: () => _showAvatarOptions(context, ref, profile),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primary, NivaraColors.primaryBlue],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: primary.withValues(alpha: 0.35),
+                        blurRadius: 18,
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: (profile?.avatarUrl != null && profile!.avatarUrl!.trim().isNotEmpty)
+                        ? Image.network(
+                            profile!.avatarUrl!,
+                            width: 58,
+                            height: 58,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Center(
+                              child: Text(
+                                name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+                                style: TextStyle(
+                                  color: ThemeData.estimateBrightnessForColor(primary) == Brightness.dark
+                                      ? Colors.white
+                                      : Colors.black,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+                              style: TextStyle(
+                                color: ThemeData.estimateBrightnessForColor(primary) == Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                Positioned(
+                  bottom: -1,
+                  right: -1,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF0C141F) : Colors.white,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      size: 11,
+                      color: ThemeData.estimateBrightnessForColor(primary) == Brightness.dark
+                          ? Colors.white
+                          : Colors.black,
+                    ),
+                  ),
                 ),
               ],
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-              style: TextStyle(
-                color: ThemeData.estimateBrightnessForColor(primary) == Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -684,6 +745,268 @@ class _IdentityCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+Future<void> _showAvatarOptions(
+  BuildContext context,
+  WidgetRef ref,
+  UserProfile? profile,
+) async {
+  if (profile == null) return;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final primary = Theme.of(context).colorScheme.primary;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: isDark ? const Color(0xFF131A24) : Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Profile Photo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Upload or change your profile picture',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: primary.withValues(alpha: 0.15),
+                child: Icon(Icons.camera_alt_rounded, color: primary),
+              ),
+              title: const Text('Take a Photo', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('Use your device camera'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickAndUploadAvatar(context, ref, profile, ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: primary.withValues(alpha: 0.15),
+                child: Icon(Icons.photo_library_rounded, color: primary),
+              ),
+              title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('Select an existing photo'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickAndUploadAvatar(context, ref, profile, ImageSource.gallery);
+              },
+            ),
+            Builder(
+              builder: (ctx) {
+                final currentUser = supabase.auth.currentUser;
+                final meta = currentUser?.userMetadata;
+                final googleAvatar = (meta?['avatar_url'] as String?) ??
+                    (meta?['picture'] as String?) ??
+                    (meta?['photoURL'] as String?);
+                if (googleAvatar != null && googleAvatar.trim().isNotEmpty) {
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF4285F4).withValues(alpha: 0.15),
+                      child: const Icon(Icons.account_circle_outlined, color: Color(0xFF4285F4)),
+                    ),
+                    title: const Text('Use Google Account Photo', style: TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: const Text('Sync avatar from your connected Google profile'),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await _syncGoogleAvatar(context, ref, profile, googleAvatar.trim());
+                    },
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            if (profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty) ...[
+              const Divider(height: 16),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0x22EF4444),
+                  child: Icon(Icons.delete_outline_rounded, color: NivaraColors.danger),
+                ),
+                title: const Text(
+                  'Remove Photo',
+                  style: TextStyle(color: NivaraColors.danger, fontWeight: FontWeight.w700),
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _removeAvatar(context, ref, profile);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> _pickAndUploadAvatar(
+  BuildContext context,
+  WidgetRef ref,
+  UserProfile profile,
+  ImageSource source,
+) async {
+  try {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Uploading profile photo...'),
+            ],
+          ),
+          duration: Duration(seconds: 15),
+        ),
+      );
+    }
+
+    final bytes = await picked.readAsBytes();
+    final path = '${profile.id}/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    await supabase.storage.from(kBucketPhotos).uploadBinary(
+      path,
+      bytes,
+      fileOptions: const FileOptions(
+        contentType: 'image/jpeg',
+        upsert: true,
+      ),
+    );
+
+    final publicUrl = supabase.storage.from(kBucketPhotos).getPublicUrl(path);
+
+    await supabase.from(kTableProfiles).update({
+      'avatar_url': publicUrl,
+    }).eq('id', profile.id);
+
+    await ref.read(authControllerProvider.notifier).refresh();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Profile photo updated successfully!'),
+            backgroundColor: NivaraColors.primary,
+          ),
+        );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Could not upload photo: $e'),
+            backgroundColor: NivaraColors.danger,
+          ),
+        );
+    }
+  }
+}
+
+Future<void> _removeAvatar(
+  BuildContext context,
+  WidgetRef ref,
+  UserProfile profile,
+) async {
+  try {
+    await supabase.from(kTableProfiles).update({
+      'avatar_url': null,
+    }).eq('id', profile.id);
+
+    await ref.read(authControllerProvider.notifier).refresh();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Profile photo removed.')),
+        );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Could not remove photo: $e')),
+        );
+    }
+  }
+}
+
+Future<void> _syncGoogleAvatar(
+  BuildContext context,
+  WidgetRef ref,
+  UserProfile profile,
+  String googleAvatarUrl,
+) async {
+  try {
+    await supabase.from(kTableProfiles).update({
+      'avatar_url': googleAvatarUrl,
+    }).eq('id', profile.id);
+
+    await ref.read(authControllerProvider.notifier).refresh();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Google account photo synced successfully!'),
+            backgroundColor: NivaraColors.primary,
+          ),
+        );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Could not sync photo: $e'),
+            backgroundColor: NivaraColors.danger,
+          ),
+        );
+    }
   }
 }
 

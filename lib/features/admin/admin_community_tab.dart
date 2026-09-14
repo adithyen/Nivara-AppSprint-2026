@@ -15,6 +15,7 @@ import '../../models/community_post.dart';
 import '../../models/enums.dart';
 import '../../router.dart';
 import '../community/community_tab.dart' show communityTypeColor, communityTypeIcon;
+import '../lostfound/lf_contact.dart';
 import '../worker/worker_repo.dart';
 
 /// **Admin Community** tab — state-of-the-art municipal civic feed matching the citizen UI,
@@ -33,7 +34,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
   Position? _pos;
   List<CommunityPost> _posts = const [];
   Map<String, List<CommunityPollOption>> _pollOptions = const {};
-  Map<String, String> _myVotes = const {}; // postId → optionId
+  Map<String, Set<String>> _myVotes = const {}; // postId → Set of optionIds
 
   double get _lat => _pos?.latitude ?? kDefaultLat;
   double get _lng => _pos?.longitude ?? kDefaultLng;
@@ -58,7 +59,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
 
     List<CommunityPost> posts = const [];
     var options = <String, List<CommunityPollOption>>{};
-    var votes = <String, String>{};
+    var votes = <String, Set<String>>{};
 
     try {
       final rows = await supabase.rpc(
@@ -94,7 +95,7 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
         .from(kTableCommunityPollOptions)
         .select()
         .inFilter('post_id', pollIds)
-        .order('sort_order');
+        .order('position');
     final map = <String, List<CommunityPollOption>>{};
     for (final r in rows as List) {
       final opt = CommunityPollOption.fromMap(r as Map<String, dynamic>);
@@ -103,19 +104,25 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
     return map;
   }
 
-  Future<Map<String, String>> _fetchMyVotes(List<String> pollIds) async {
+  Future<Map<String, Set<String>>> _fetchMyVotes(List<String> pollIds) async {
     final uid = supabase.auth.currentUser?.id;
     if (uid == null) return {};
-    final rows = await supabase
-        .from(kTableCommunityPollVotes)
-        .select('post_id, option_id')
-        .eq('user_id', uid)
-        .inFilter('post_id', pollIds);
-    return {
-      for (final r in rows as List)
-        (r as Map<String, dynamic>)['post_id'] as String:
-            r['option_id'] as String,
-    };
+    try {
+      final rows = await supabase
+          .from(kTableCommunityPollVotes)
+          .select('post_id, option_id')
+          .eq('user_id', uid)
+          .inFilter('post_id', pollIds);
+      final map = <String, Set<String>>{};
+      for (final r in rows as List) {
+        final pid = r['post_id'] as String;
+        final oid = r['option_id'] as String;
+        map.putIfAbsent(pid, () => <String>{}).add(oid);
+      }
+      return map;
+    } catch (_) {
+      return {};
+    }
   }
 
   Future<void> _compose(CommunityPostType template) async {
@@ -134,44 +141,132 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
         ..showSnackBar(const SnackBar(content: Text('Sign in to vote in polls.')));
       return;
     }
-    if (_myVotes.containsKey(post.id)) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('You have already voted in this poll.')));
-      return;
-    }
+
+    final postVotes = _myVotes[post.id] ?? <String>{};
+    final alreadyVotedThis = postVotes.contains(option.id);
+    final allowsMultiple = post.allowsMultipleVotes;
+
     try {
-      try {
-        await supabase.rpc('community_vote', params: {
-          'p_post_id': post.id,
-          'p_option_id': option.id,
-        });
-      } catch (_) {
-        await supabase.from(kTableCommunityPollVotes).upsert({
-          'post_id': post.id,
-          'option_id': option.id,
-          'user_id': uid,
+      await supabase.rpc('community_vote', params: {
+        'p_post_id': post.id,
+        'p_option_id': option.id,
+      });
+
+      setState(() {
+        final current = Map<String, Set<String>>.from(_myVotes);
+        final updatedSet = Set<String>.from(current[post.id] ?? <String>{});
+
+        if (alreadyVotedThis) {
+          updatedSet.remove(option.id);
+        } else {
+          if (!allowsMultiple) {
+            updatedSet.clear();
+          }
+          updatedSet.add(option.id);
+        }
+
+        if (updatedSet.isEmpty) {
+          current.remove(post.id);
+        } else {
+          current[post.id] = updatedSet;
+        }
+        _myVotes = current;
+      });
+
+      final freshOpts = await _fetchPollOptions([post.id]);
+      if (mounted && freshOpts.containsKey(post.id)) {
+        setState(() {
+          final allOpts = Map<String, List<CommunityPollOption>>.from(_pollOptions);
+          allOpts[post.id] = freshOpts[post.id]!;
+          _pollOptions = allOpts;
         });
       }
-      setState(() {
-        _myVotes[post.id] = option.id;
-        final opts = _pollOptions[post.id];
-        if (opts != null) {
-          _pollOptions[post.id] = opts
-              .map((o) => o.id == option.id ? o.copyWith(voteCount: o.voteCount + 1) : o)
-              .toList();
-        }
-      });
+
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Vote recorded.')));
+        ..showSnackBar(SnackBar(
+          content: Text(alreadyVotedThis
+              ? 'Vote removed.'
+              : (allowsMultiple ? 'Vote recorded.' : 'Vote recorded / updated.')),
+        ));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Could not vote: $e')));
+        ..showSnackBar(SnackBar(content: Text('Could not update vote: $e')));
     }
+  }
+
+  void _showFullImage(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: NivaraImage(
+                  source: url,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openPostDetail(CommunityPost post) {
+    final dist = (post.lat != null && post.lng != null)
+        ? haversineMeters(_lat, _lng, post.lat!, post.lng!)
+        : null;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF10161E)
+          : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return _AdminPostDetailSheet(
+            post: post,
+            distanceMeters: dist,
+            options: _pollOptions[post.id] ?? const [],
+            myVotes: _myVotes[post.id] ?? const {},
+            onVote: (opt) async {
+              await _vote(post, opt);
+              setSheetState(() {});
+            },
+            onDelete: () async {
+              Navigator.pop(ctx);
+              await _adminDelete(post);
+            },
+            onImageTap: (url) => _showFullImage(context, url),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _adminDelete(CommunityPost post) async {
@@ -332,9 +427,11 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
                   post: p,
                   distanceMeters: dist,
                   options: _pollOptions[p.id] ?? const [],
-                  myVoteOptionId: _myVotes[p.id],
+                  myVotes: _myVotes[p.id] ?? const {},
                   onVote: (opt) => _vote(p, opt),
                   onDelete: () => _adminDelete(p),
+                  onTap: () => _openPostDetail(p),
+                  onImageTap: (url) => _showFullImage(context, url),
                 ),
               );
             }),
@@ -483,288 +580,755 @@ class _AdminTemplateButton extends StatelessWidget {
 class _AdminPostCard extends StatelessWidget {
   const _AdminPostCard({
     required this.post,
-    this.distanceMeters,
+    required this.distanceMeters,
     required this.options,
-    this.myVoteOptionId,
-    this.onVote,
+    required this.myVotes,
+    required this.onVote,
     required this.onDelete,
+    required this.onTap,
+    required this.onImageTap,
   });
 
   final CommunityPost post;
   final double? distanceMeters;
   final List<CommunityPollOption> options;
-  final String? myVoteOptionId;
-  final ValueChanged<CommunityPollOption>? onVote;
+  final Set<String> myVotes;
+  final ValueChanged<CommunityPollOption> onVote;
   final VoidCallback onDelete;
+  final VoidCallback onTap;
+  final ValueChanged<String> onImageTap;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = communityTypeColor(post.type);
-    final totalVotes = options.fold<int>(0, (sum, o) => sum + o.voteCount);
 
     final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
     final secondaryText = isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B);
     final photo = (post.photoUrls?.isNotEmpty ?? false) ? post.photoUrls!.first : null;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF10161E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return BouncyTap(
+      onTap: onTap,
+      scaleFactor: 0.98,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF10161E) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Author Header + Type Badge + Moderation Action
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: color.withValues(alpha: isDark ? 0.2 : 0.12),
-                child: Text(
-                  post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Author Header + Type Badge + Moderation Action
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: color.withValues(alpha: isDark ? 0.2 : 0.12),
+                  child: Text(
+                    post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.authorName,
-                      style: TextStyle(
-                        color: primaryText,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          timeAgo(post.createdAt),
-                          style: TextStyle(color: secondaryText, fontSize: 11),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.authorName,
+                        style: TextStyle(
+                          color: primaryText,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
                         ),
-                        if (distanceMeters != null) ...[
-                          Text(' · ', style: TextStyle(color: secondaryText, fontSize: 11)),
+                      ),
+                      Row(
+                        children: [
                           Text(
-                            formatDistance(distanceMeters!),
+                            timeAgo(post.createdAt),
                             style: TextStyle(color: secondaryText, fontSize: 11),
                           ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Type Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: isDark ? 0.15 : 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withValues(alpha: isDark ? 0.4 : 0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(communityTypeIcon(post.type), color: color, size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      post.type.label,
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Title
-          Text(
-            post.title,
-            style: TextStyle(
-              color: primaryText,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-
-          // Body
-          if (post.body != null && post.body!.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              post.body!.trim(),
-              style: TextStyle(
-                color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF334155),
-                fontSize: 13.5,
-                height: 1.4,
-              ),
-            ),
-          ],
-
-          // Photo if present
-          if (photo != null) ...[
-            const SizedBox(height: 12),
-            NivaraImage(
-              source: photo,
-              height: 190,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ],
-
-          // Poll Section (if poll)
-          if (post.isPoll && options.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            ...options.map((opt) {
-              final pct = totalVotes > 0 ? (opt.voteCount / totalVotes * 100).round() : 0;
-              final isMyVote = myVoteOptionId == opt.id;
-              final canVote = onVote != null && myVoteOptionId == null;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: BouncyTap(
-                  onTap: canVote ? () => onVote!(opt) : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isMyVote
-                          ? color.withValues(alpha: isDark ? 0.18 : 0.10)
-                          : (isDark ? const Color(0xFF141C26) : const Color(0xFFF8FAFC)),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isMyVote
-                            ? color
-                            : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
-                        width: isMyVote ? 1.6 : 1.0,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            if (isMyVote) ...[
-                              Icon(Icons.check_circle_rounded, size: 14, color: color),
-                              const SizedBox(width: 6),
-                            ],
-                            Expanded(
-                              child: Text(
-                                opt.label,
-                                style: TextStyle(
-                                  color: primaryText,
-                                  fontWeight: isMyVote ? FontWeight.w700 : FontWeight.w500,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
+                          if (distanceMeters != null) ...[
+                            Text(' · ', style: TextStyle(color: secondaryText, fontSize: 11)),
                             Text(
-                              '${opt.voteCount} ($pct%)',
-                              style: TextStyle(
-                                color: isMyVote ? color : secondaryText,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                              ),
+                              formatDistance(distanceMeters!),
+                              style: TextStyle(color: secondaryText, fontSize: 11),
                             ),
                           ],
-                        ),
-                      const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: totalVotes > 0 ? opt.voteCount / totalVotes : 0,
-                            minHeight: 5,
-                            backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-                            valueColor: AlwaysStoppedAnimation(color),
-                          ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }),
-          ],
-
-          const SizedBox(height: 12),
-
-          // Admin Moderation Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.admin_panel_settings_outlined,
-                  size: 16,
-                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Official Moderation',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                // Type Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: isDark ? 0.15 : 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: color.withValues(alpha: isDark ? 0.4 : 0.3)),
                   ),
-                ),
-                const Spacer(),
-                BouncyTap(
-                  onTap: onDelete,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: NivaraColors.danger.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: NivaraColors.danger.withValues(alpha: 0.4)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.delete_outline_rounded, size: 14, color: NivaraColors.danger),
-                        SizedBox(width: 4),
-                        Text(
-                          'Delete Post',
-                          style: TextStyle(
-                            color: NivaraColors.danger,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11.5,
-                          ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(communityTypeIcon(post.type), color: color, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        post.type.label,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+
+            const SizedBox(height: 12),
+
+            // Title
+            Text(
+              post.title,
+              style: TextStyle(
+                color: primaryText,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+
+            // Body
+            if (post.body != null && post.body!.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                post.body!.trim(),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF334155),
+                  fontSize: 13.5,
+                  height: 1.4,
+                ),
+              ),
+            ],
+
+            // Photo if present (tappable to zoom)
+            if (photo != null) ...[
+              const SizedBox(height: 12),
+              BouncyTap(
+                onTap: () => onImageTap(photo),
+                child: NivaraImage(
+                  source: photo,
+                  height: 190,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ],
+
+            // Poll Section (interactive)
+            if (post.isPoll && options.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _PollWidget(
+                options: options,
+                myVotes: myVotes,
+                allowsMultiple: post.allowsMultipleVotes,
+                onVote: onVote,
+              ),
+            ],
+
+            const SizedBox(height: 12),
+
+            // Contact Pill & Distance Footer
+            Row(
+              children: [
+                if (post.contactValue != null &&
+                    post.contactValue!.isNotEmpty &&
+                    post.contactMethod != null)
+                  _ContactPill(
+                    method: LFContactMethod.fromWire(post.contactMethod),
+                    value: post.contactValue!,
+                  ),
+                const Spacer(),
+                Text(
+                  'Tap to inspect',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 10,
+                  color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Admin Moderation Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.admin_panel_settings_outlined,
+                    size: 16,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Official Moderation',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                    ),
+                  ),
+                  const Spacer(),
+                  BouncyTap(
+                    onTap: onDelete,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: NivaraColors.danger.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: NivaraColors.danger.withValues(alpha: 0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.delete_outline_rounded, size: 14, color: NivaraColors.danger),
+                          SizedBox(width: 4),
+                          Text(
+                            'Delete Post',
+                            style: TextStyle(
+                              color: NivaraColors.danger,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interactive Poll Widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PollWidget extends StatelessWidget {
+  const _PollWidget({
+    required this.options,
+    required this.myVotes,
+    required this.allowsMultiple,
+    required this.onVote,
+  });
+
+  final List<CommunityPollOption> options;
+  final Set<String> myVotes;
+  final bool allowsMultiple;
+  final ValueChanged<CommunityPollOption> onVote;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = options.fold<int>(0, (sum, o) => sum + o.voteCount);
+    final hasVoted = myVotes.isNotEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              allowsMultiple ? Icons.checklist_rounded : Icons.how_to_vote_rounded,
+              size: 14,
+              color: primary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              allowsMultiple
+                  ? 'Multiple choices allowed • Tap to vote/unvote'
+                  : (hasVoted ? 'Tap any option to switch your vote' : 'Single choice • Tap to vote'),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: primary.withValues(alpha: 0.9),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...options.map((opt) {
+          final isChosen = myVotes.contains(opt.id);
+          final pct = total == 0 ? 0.0 : (opt.voteCount / total);
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: BouncyTap(
+              onTap: () => onVote(opt),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isChosen
+                      ? primary.withValues(alpha: isDark ? 0.18 : 0.08)
+                      : (isDark ? const Color(0xFF131A24) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isChosen
+                        ? primary
+                        : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+                    width: isChosen ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          allowsMultiple
+                              ? (isChosen ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded)
+                              : (isChosen ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded),
+                          size: 17,
+                          color: isChosen ? primary : (isDark ? Colors.white38 : Colors.black38),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            opt.label,
+                            style: TextStyle(
+                              color: isChosen ? primary : (isDark ? Colors.white : const Color(0xFF111827)),
+                              fontWeight: isChosen ? FontWeight.w800 : FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        if (hasVoted) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '${(pct * 100).round()}% (${opt.voteCount})',
+                            style: TextStyle(
+                              color: isChosen ? primary : (isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (hasVoted) ...[
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 5,
+                          backgroundColor: isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : const Color(0xFFE2E8F0),
+                          color: isChosen ? primary : primary.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Contact Action Pill
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ContactPill extends StatelessWidget {
+  const _ContactPill({required this.method, required this.value});
+  final LFContactMethod method;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = lfContactColor(method);
+    final icon = lfContactIcon(method);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return BouncyTap(
+      onTap: () => launchLFContact(method, value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: isDark ? 0.18 : 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              method.label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin Post Detail Modal Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AdminPostDetailSheet extends StatelessWidget {
+  const _AdminPostDetailSheet({
+    required this.post,
+    required this.options,
+    required this.myVotes,
+    required this.distanceMeters,
+    required this.onVote,
+    required this.onDelete,
+    required this.onImageTap,
+  });
+
+  final CommunityPost post;
+  final List<CommunityPollOption> options;
+  final Set<String> myVotes;
+  final double? distanceMeters;
+  final ValueChanged<CommunityPollOption> onVote;
+  final VoidCallback onDelete;
+  final ValueChanged<String> onImageTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = communityTypeColor(post.type);
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Author & Type Header
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: color.withValues(alpha: isDark ? 0.22 : 0.15),
+                  child: Text(
+                    post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.authorName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(
+                            timeAgo(post.createdAt),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                            ),
+                          ),
+                          if (distanceMeters != null) ...[
+                            Text(
+                              ' · ${formatDistance(distanceMeters!)} away',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: isDark ? 0.18 : 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: color.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(communityTypeIcon(post.type), color: color, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        post.type.label,
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Title
+            Text(
+              post.title,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Body
+            if (post.body != null && post.body!.trim().isNotEmpty) ...[
+              Text(
+                post.body!.trim(),
+                style: TextStyle(
+                  fontSize: 14.5,
+                  height: 1.5,
+                  color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Photos Gallery
+            if (post.photoUrls?.isNotEmpty ?? false) ...[
+              const Text(
+                'ATTACHED PHOTOS (TAP TO ZOOM)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...post.photoUrls!.map((url) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: BouncyTap(
+                      onTap: () => onImageTap(url),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: NivaraImage(
+                          source: url,
+                          height: 220,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  )),
+              const SizedBox(height: 12),
+            ],
+
+            // Poll Section
+            if (post.isPoll && options.isNotEmpty) ...[
+              const Text(
+                'MUNICIPAL POLL INTERACTION',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _PollWidget(
+                options: options,
+                myVotes: myVotes,
+                allowsMultiple: post.allowsMultipleVotes,
+                onVote: onVote,
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Contact section
+            if (post.contactValue != null &&
+                post.contactValue!.isNotEmpty &&
+                post.contactMethod != null) ...[
+              const Text(
+                'CONTACT CITIZEN',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _ContactPill(
+                method: LFContactMethod.fromWire(post.contactMethod),
+                value: post.contactValue!,
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Location coordinates
+            if (post.lat != null && post.lng != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF141C26) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 16, color: primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Location: ${post.lat!.toStringAsFixed(5)}, ${post.lng!.toStringAsFixed(5)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // Official Moderation Console
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: NivaraColors.danger.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: NivaraColors.danger.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.shield_outlined, color: NivaraColors.danger, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Municipal Moderation Action',
+                        style: TextStyle(
+                          color: NivaraColors.danger,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'As an administrator, you can remove offensive, irrelevant, or spam posts from the public civic forum.',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  BouncyTap(
+                    onTap: onDelete,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: NivaraColors.danger,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.delete_forever_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Delete This Post Permanently',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
