@@ -52,6 +52,9 @@ class VoiceReportPayload {
   final String description;
   final String? extractedLandmark;
   final String? contactInfo;
+  final String? contactMethod;
+  final DateTime? validUntil;
+  final bool? locationOn;
   final List<String> tags;
   final List<String> pollOptions;
   final String rawTranscript;
@@ -69,6 +72,9 @@ class VoiceReportPayload {
     required this.description,
     this.extractedLandmark,
     this.contactInfo,
+    this.contactMethod,
+    this.validUntil,
+    this.locationOn,
     this.tags = const [],
     this.pollOptions = const [],
     required this.rawTranscript,
@@ -87,6 +93,9 @@ class VoiceReportPayload {
     String? description,
     String? extractedLandmark,
     String? contactInfo,
+    String? contactMethod,
+    DateTime? validUntil,
+    bool? locationOn,
     List<String>? tags,
     List<String>? pollOptions,
     String? rawTranscript,
@@ -104,6 +113,9 @@ class VoiceReportPayload {
       description: description ?? this.description,
       extractedLandmark: extractedLandmark ?? this.extractedLandmark,
       contactInfo: contactInfo ?? this.contactInfo,
+      contactMethod: contactMethod ?? this.contactMethod,
+      validUntil: validUntil ?? this.validUntil,
+      locationOn: locationOn ?? this.locationOn,
       tags: tags ?? this.tags,
       pollOptions: pollOptions ?? this.pollOptions,
       rawTranscript: rawTranscript ?? this.rawTranscript,
@@ -139,6 +151,10 @@ class VoiceReportPayload {
       'initialBody': description,
       'initialPostType': communityType,
       'landmark': extractedLandmark,
+      'contactInfo': contactInfo,
+      'contactMethod': contactMethod,
+      'validUntil': validUntil,
+      'locationOn': locationOn,
     };
   }
 }

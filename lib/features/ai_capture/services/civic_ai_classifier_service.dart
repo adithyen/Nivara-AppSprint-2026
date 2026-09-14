@@ -535,7 +535,7 @@ Respond ONLY with this raw JSON:
           titleMl: 'റോഡിലെ കുഴി',
           descriptionMl:
               'വാഹനങ്ങൾക്കും കാൽനടക്കാർക്കും ഭീഷണിയായ ഒരു വലിയ റോഡ് കുഴി ശ്രദ്ധയിൽ പെട്ടിരിക്കുന്നു.',
-          defaultTags: ['pothole', 'road_damage', 'vehicle_hazard'],
+          defaultTags: ['pothole', 'road_damage', 'vehicle_hazard', 'roadway_hazard'],
         );
       case ReportCategory.openManhole:
         return const CivicPresetMetadata(

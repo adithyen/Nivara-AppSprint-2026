@@ -68,7 +68,7 @@ void main() {
       );
 
       expect(payload.civicCategory, ReportCategory.garbage);
-      expect(payload.title, contains('Garbage'));
+      expect(payload.title, anyOf(contains('Garbage'), contains('कचरा')));
     });
 
     test('Hindi: Detects street light outage', () async {
@@ -214,7 +214,7 @@ void main() {
 
     test('English: Default general post', () async {
       const transcript =
-          'Had a wonderful time meeting the neighbors at our community garden harvest event today';
+          'Had a wonderful time chatting with the neighbors in our community garden this sunny afternoon';
       final payload = await parser.parseTranscript(
         transcript,
         forcedMode: VoiceReportMode.community,

@@ -43,6 +43,14 @@ class CommunityComposeScreen extends ConsumerStatefulWidget {
     this.initialTitle,
     this.initialBody,
     this.initialLabel,
+    this.initialContactOn,
+    this.initialContactMethod,
+    this.initialContactValue,
+    this.initialValidUntil,
+    this.initialLocationOn,
+    this.initialRadiusKm,
+    this.initialLat,
+    this.initialLng,
   });
 
   final CommunityPostType type;
@@ -50,6 +58,14 @@ class CommunityComposeScreen extends ConsumerStatefulWidget {
   final String? initialTitle;
   final String? initialBody;
   final String? initialLabel;
+  final bool? initialContactOn;
+  final LFContactMethod? initialContactMethod;
+  final String? initialContactValue;
+  final DateTime? initialValidUntil;
+  final bool? initialLocationOn;
+  final double? initialRadiusKm;
+  final double? initialLat;
+  final double? initialLng;
 
   @override
   ConsumerState<CommunityComposeScreen> createState() =>
@@ -95,6 +111,34 @@ class _CommunityComposeScreenState
     if (widget.initialTitle != null) _titleCtrl.text = widget.initialTitle!;
     if (widget.initialBody != null) _bodyCtrl.text = widget.initialBody!;
     if (widget.initialLabel != null) _labelCtrl.text = widget.initialLabel!;
+    if (widget.initialContactOn == true || (widget.initialContactValue != null && widget.initialContactValue!.isNotEmpty)) {
+      _contactOn = true;
+      if (widget.initialContactMethod != null) _contactMethod = widget.initialContactMethod!;
+      if (widget.initialContactValue != null) _contactCtrl.text = widget.initialContactValue!;
+    }
+    if (widget.initialValidUntil != null) {
+      _validUntil = widget.initialValidUntil;
+    }
+    if (widget.initialLocationOn != null) {
+      _locationOn = widget.initialLocationOn!;
+    }
+    if (widget.initialRadiusKm != null) {
+      _radiusKm = widget.initialRadiusKm!.clamp(1, 50);
+    }
+    if (widget.initialLat != null && widget.initialLng != null) {
+      _pos = Position(
+        latitude: widget.initialLat!,
+        longitude: widget.initialLng!,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
+    }
     final e = widget.existing;
     if (e != null) {
       _titleCtrl.text = e.title;
@@ -127,8 +171,8 @@ class _CommunityComposeScreenState
     if (_isPoll) {
       _pollCtrls.addAll([TextEditingController(), TextEditingController()]);
     }
-    // A fresh located post needs a GPS fix; an edit already has coordinates.
-    if (!_isEdit && _locationOn) _fetchLocation();
+    // A fresh located post needs a GPS fix; an edit or preset already has coordinates.
+    if (!_isEdit && _locationOn && _pos == null) _fetchLocation();
   }
 
   @override
@@ -411,8 +455,21 @@ class _CommunityComposeScreenState
                     if (payload.description.isNotEmpty && _allowsBody) {
                       _bodyCtrl.text = payload.description;
                     }
-                    if (payload.extractedLandmark != null && _labelCtrl.text.isEmpty) {
+                    if (payload.extractedLandmark != null && payload.extractedLandmark!.isNotEmpty) {
                       _labelCtrl.text = payload.extractedLandmark!;
+                    }
+                    if (payload.contactInfo != null && payload.contactInfo!.isNotEmpty) {
+                      _contactOn = true;
+                      _contactCtrl.text = payload.contactInfo!;
+                      if (payload.contactMethod != null) {
+                        _contactMethod = LFContactMethod.fromWire(payload.contactMethod);
+                      }
+                    }
+                    if (payload.validUntil != null) {
+                      _validUntil = payload.validUntil;
+                    }
+                    if (payload.locationOn != null) {
+                      _locationOn = payload.locationOn!;
                     }
                   });
                 },

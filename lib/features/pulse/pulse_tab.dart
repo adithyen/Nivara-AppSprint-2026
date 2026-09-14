@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -25,13 +27,16 @@ class PulseTab extends ConsumerStatefulWidget {
   ConsumerState<PulseTab> createState() => _PulseTabState();
 }
 
-class _PulseTabState extends ConsumerState<PulseTab> {
+class _PulseTabState extends ConsumerState<PulseTab> with WidgetsBindingObserver {
   final _location = const LocationService();
 
   double _radiusKm = 5;
   Position? _pos;
   bool _locating = true;
   bool _loading = true;
+  bool _locationServiceOff = false;
+  bool _permissionDenied = false;
+  StreamSubscription<ServiceStatus>? _serviceStatusSub;
   List<Report> _reports = const [];
 
   double get _lat => _pos?.latitude ?? kDefaultLat;
@@ -52,15 +57,81 @@ class _PulseTabState extends ConsumerState<PulseTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _listenServiceStatus();
     _init();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _serviceStatusSub?.cancel();
+    super.dispose();
+  }
+
+  void _listenServiceStatus() {
+    _serviceStatusSub = _location.serviceStatusStream.listen((status) {
+      if (status == ServiceStatus.enabled) {
+        if (mounted) {
+          setState(() {
+            _locationServiceOff = false;
+            _locating = true;
+          });
+          _refresh();
+        }
+      } else if (status == ServiceStatus.disabled) {
+        if (mounted) {
+          setState(() => _locationServiceOff = true);
+        }
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkLocationAndReload();
+    }
+  }
+
+  Future<void> _checkLocationAndReload() async {
+    final enabled = await _location.isServiceEnabled();
+    if (enabled && _locationServiceOff) {
+      if (mounted) {
+        setState(() {
+          _locationServiceOff = false;
+          _locating = true;
+        });
+        await _refresh();
+      }
+    } else if (!enabled && !_locationServiceOff) {
+      if (mounted) {
+        setState(() => _locationServiceOff = true);
+      }
+    }
+  }
+
   Future<void> _init() async {
+    final serviceOn = await _location.isServiceEnabled();
+    if (!serviceOn) {
+      if (!mounted) return;
+      setState(() {
+        _locationServiceOff = true;
+        _locating = false;
+      });
+      await _load();
+      return;
+    }
+
     final perm = await _location.ensurePermission();
+    final granted = _location.isGranted(perm);
     Position? pos;
-    if (_location.isGranted(perm)) pos = await _location.current();
+    if (granted) pos = await _location.current();
+
     if (!mounted) return;
     setState(() {
+      _locationServiceOff = false;
+      _permissionDenied = !granted;
       _pos = pos;
       _locating = false;
     });
@@ -80,12 +151,26 @@ class _PulseTabState extends ConsumerState<PulseTab> {
           'p_radius_km': _radiusKm,
           'p_limit': 300,
         },
-      );
+      ).timeout(const Duration(seconds: 4));
       reports = (rows as List)
           .map((e) => Report.fromMap(e as Map<String, dynamic>))
           .toList();
     } catch (_) {
-      reports = const [];
+      // Graceful fallback to direct query if RPC times out or offline
+      try {
+        final fallbackRows = await supabase
+            .from(kTableReports)
+            .select()
+            .order('created_at', ascending: false)
+            .limit(100)
+            .timeout(const Duration(seconds: 3));
+        reports = (fallbackRows as List)
+            .map((e) => Report.fromMap(e as Map<String, dynamic>))
+            .where((r) => haversineMeters(_lat, _lng, r.lat, r.lng) <= _radiusKm * 1000)
+            .toList();
+      } catch (_) {
+        reports = const [];
+      }
     }
     if (!mounted) return;
     setState(() {
@@ -95,10 +180,31 @@ class _PulseTabState extends ConsumerState<PulseTab> {
   }
 
   Future<void> _refresh() async {
+    final serviceOn = await _location.isServiceEnabled();
+    if (!serviceOn) {
+      if (mounted) {
+        setState(() {
+          _locationServiceOff = true;
+          _locating = false;
+        });
+      }
+      await _load();
+      return;
+    }
+
     final perm = await _location.ensurePermission();
-    if (_location.isGranted(perm)) {
-      final pos = await _location.current();
+    final granted = _location.isGranted(perm);
+    Position? pos;
+    if (granted) {
+      pos = await _location.current();
       if (mounted && pos != null) setState(() => _pos = pos);
+    }
+    if (mounted) {
+      setState(() {
+        _locationServiceOff = false;
+        _permissionDenied = !granted;
+        _locating = false;
+      });
     }
     await _load();
   }
@@ -115,6 +221,24 @@ class _PulseTabState extends ConsumerState<PulseTab> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
+          if (_locationServiceOff) ...[
+            _LocationServiceDisabledCard(
+              currentLang: currentLang,
+              onEnablePressed: () async {
+                await _location.openLocationSettings();
+              },
+            ),
+            const SizedBox(height: 14),
+          ] else if (_permissionDenied) ...[
+            _LocationPermissionDeniedCard(
+              currentLang: currentLang,
+              onGrantPressed: () async {
+                await Geolocator.requestPermission();
+                _refresh();
+              },
+            ),
+            const SizedBox(height: 14),
+          ],
           _RadiusCard(
             radiusKm: _radiusKm,
             locating: _locating,
@@ -636,4 +760,225 @@ class _SectionHeader extends StatelessWidget {
       letterSpacing: -0.2,
     ),
   );
+}
+
+class _LocationServiceDisabledCard extends StatelessWidget {
+  final AppLanguage currentLang;
+  final VoidCallback onEnablePressed;
+
+  const _LocationServiceDisabledCard({
+    required this.currentLang,
+    required this.onEnablePressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E170C) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.amber.withValues(alpha: isDark ? 0.4 : 0.6),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.location_off_rounded,
+                  color: Colors.amber,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      NivaraStrings.tr('pulse_gps_disabled_title', currentLang),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                        color: Colors.amber,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      NivaraStrings.tr('pulse_gps_disabled_sub', currentLang),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : const Color(0xFF78350F),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              BouncyTap(
+                onTap: onEnablePressed,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.settings_outlined, color: Colors.black, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        NivaraStrings.tr('pulse_btn_turn_on_gps', currentLang),
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.sync_rounded, size: 13, color: Colors.amber),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Auto-reloads when enabled',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationPermissionDeniedCard extends StatelessWidget {
+  final AppLanguage currentLang;
+  final VoidCallback onGrantPressed;
+
+  const _LocationPermissionDeniedCard({
+    required this.currentLang,
+    required this.onGrantPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F1115) : const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.redAccent.withValues(alpha: isDark ? 0.35 : 0.5),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.near_me_disabled_rounded,
+                  color: Colors.redAccent,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      NivaraStrings.tr('pulse_permission_denied_title', currentLang),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      NivaraStrings.tr('pulse_permission_denied_sub', currentLang),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : const Color(0xFF881337),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          BouncyTap(
+            onTap: onGrantPressed,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    NivaraStrings.tr('pulse_btn_grant_permission', currentLang),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

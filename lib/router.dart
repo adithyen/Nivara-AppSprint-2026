@@ -328,15 +328,35 @@ final routerProvider = Provider<GoRouter>((ref) {
             } else if (extra['post'] is CommunityPost) {
               existing = extra['post'] as CommunityPost;
             }
-            final title = extra['title'] as String?;
-            final body = extra['body'] as String? ?? extra['description'] as String?;
-            final label = extra['address'] as String? ?? extra['label'] as String?;
+            final title = extra['title'] as String? ?? extra['initialTitle'] as String?;
+            final body = extra['body'] as String? ?? extra['description'] as String? ?? extra['initialBody'] as String?;
+            final label = extra['address'] as String? ?? extra['label'] as String? ?? extra['landmark'] as String?;
+            final contactOn = (extra['contactOn'] as bool?) ?? (extra['initialContactOn'] as bool?);
+            final contactMethodRaw = extra['contactMethod'] ?? extra['initialContactMethod'];
+            final LFContactMethod? contactMethod = contactMethodRaw is LFContactMethod
+                ? contactMethodRaw
+                : (contactMethodRaw is String ? LFContactMethod.fromWire(contactMethodRaw) : null);
+            final contactValue = extra['contactValue'] as String? ?? extra['contactInfo'] as String? ?? extra['initialContactValue'] as String?;
+            final validUntil = (extra['validUntil'] as DateTime?) ?? (extra['initialValidUntil'] as DateTime?);
+            final locationOn = (extra['locationOn'] as bool?) ?? (extra['initialLocationOn'] as bool?);
+            final radiusKm = ((extra['radiusKm'] ?? extra['initialRadiusKm']) as num?)?.toDouble();
+            final lat = ((extra['lat'] ?? extra['initialLat']) as num?)?.toDouble();
+            final lng = ((extra['lng'] ?? extra['initialLng']) as num?)?.toDouble();
+
             return CommunityComposeScreen(
               type: type,
               existing: existing,
               initialTitle: title,
               initialBody: body,
               initialLabel: label,
+              initialContactOn: contactOn,
+              initialContactMethod: contactMethod,
+              initialContactValue: contactValue,
+              initialValidUntil: validUntil,
+              initialLocationOn: locationOn,
+              initialRadiusKm: radiusKm,
+              initialLat: lat,
+              initialLng: lng,
             );
           }
 

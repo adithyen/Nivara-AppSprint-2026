@@ -1583,7 +1583,11 @@ class _WorkWithNivaraSheetState extends ConsumerState<_WorkWithNivaraSheet> {
                 final isSelected = _selectedCategories.contains(cat.$1);
                 return FilterChip(
                   avatar: Icon(cat.$3, size: 16, color: isSelected ? Colors.black : cat.$4),
-                  label: Text(NivaraStrings.tr('cat_${cat.$1}', currentLang)),
+                  label: Text(
+                    NivaraStrings.tr('cat_${cat.$1}', currentLang) == 'cat_${cat.$1}'
+                        ? cat.$2
+                        : NivaraStrings.tr('cat_${cat.$1}', currentLang),
+                  ),
                   selected: isSelected,
                   selectedColor: scheme.primary,
                   checkmarkColor: Colors.black,

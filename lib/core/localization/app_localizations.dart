@@ -25,7 +25,7 @@ abstract final class NivaraStrings {
     'role_citizen': {
       AppLanguage.en: 'Citizen',
       AppLanguage.hi: 'नागरिक',
-      AppLanguage.ml: 'നഗരവാസി',
+      AppLanguage.ml: 'പൗരൻ',
     },
     'role_worker': {
       AppLanguage.en: 'Field Worker',
@@ -35,7 +35,7 @@ abstract final class NivaraStrings {
     'role_admin': {
       AppLanguage.en: 'Municipal Officer',
       AppLanguage.hi: 'नगर निगम अधिकारी',
-      AppLanguage.ml: 'നഗരസഭാ ഉദ്യോഗസ്ഥർ',
+      AppLanguage.ml: 'നഗരസഭാ ഉദ്യോഗസ്ഥൻ',
     },
     'role_superadmin': {
       AppLanguage.en: 'Super Admin',
@@ -751,6 +751,43 @@ abstract final class NivaraStrings {
       AppLanguage.ml: 'മറ്റുള്ളവ',
     },
 
+    // Work with Nivara Department Categories
+    'cat_roads_potholes': {
+      AppLanguage.en: 'Roads & Potholes',
+      AppLanguage.hi: 'सड़कें एवं गड्ढे',
+      AppLanguage.ml: 'റോഡുകളും കുഴികളും',
+    },
+    'cat_garbage_waste': {
+      AppLanguage.en: 'Sanitation & Waste',
+      AppLanguage.hi: 'स्वच्छता एवं कचरा',
+      AppLanguage.ml: 'മാലിന്യ നിർമാർജനം',
+    },
+    'cat_street_lighting': {
+      AppLanguage.en: 'Streetlights & Electrical',
+      AppLanguage.hi: 'स्ट्रीट लाइट एवं विद्युत',
+      AppLanguage.ml: 'തെരുവ് വിളക്കുകളും വൈദ്യുതിയും',
+    },
+    'cat_water_drainage': {
+      AppLanguage.en: 'Water & Drainage',
+      AppLanguage.hi: 'जल एवं जल निकासी',
+      AppLanguage.ml: 'കുടിവെള്ളവും ഡ്രെയിനേജും',
+    },
+    'cat_parks_trees': {
+      AppLanguage.en: 'Parks & Environment',
+      AppLanguage.hi: 'पार्क एवं पर्यावरण',
+      AppLanguage.ml: 'പാർക്കുകളും പരിസ്ഥിതിയും',
+    },
+    'cat_animal_control': {
+      AppLanguage.en: 'Animal Control',
+      AppLanguage.hi: 'पशु नियंत्रण',
+      AppLanguage.ml: 'മൃഗസംരക്ഷണം & നിയന്ത്രണം',
+    },
+    'cat_general': {
+      AppLanguage.en: 'General Maintenance',
+      AppLanguage.hi: 'सामान्य रखरखाव',
+      AppLanguage.ml: 'പൊതു അറ്റകുറ്റപ്പണികൾ',
+    },
+
     // Accessibility
     'a11y_vision_title': {
       AppLanguage.en: 'Vision & Display',
@@ -1120,6 +1157,11 @@ abstract final class NivaraStrings {
       AppLanguage.hi: 'सिस्टम',
       AppLanguage.ml: 'സിസ്റ്റം',
     },
+    'theme_system_desc': {
+      AppLanguage.en: 'Matches system dark/light theme automatically',
+      AppLanguage.hi: 'सिस्टम के अनुसार डार्क या लाइट थीम स्वतः सेट होती है',
+      AppLanguage.ml: 'സിസ്റ്റം ക്രമീകരണത്തിനനുസരിച്ച് തീം മാറുന്നു',
+    },
     'theme_light': {
       AppLanguage.en: 'Light',
       AppLanguage.hi: 'लाइट',
@@ -1208,6 +1250,11 @@ abstract final class NivaraStrings {
       AppLanguage.ml: 'പരാതികൾ നൽകാനും കൈകാര്യം ചെയ്യാനും വീണ്ടും ലോഗിൻ ചെയ്യേണ്ടിവരും.',
     },
     'btn_cancel': {
+      AppLanguage.en: 'Cancel',
+      AppLanguage.hi: 'रद्द करें',
+      AppLanguage.ml: 'റദ്ദാക്കുക',
+    },
+    'sign_out_cancel': {
       AppLanguage.en: 'Cancel',
       AppLanguage.hi: 'रद्द करें',
       AppLanguage.ml: 'റദ്ദാക്കുക',
@@ -1396,10 +1443,89 @@ abstract final class NivaraStrings {
       AppLanguage.hi: 'इंटरनेट कनेक्शन बहाल होने पर सूचियां स्वतः अपडेट हो जाएंगी।',
       AppLanguage.ml: 'ഇന്റർനെറ്റ് ലഭ്യമാകുമ്പോൾ തത്സമയം ലഭ്യമാകും.',
     },
+    'my_listings': {
+      AppLanguage.en: 'My Listings',
+      AppLanguage.hi: 'मेरी सूचियां',
+      AppLanguage.ml: 'എന്റെ ലിസ്റ്റിംഗുകൾ',
+    },
+    'could_not_load_items': {
+      AppLanguage.en: 'Could not load listings. Tap to retry.',
+      AppLanguage.hi: 'सूचियां लोड नहीं हो सकीं। पुनः प्रयास करने के लिए टैप करें।',
+      AppLanguage.ml: 'ലിസ്റ്റിംഗുകൾ ലോഡ് ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.',
+    },
     'notifications_title': {
       AppLanguage.en: 'Notifications',
       AppLanguage.hi: 'सूचनाएँ',
       AppLanguage.ml: 'അറിയിപ്പുകൾ',
+    },
+
+    // Pulse Location Services Recovery
+    'pulse_gps_disabled_title': {
+      AppLanguage.en: 'Device Location is Turned Off',
+      AppLanguage.hi: 'डिवाइस लोकेशन बंद है',
+      AppLanguage.ml: 'ലൊക്കേഷൻ സ്വിച്ച് ഓഫ് ആണ്',
+    },
+    'pulse_gps_disabled_sub': {
+      AppLanguage.en: 'Turn on GPS to load live civic telemetry, road hazards, and municipal issues in your immediate radius.',
+      AppLanguage.hi: 'अपने आसपास की नागरिक समस्याओं और रोड खतरों को देखने के लिए जीपीएस चालू करें।',
+      AppLanguage.ml: 'സമീപത്തെ റോഡ് തകരാറുകളും നഗരസഭാ പ്രശ്നങ്ങളും കാണാൻ GPS ഓൺ ചെയ്യുക.',
+    },
+    'pulse_btn_turn_on_gps': {
+      AppLanguage.en: 'Turn On Location',
+      AppLanguage.hi: 'लोकेशन चालू करें',
+      AppLanguage.ml: 'ലൊക്കേഷൻ ഓൺ ചെയ്യുക',
+    },
+    'pulse_permission_denied_title': {
+      AppLanguage.en: 'Location Permission Required',
+      AppLanguage.hi: 'लोकेशन अनुमति आवश्यक है',
+      AppLanguage.ml: 'ലൊക്കേഷൻ അനുമതി ആവശ്യമാണ്',
+    },
+    'pulse_permission_denied_sub': {
+      AppLanguage.en: 'Nivara requires location access to find civic issues around you.',
+      AppLanguage.hi: 'आपके आसपास की समस्याएं खोजने के लिए लोकेशन अनुमति जरूरी है।',
+      AppLanguage.ml: 'സമീപത്തെ പ്രശ്നങ്ങൾ കാണാൻ ലൊക്കേഷൻ അനുമതി നൽകുക.',
+    },
+    'pulse_btn_grant_permission': {
+      AppLanguage.en: 'Grant Permission',
+      AppLanguage.hi: 'अनुमति दें',
+      AppLanguage.ml: 'അനുമതി നൽകുക',
+    },
+
+    // Voice Reporting Community Controls
+    'voice_contact_options': {
+      AppLanguage.en: 'Contact Details (Optional)',
+      AppLanguage.hi: 'संपर्क विवरण (वैकल्पिक)',
+      AppLanguage.ml: 'ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ (ഓപ്ഷണൽ)',
+    },
+    'voice_enable_contact': {
+      AppLanguage.en: 'Add Contact Info',
+      AppLanguage.hi: 'संपर्क जानकारी जोड़ें',
+      AppLanguage.ml: 'ഫോൺ നമ്പർ/ഇമെയിൽ ചേർക്കുക',
+    },
+    'voice_location_landmark': {
+      AppLanguage.en: 'Location & Landmark',
+      AppLanguage.hi: 'स्थान एवं लैंडमार्क',
+      AppLanguage.ml: 'സ്ഥലവും ലാൻഡ്‌മാർക്കും',
+    },
+    'voice_event_expiry_date': {
+      AppLanguage.en: 'Event or Expiry Date',
+      AppLanguage.hi: 'आयोजन या समाप्ति तिथि',
+      AppLanguage.ml: 'തീയതി നിശ്ചയിക്കുക',
+    },
+    'voice_set_date': {
+      AppLanguage.en: 'Set Date',
+      AppLanguage.hi: 'तारीख चुनें',
+      AppLanguage.ml: 'തീയതി തിരഞ്ഞെടുക്കുക',
+    },
+    'voice_citywide': {
+      AppLanguage.en: 'City-Wide Post',
+      AppLanguage.hi: 'पूरे शहर के लिए',
+      AppLanguage.ml: 'നഗരം മുഴുവൻ',
+    },
+    'voice_radius': {
+      AppLanguage.en: 'Radius',
+      AppLanguage.hi: 'दायरा',
+      AppLanguage.ml: 'പരിധി',
     },
     'notifications_empty': {
       AppLanguage.en: 'No notifications yet',

@@ -7,14 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../../core/constants.dart';
+import '../../../core/localization/app_localizations.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/offline_queue_service.dart';
 import '../../../core/services/ola_maps_service.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/theme.dart';
+import '../../../models/community_post.dart';
 import '../../../models/enums.dart';
 import '../../../models/lf_item.dart';
 import '../../../models/report.dart';
@@ -87,6 +90,15 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   Timer? _debounceTimer;
   final ImagePicker _picker = ImagePicker();
 
+  // Community post customization fields
+  late TextEditingController _communityLandmarkCtrl;
+  late TextEditingController _communityContactCtrl;
+  bool _communityLocationOn = true;
+  double _communityRadiusKm = 5.0;
+  bool _communityContactOn = false;
+  LFContactMethod _communityContactMethod = LFContactMethod.phone;
+  DateTime? _communityValidUntil;
+
   @override
   void initState() {
     super.initState();
@@ -95,8 +107,10 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     _selectedCommunityType = widget.initialCommunityType ?? CommunityPostType.general;
     _transcriptController = TextEditingController();
     _transcriptFocusNode = FocusNode();
+    _communityLandmarkCtrl = TextEditingController();
+    _communityContactCtrl = TextEditingController();
 
-    // Match current app language if possible
+    // Match current app language if possible & prefill user profile contact
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final appLang = ref.read(languageControllerProvider);
       if (appLang == AppLanguage.ml) {
@@ -106,6 +120,17 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
       } else {
         _language = VoiceLanguage.auto;
       }
+
+      final profile = ref.read(authControllerProvider).asData?.value;
+      final authEmail = supabase.auth.currentUser?.email;
+      if (profile != null && (profile.phone ?? '').trim().isNotEmpty) {
+        _communityContactCtrl.text = profile.phone!.trim();
+        _communityContactMethod = LFContactMethod.phone;
+      } else if (authEmail != null && authEmail.trim().isNotEmpty) {
+        _communityContactCtrl.text = authEmail.trim();
+        _communityContactMethod = LFContactMethod.email;
+      }
+
       setState(() {});
       _fetchLocation();
       _startVoiceListening();
@@ -117,6 +142,8 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     _debounceTimer?.cancel();
     _transcriptController.dispose();
     _transcriptFocusNode.dispose();
+    _communityLandmarkCtrl.dispose();
+    _communityContactCtrl.dispose();
     ref.read(voiceRecognitionServiceProvider).stopListening();
     super.dispose();
   }
@@ -130,7 +157,14 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
           lat: pos.latitude,
           lng: pos.longitude,
         );
-        if (mounted) setState(() => _currentAddress = addr);
+        if (mounted) {
+          setState(() {
+            _currentAddress = addr;
+            if (_communityLandmarkCtrl.text.trim().isEmpty && addr != null) {
+              _communityLandmarkCtrl.text = addr;
+            }
+          });
+        }
       }
     } catch (_) {}
   }
@@ -191,6 +225,19 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
               }
               if (_mode == VoiceReportMode.community) {
                 _selectedCommunityType = payload.communityType;
+                if (payload.extractedLandmark != null && _communityLandmarkCtrl.text.trim().isEmpty) {
+                  _communityLandmarkCtrl.text = payload.extractedLandmark!;
+                }
+                if (payload.contactInfo != null && _communityContactCtrl.text.trim().isEmpty) {
+                  _communityContactCtrl.text = payload.contactInfo!;
+                  _communityContactOn = true;
+                  if (payload.contactMethod != null) {
+                    _communityContactMethod = LFContactMethod.fromWire(payload.contactMethod);
+                  }
+                }
+                if (payload.validUntil != null && _communityValidUntil == null) {
+                  _communityValidUntil = payload.validUntil;
+                }
               }
             });
           }
@@ -248,6 +295,19 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
             }
             if (_mode == VoiceReportMode.community) {
               _selectedCommunityType = payload.communityType;
+              if (payload.extractedLandmark != null && _communityLandmarkCtrl.text.trim().isEmpty) {
+                _communityLandmarkCtrl.text = payload.extractedLandmark!;
+              }
+              if (payload.contactInfo != null && _communityContactCtrl.text.trim().isEmpty) {
+                _communityContactCtrl.text = payload.contactInfo!;
+                _communityContactOn = true;
+                if (payload.contactMethod != null) {
+                  _communityContactMethod = LFContactMethod.fromWire(payload.contactMethod);
+                }
+              }
+              if (payload.validUntil != null && _communityValidUntil == null) {
+                _communityValidUntil = payload.validUntil;
+              }
             }
           });
         }
@@ -473,18 +533,41 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
           break;
 
         case VoiceReportMode.community:
-          final postMap = {
-            'user_id': uid,
-            'post_type': _selectedCommunityType.wire,
-            'title': _parsedPayload?.title ?? _liveTranscript,
-            'body': _parsedPayload?.description ?? _liveTranscript,
-            if (photoUrls != null && photoUrls.isNotEmpty) 'photo_urls': photoUrls,
-            'lat': _currentPosition?.latitude ?? kDefaultLat,
-            'lng': _currentPosition?.longitude ?? kDefaultLng,
-            'location_label': _parsedPayload?.extractedLandmark ?? _currentAddress,
-            'created_at': DateTime.now().toIso8601String(),
-          };
-          await supabase.from(kTableCommunityPosts).insert(postMap);
+          final post = CommunityPost(
+            id: '',
+            authorId: uid ?? 'anon',
+            authorName: profile?.displayName ?? 'Citizen',
+            type: _selectedCommunityType,
+            title: (_parsedPayload?.title.isNotEmpty == true)
+                ? _parsedPayload!.title
+                : _liveTranscript,
+            body: (_parsedPayload?.description.isNotEmpty == true)
+                ? _parsedPayload!.description
+                : _liveTranscript,
+            photoUrls: photoUrls,
+            lat: _communityLocationOn ? (_currentPosition?.latitude ?? kDefaultLat) : null,
+            lng: _communityLocationOn ? (_currentPosition?.longitude ?? kDefaultLng) : null,
+            locationLabel: _communityLocationOn
+                ? (_communityLandmarkCtrl.text.trim().isNotEmpty
+                    ? _communityLandmarkCtrl.text.trim()
+                    : (_parsedPayload?.extractedLandmark ?? _currentAddress))
+                : null,
+            visibilityRadiusKm: _communityRadiusKm,
+            contactMethod: _communityContactOn ? _communityContactMethod.wire : null,
+            contactValue: _communityContactOn && _communityContactCtrl.text.trim().isNotEmpty
+                ? _communityContactCtrl.text.trim()
+                : null,
+            validUntil: _communityValidUntil,
+            createdAt: DateTime.now(),
+          );
+          try {
+            await supabase.from(kTableCommunityPosts).insert(post.toInsertMap());
+          } catch (_) {
+            await OfflineQueueService.enqueueCommunity(
+              payload: post.toInsertMap(),
+              photos: _attachedPhotoPath != null ? [File(_attachedPhotoPath!)] : const [],
+            );
+          }
           break;
       }
 
@@ -518,8 +601,29 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     if (_parsedPayload == null && _liveTranscript.trim().isEmpty) return;
     Navigator.of(context).pop();
 
-    if (widget.onPayloadReady != null && _parsedPayload != null) {
-      widget.onPayloadReady!(_parsedPayload!);
+    final payload = _parsedPayload ??
+        VoiceReportPayload(
+          mode: _mode,
+          communityType: _selectedCommunityType,
+          lfItemType: _selectedLFItemType,
+          title: _liveTranscript,
+          description: _liveTranscript,
+          rawTranscript: _liveTranscript,
+          timestamp: DateTime.now(),
+        );
+
+    final enriched = payload.copyWith(
+      contactInfo: _communityContactOn ? _communityContactCtrl.text.trim() : null,
+      contactMethod: _communityContactOn ? _communityContactMethod.wire : null,
+      validUntil: _communityValidUntil,
+      locationOn: _communityLocationOn,
+      extractedLandmark: _communityLandmarkCtrl.text.trim().isNotEmpty
+          ? _communityLandmarkCtrl.text.trim()
+          : payload.extractedLandmark,
+    );
+
+    if (widget.onPayloadReady != null) {
+      widget.onPayloadReady!(enriched);
       return;
     }
 
@@ -528,11 +632,11 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
         context.push(
           '/report',
           extra: {
-            'category': _parsedPayload?.civicCategory,
-            'title': _parsedPayload?.title ?? _liveTranscript,
-            'description': _parsedPayload?.description ?? _liveTranscript,
-            'severity': _parsedPayload?.severity ?? Severity.medium,
-            'address': _parsedPayload?.extractedLandmark ?? _currentAddress,
+            'category': enriched.civicCategory,
+            'title': enriched.title,
+            'description': enriched.description,
+            'severity': enriched.severity,
+            'address': enriched.extractedLandmark ?? _currentAddress,
             'lat': _currentPosition?.latitude ?? kDefaultLat,
             'lng': _currentPosition?.longitude ?? kDefaultLng,
             if (_attachedPhotoPath != null) 'photoPath': _attachedPhotoPath,
@@ -554,10 +658,18 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
           '/community/compose',
           extra: {
             'type': _selectedCommunityType,
-            'title': _parsedPayload?.title ?? _liveTranscript,
-            'body': _parsedPayload?.description ?? _liveTranscript,
-            'description': _parsedPayload?.description ?? _liveTranscript,
-            'address': _parsedPayload?.extractedLandmark ?? _currentAddress,
+            'title': enriched.title,
+            'body': enriched.description,
+            'description': enriched.description,
+            'address': enriched.extractedLandmark ?? _currentAddress,
+            'initialContactOn': _communityContactOn,
+            'initialContactMethod': _communityContactMethod,
+            'initialContactValue': _communityContactCtrl.text.trim(),
+            'initialValidUntil': _communityValidUntil,
+            'initialLocationOn': _communityLocationOn,
+            'initialRadiusKm': _communityRadiusKm,
+            'initialLat': _communityLocationOn ? (_currentPosition?.latitude ?? kDefaultLat) : null,
+            'initialLng': _communityLocationOn ? (_currentPosition?.longitude ?? kDefaultLng) : null,
           },
         );
         break;
@@ -568,6 +680,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
+    final currentLang = ref.watch(languageControllerProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -1013,6 +1126,10 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
               ),
             ],
 
+            // Community Customization (Location, Landmark, Contact, Event Date)
+            if (_mode == VoiceReportMode.community)
+              _buildCommunityOptionsSection(isDark, scheme, currentLang),
+
             // Photo Proof Evidence Section
             _buildPhotoProofSection(isDark, scheme),
 
@@ -1085,6 +1202,308 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
           fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+
+  Widget _buildCommunityOptionsSection(bool isDark, ColorScheme scheme, AppLanguage currentLang) {
+    final cardBg = isDark ? const Color(0xFF131F37) : const Color(0xFFF8FAFC);
+    final borderColor = NivaraColors.primary.withValues(alpha: 0.25);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.tune_rounded, size: 16, color: Colors.purpleAccent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Community Post Details',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // 1. Location & Landmark
+          Row(
+            children: [
+              Icon(Icons.location_on_rounded, size: 16, color: scheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  NivaraStrings.tr('voice_location_landmark', currentLang),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+              Switch.adaptive(
+                value: _communityLocationOn,
+                activeTrackColor: scheme.primary,
+                onChanged: (val) {
+                  setState(() => _communityLocationOn = val);
+                },
+              ),
+            ],
+          ),
+          if (_communityLocationOn) ...[
+            const SizedBox(height: 6),
+            TextField(
+              controller: _communityLandmarkCtrl,
+              style: TextStyle(fontSize: 13, color: scheme.onSurface),
+              decoration: InputDecoration(
+                hintText: 'e.g. Near Indiranagar Metro / ${_currentAddress ?? 'Current Location'}',
+                hintStyle: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                prefixIcon: const Icon(Icons.place_outlined, size: 18),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ChoiceChip(
+                  label: Text(
+                    NivaraStrings.tr('voice_radius', currentLang),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: _communityRadiusKm <= 10 ? FontWeight.w700 : FontWeight.w500,
+                      color: _communityRadiusKm <= 10 ? Colors.white : scheme.onSurface,
+                    ),
+                  ),
+                  selected: _communityRadiusKm <= 10,
+                  selectedColor: scheme.primary,
+                  onSelected: (sel) {
+                    if (sel) setState(() => _communityRadiusKm = 5.0);
+                  },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: Text(
+                    NivaraStrings.tr('voice_citywide', currentLang),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: _communityRadiusKm > 10 ? FontWeight.w700 : FontWeight.w500,
+                      color: _communityRadiusKm > 10 ? Colors.white : scheme.onSurface,
+                    ),
+                  ),
+                  selected: _communityRadiusKm > 10,
+                  selectedColor: scheme.primary,
+                  onSelected: (sel) {
+                    if (sel) setState(() => _communityRadiusKm = 50.0);
+                  },
+                ),
+              ],
+            ),
+          ],
+
+          const Divider(height: 20),
+
+          // 2. Contact Information
+          Row(
+            children: [
+              Icon(Icons.contact_phone_rounded, size: 16, color: Colors.teal),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  NivaraStrings.tr('voice_contact_options', currentLang),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+              Switch.adaptive(
+                value: _communityContactOn,
+                activeTrackColor: Colors.teal,
+                onChanged: (val) {
+                  setState(() => _communityContactOn = val);
+                },
+              ),
+            ],
+          ),
+          if (_communityContactOn) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  avatar: const Icon(Icons.phone_rounded, size: 14),
+                  label: const Text('Phone', style: TextStyle(fontSize: 11)),
+                  selected: _communityContactMethod == LFContactMethod.phone,
+                  selectedColor: Colors.teal,
+                  onSelected: (sel) {
+                    if (sel) setState(() => _communityContactMethod = LFContactMethod.phone);
+                  },
+                ),
+                ChoiceChip(
+                  avatar: const Icon(Icons.chat_rounded, size: 14),
+                  label: const Text('WhatsApp', style: TextStyle(fontSize: 11)),
+                  selected: _communityContactMethod == LFContactMethod.whatsapp,
+                  selectedColor: Colors.teal,
+                  onSelected: (sel) {
+                    if (sel) setState(() => _communityContactMethod = LFContactMethod.whatsapp);
+                  },
+                ),
+                ChoiceChip(
+                  avatar: const Icon(Icons.email_rounded, size: 14),
+                  label: const Text('Email', style: TextStyle(fontSize: 11)),
+                  selected: _communityContactMethod == LFContactMethod.email,
+                  selectedColor: Colors.teal,
+                  onSelected: (sel) {
+                    if (sel) setState(() => _communityContactMethod = LFContactMethod.email);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _communityContactCtrl,
+              keyboardType: _communityContactMethod == LFContactMethod.email
+                  ? TextInputType.emailAddress
+                  : TextInputType.phone,
+              style: TextStyle(fontSize: 13, color: scheme.onSurface),
+              decoration: InputDecoration(
+                hintText: _communityContactMethod == LFContactMethod.email
+                    ? 'e.g. citizen@example.com'
+                    : 'e.g. +91 98765 43210',
+                hintStyle: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                prefixIcon: Icon(
+                  _communityContactMethod == LFContactMethod.email
+                      ? Icons.email_outlined
+                      : (_communityContactMethod == LFContactMethod.whatsapp
+                          ? Icons.chat_bubble_outline
+                          : Icons.phone_outlined),
+                  size: 18,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
+                ),
+              ),
+            ),
+          ],
+
+          const Divider(height: 20),
+
+          // 3. Event / Expiry Date Picker
+          Row(
+            children: [
+              Icon(Icons.event_available_rounded, size: 16, color: Colors.orangeAccent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  NivaraStrings.tr('voice_event_expiry_date', currentLang),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+              if (_communityValidUntil != null)
+                IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18, color: Colors.redAccent),
+                  tooltip: 'Clear Date',
+                  onPressed: () => setState(() => _communityValidUntil = null),
+                ),
+              InkWell(
+                onTap: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _communityValidUntil ?? now.add(const Duration(days: 7)),
+                    firstDate: now,
+                    lastDate: now.add(const Duration(days: 365)),
+                  );
+                  if (picked != null) {
+                    setState(() => _communityValidUntil = picked);
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _communityValidUntil != null
+                        ? Colors.orangeAccent.withValues(alpha: 0.2)
+                        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _communityValidUntil != null
+                          ? Colors.orangeAccent
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.calendar_month_rounded,
+                        size: 14,
+                        color: _communityValidUntil != null ? Colors.orangeAccent : scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _communityValidUntil != null
+                            ? DateFormat('dd MMM yyyy').format(_communityValidUntil!)
+                            : NivaraStrings.tr('voice_set_date', currentLang),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: _communityValidUntil != null ? Colors.orangeAccent : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
