@@ -70,7 +70,8 @@ class VoiceReportingSheet extends ConsumerStatefulWidget {
   ConsumerState<VoiceReportingSheet> createState() => _VoiceReportingSheetState();
 }
 
-class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
+class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet>
+    with WidgetsBindingObserver {
   late VoiceReportMode _mode;
   late LFItemType _selectedLFItemType;
   late CommunityPostType _selectedCommunityType;
@@ -102,6 +103,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _mode = widget.initialMode ?? VoiceReportMode.civic;
     _selectedLFItemType = widget.initialLFItemType ?? LFItemType.lost;
     _selectedCommunityType = widget.initialCommunityType ?? CommunityPostType.general;
@@ -112,6 +114,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
 
     // Match current app language if possible & prefill user profile contact
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final appLang = ref.read(languageControllerProvider);
       if (appLang == AppLanguage.ml) {
         _language = VoiceLanguage.ml;
@@ -138,13 +141,28 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When app is minimized to home or goes to background:
+    // Shut down speech immediately to prevent any audio loops or background beeps!
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      ref.read(voiceRecognitionServiceProvider).cancelSync();
+      if (mounted && _voiceState == VoiceState.listening) {
+        setState(() => _voiceState = VoiceState.idle);
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _debounceTimer?.cancel();
     _transcriptController.dispose();
     _transcriptFocusNode.dispose();
     _communityLandmarkCtrl.dispose();
     _communityContactCtrl.dispose();
-    ref.read(voiceRecognitionServiceProvider).stopListening();
+    ref.read(voiceRecognitionServiceProvider).cancelSync();
     super.dispose();
   }
 
@@ -170,6 +188,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
   }
 
   Future<void> _startVoiceListening() async {
+    if (!mounted) return;
     final speechService = ref.read(voiceRecognitionServiceProvider);
 
     final started = await speechService.startListening(
@@ -181,75 +200,97 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
       onStateChanged: (state) {
         if (mounted) setState(() => _voiceState = state);
       },
-      onResult: (text, isFinal) async {
-        if (!mounted) return;
-        _liveTranscript = text;
-
-        // Auto-update controller directly so real spoken words appear in the text field immediately
-        _transcriptController.value = TextEditingValue(
-          text: text,
-          selection: TextSelection.collapsed(offset: text.length),
-        );
-        setState(() {});
-
-        if (text.trim().isNotEmpty) {
-          // Auto-detect Lost vs Found from keywords if spoken
-          final lower = text.toLowerCase();
-          if (_hasMatch(lower, const ['found', 'picked up', 'saw', 'got', 'spotted', 'കണ്ടെത്തി', 'കിട്ടി', 'ലഭിച്ചു', 'കണ്ടു', 'मिला', 'पाया'])) {
-            if (_selectedLFItemType != LFItemType.found) {
-              _selectedLFItemType = LFItemType.found;
-              HapticFeedback.mediumImpact();
-            }
-          } else if (_hasMatch(lower, const ['lost', 'missing', 'dropped', 'misplaced', 'left behind', 'നഷ്ടപ്പെട്ടു', 'പോയി', 'കളഞ്ഞു', 'खो गया', 'गुम'])) {
-            if (_selectedLFItemType != LFItemType.lost) {
-              _selectedLFItemType = LFItemType.lost;
-              HapticFeedback.mediumImpact();
-            }
-          }
-
-          final parser = ref.read(voiceIntentParserServiceProvider);
-          final payload = await parser.parseTranscript(
-            text,
-            forcedMode: _mode,
-            forcedCommunityType: _mode == VoiceReportMode.community ? _selectedCommunityType : null,
-            language: _language,
-            enableAiRefinement: isFinal,
-          );
-          if (mounted) {
-            setState(() {
-              _parsedPayload = (_mode == VoiceReportMode.lostFound)
-                  ? payload.copyWith(lfItemType: _selectedLFItemType)
-                  : payload;
-              if (payload.mode != _mode && widget.initialMode == null) {
-                _mode = payload.mode;
-              }
-              if (_mode == VoiceReportMode.community) {
-                _selectedCommunityType = payload.communityType;
-                if (payload.extractedLandmark != null && _communityLandmarkCtrl.text.trim().isEmpty) {
-                  _communityLandmarkCtrl.text = payload.extractedLandmark!;
-                }
-                if (payload.contactInfo != null && _communityContactCtrl.text.trim().isEmpty) {
-                  _communityContactCtrl.text = payload.contactInfo!;
-                  _communityContactOn = true;
-                  if (payload.contactMethod != null) {
-                    _communityContactMethod = LFContactMethod.fromWire(payload.contactMethod);
-                  }
-                }
-                if (payload.validUntil != null && _communityValidUntil == null) {
-                  _communityValidUntil = payload.validUntil;
-                }
-              }
-            });
-          }
-        } else {
-          if (mounted) setState(() => _parsedPayload = null);
-        }
-      },
+      onResult: _handleVoiceResult,
     );
+
+    if (!mounted) {
+      speechService.cancelSync();
+      return;
+    }
 
     if (!started && mounted) {
       setState(() => _voiceState = VoiceState.idle);
     }
+  }
+
+  void _handleVoiceResult(String text, bool isFinal) async {
+    if (!mounted) return;
+    _liveTranscript = text;
+
+    // Auto-update controller directly so real spoken words appear in the text field immediately
+    _transcriptController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    setState(() {});
+
+    if (text.trim().isNotEmpty) {
+      // Auto-detect Lost vs Found from keywords if spoken
+      final lower = text.toLowerCase();
+      if (_hasMatch(lower, const ['found', 'picked up', 'saw', 'got', 'spotted', 'കണ്ടെത്തി', 'കിട്ടി', 'ലഭിച്ചു', 'കണ്ടു', 'मिला', 'पाया'])) {
+        if (_selectedLFItemType != LFItemType.found) {
+          _selectedLFItemType = LFItemType.found;
+          HapticFeedback.mediumImpact();
+        }
+      } else if (_hasMatch(lower, const ['lost', 'missing', 'dropped', 'misplaced', 'left behind', 'നഷ്ടപ്പെട്ടു', 'പോയി', 'കളഞ്ഞു', 'खो गया', 'गुम'])) {
+        if (_selectedLFItemType != LFItemType.lost) {
+          _selectedLFItemType = LFItemType.lost;
+          HapticFeedback.mediumImpact();
+        }
+      }
+
+      final parser = ref.read(voiceIntentParserServiceProvider);
+      final payload = await parser.parseTranscript(
+        text,
+        forcedMode: _mode,
+        forcedCommunityType: _mode == VoiceReportMode.community ? _selectedCommunityType : null,
+        language: _language,
+        enableAiRefinement: isFinal,
+      );
+      if (mounted) {
+        setState(() {
+          _parsedPayload = (_mode == VoiceReportMode.lostFound)
+              ? payload.copyWith(lfItemType: _selectedLFItemType)
+              : payload;
+          if (payload.mode != _mode && widget.initialMode == null) {
+            _mode = payload.mode;
+          }
+          if (_mode == VoiceReportMode.community) {
+            _selectedCommunityType = payload.communityType;
+            if (payload.extractedLandmark != null && _communityLandmarkCtrl.text.trim().isEmpty) {
+              _communityLandmarkCtrl.text = payload.extractedLandmark!;
+            }
+            if (payload.contactInfo != null && _communityContactCtrl.text.trim().isEmpty) {
+              _communityContactCtrl.text = payload.contactInfo!;
+              _communityContactOn = true;
+              if (payload.contactMethod != null) {
+                _communityContactMethod = LFContactMethod.fromWire(payload.contactMethod);
+              }
+            }
+            if (payload.validUntil != null && _communityValidUntil == null) {
+              _communityValidUntil = payload.validUntil;
+            }
+          }
+        });
+      }
+    } else {
+      if (mounted) setState(() => _parsedPayload = null);
+    }
+  }
+
+  Future<void> _clearTranscript() async {
+    HapticFeedback.lightImpact();
+    _transcriptController.clear();
+    _liveTranscript = '';
+    _debounceTimer?.cancel();
+    setState(() {
+      _parsedPayload = null;
+    });
+    // Completely wipe both Dart buffers and cycle Android's native SpeechRecognizer
+    // so no previously spoken words are retained or prepended to newly spoken words!
+    await ref.read(voiceRecognitionServiceProvider).clearBuffer(
+      restartIfListening: _voiceState == VoiceState.listening,
+    );
   }
 
   bool _hasMatch(String text, List<String> needles) {
@@ -261,7 +302,15 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
 
   void _onTranscriptChanged(String val) {
     _liveTranscript = val;
+    ref.read(voiceRecognitionServiceProvider).updateBaseText(val);
     _debounceTimer?.cancel();
+
+    if (val.trim().isEmpty) {
+      ref.read(voiceRecognitionServiceProvider).clearBuffer(restartIfListening: false);
+      setState(() => _parsedPayload = null);
+      return;
+    }
+
     _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       if (val.trim().isNotEmpty) {
         final lower = val.toLowerCase();
@@ -682,7 +731,14 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
     final scheme = Theme.of(context).colorScheme;
     final currentLang = ref.watch(languageControllerProvider);
 
-    return Container(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          ref.read(voiceRecognitionServiceProvider).cancelSync();
+        }
+      },
+      child: Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -978,14 +1034,7 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
                       ),
                       if (_transcriptController.text.isNotEmpty)
                         GestureDetector(
-                          onTap: () {
-                            _transcriptController.clear();
-                            _liveTranscript = '';
-                            _debounceTimer?.cancel();
-                            setState(() {
-                              _parsedPayload = null;
-                            });
-                          },
+                          onTap: _clearTranscript,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
@@ -1184,8 +1233,9 @@ class _VoiceReportingSheetState extends ConsumerState<VoiceReportingSheet> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSlotChip({required String label, required Color color}) {
     return Container(

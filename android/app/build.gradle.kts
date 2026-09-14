@@ -35,6 +35,7 @@ android {
 
     packaging {
         jniLibs {
+            useLegacyPackaging = true
             pickFirsts.add("**/libmaplibre.so")
             pickFirsts.add("**/libc++_shared.so")
             pickFirsts.add("lib/**/libmaplibre.so")
