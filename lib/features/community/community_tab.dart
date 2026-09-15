@@ -75,10 +75,20 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
     var votes = <String, Set<String>>{};
 
     try {
-      final rows = await supabase.rpc(
+      var rows = await supabase.rpc(
         'community_posts_near',
         params: {'p_lat': _lat, 'p_lng': _lng, 'p_limit': 200},
       );
+      if (rows is List && rows.isEmpty) {
+        // Fallback: If no posts strictly within the narrow local GPS radius,
+        // show active city/regional posts so the board remains lively.
+        rows = await supabase
+            .from(kTableCommunityPosts)
+            .select()
+            .eq('status', 'OPEN')
+            .order('created_at', ascending: false)
+            .limit(200);
+      }
       posts = (rows as List)
           .map((e) => CommunityPost.fromMap(e as Map<String, dynamic>))
           .toList();

@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/Backend-Supabase%20%7C%20PostgreSQL%2015-3ECF8E?style=for-the-badge&logo=supabase"/>
   <img src="https://img.shields.io/badge/AI%20Vision-NVIDIA%20NIM%20%7C%20Llama--3.2--11B-76B900?style=for-the-badge&logo=nvidia"/>
   <img src="https://img.shields.io/badge/Maps-Ola%20Maps%20Vector-E11D48?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Release-v1.0.64%20(Production)-16A34A?style=for-the-badge&logo=android"/>
+  <img src="https://img.shields.io/badge/Release-v1.0.67%20(Production)-16A34A?style=for-the-badge&logo=android"/>
 </p>
 
 <p align="center">
@@ -272,36 +272,62 @@ Transparent end-to-end lifecycle tracking for every reported civic hazard:
 
 # 📱 Screenshots
 
-> Below is the visual showcase of Nivara across Citizen, Field Worker, and Municipal Admin workflows.
+> Below is the visual showcase of Nivara captured directly on physical Android hardware across Citizen, Field Worker, and Municipal Admin workflows. All high-resolution captures are sourced from the [`git images`](git%20images/) repository directory.
+
+### 🏙️ 1. Core Navigation & AI Autonomous Sensing
 
 | Screen | Preview | Highlights |
 |---|:---:|---|
-| **Live Civic Map (Dark Vector)** | <img src="docs/screenshots/01_civic_map.png" width="260" alt="Civic Map Screen"/><br/>`<!-- Placeholder: docs/screenshots/01_civic_map.png -->` | Ola Maps dark vector tiles, category-coded hazard pins, user location marker, and instant report bottom sheet. |
-| **SensorWatch Engine Active** | <img src="docs/screenshots/02_sensorwatch_active.png" width="260" alt="SensorWatch Screen"/><br/>`<!-- Placeholder: docs/screenshots/02_sensorwatch_active.png -->` | Real-time 50Hz accelerometer readout, g-force shock meter, speed deadband indicator, and SHA-256 evidence package logger. |
-| **AI Voice Assistant (Malayalam/Hindi/English)** | <img src="docs/screenshots/03_voice_assistant.png" width="260" alt="Voice Assistant Screen"/><br/>`<!-- Placeholder: docs/screenshots/03_voice_assistant.png -->` | Continuous speech listening waveform, interactive editable transcript box, auto-detected slot chips, and photo proof gate. |
-| **NVIDIA NIM Vision Camera** | <img src="docs/screenshots/04_ai_camera.png" width="260" alt="AI Camera Screen"/><br/>`<!-- Placeholder: docs/screenshots/04_ai_camera.png -->` | Physical steady-lock gyro ring, Llama-3.2-90B inference console, auto-shutter lock, and detected hazard bounding box. |
-| **Lost & Found Hub & Proximity Match** | <img src="docs/screenshots/05_lost_found_hub.png" width="260" alt="Lost & Found Hub"/><br/>`<!-- Placeholder: docs/screenshots/05_lost_found_hub.png -->` | Filterable lost/found listings, PostGIS proximity match badge, reward indicators, and high-resolution photo proof gallery. |
-| **Handover Pass (Dynamic QR & 6-Digit PIN)** | <img src="docs/screenshots/06_handover_pass.png" width="260" alt="Handover Pass"/><br/>`<!-- Placeholder: docs/screenshots/06_handover_pass.png -->` | Cryptographic QR code, proximity PIN handshake, real-time mutual peer sync, and Account Ownership context card. |
-| **Field Worker Task Execution** | <img src="docs/screenshots/07_worker_dashboard.png" width="260" alt="Worker Dashboard"/><br/>`<!-- Placeholder: docs/screenshots/07_worker_dashboard.png -->` | Assigned municipal tasks, GPS route navigation, remediation progress logger, and before/after repair photo proof capture. |
-| **Municipal Admin Triage Console** | <img src="docs/screenshots/08_admin_dashboard.png" width="260" alt="Admin Dashboard"/><br/>`<!-- Placeholder: docs/screenshots/08_admin_dashboard.png -->` | City-wide hazard telemetry, departmental worker dispatch, status audit trail, and field staff management. |
-| **Community Board & Verified Polls** | <img src="docs/screenshots/09_community_board.png" width="260" alt="Community Board"/><br/>`<!-- Placeholder: docs/screenshots/09_community_board.png -->` | Anti-fraud neighbourhood voting, live percentage bars, community announcements, and local micro-job listings. |
-| **Realtime Notification Center** | <img src="docs/screenshots/10_notifications.png" width="260" alt="Notification Center"/><br/>`<!-- Placeholder: docs/screenshots/10_notifications.png -->` | Cross-role push notification history, deep-link routing to reports/handovers, and unread badge synchronization. |
+| **Home Dashboard (Adaptive Light Theme)** | <img src="git%20images/01_home_dashboard.jpg" width="240" alt="Home Dashboard"/> | Curated quick-action banners for AI Vision & AI Voice Reporting, 4 core civic module entrypoints, and bottom navigation bar. |
+| **Live Civic Map (With Hazard Sheet)** | <img src="git%20images/02_live_civic_map.jpg" width="240" alt="Live Civic Map"/> | Ola Maps dark vector tiles, category-coded hazard pins, user location marker, and instant report bottom sheet. |
+| **SensorWatch Autonomous Pothole HUD** | <img src="git%20images/03_sensorwatch_active.jpg" width="240" alt="SensorWatch HUD"/> | Real-time 50Hz accelerometer readout, g-force shock threshold meter, speed deadband indicator, and SHA-256 evidence package logger. |
+| **Multilingual AI Voice Assistant** | <img src="git%20images/04_ai_voice_assistant.jpg" width="240" alt="AI Voice Assistant"/> | Continuous speech listening visualizer, editable transcript box, auto-extracted slot chips (Category, Severity, Landmark), and 1-Tap Submit. |
+| **NVIDIA NIM Vision Camera (Steady-Lock)** | <img src="git%20images/05_ai_vision_camera.jpg" width="240" alt="NVIDIA Vision Camera"/> | Physical gyro steady-lock ring, Llama-3.2-90B inference console, auto-shutter lock, detected bounding box (`ROAD SIGN 80%`), and auto-filled report drawer. |
+| **Civic Report Detail & Street View** | <img src="git%20images/06_civic_report_detail.jpg" width="240" alt="Civic Report Detail"/> | High-resolution photo proof, citizen community verification count, 360° street view, and turn-by-turn navigation CTA. |
 
-### 📸 Recommended Screenshot Capture Specifications
-For optimal presentation when taking screenshots:
-1. **Device Profile**: 1080x2400 (20:9 aspect ratio), Android 13/14, Dark Mode enabled.
-2. **Location Mock**: Thiruvananthapuram (`8.5241° N, 76.9366° E`) with sample hazards plotted on map.
-3. **Storage Location**: Save PNG files directly into `docs/screenshots/` matching the filenames listed in the table above.
+### 🔍 2. Proximity Lost & Found & Verification Radar
+
+| Screen | Preview | Highlights |
+|---|:---:|---|
+| **Lost & Found Hub & Proof Gallery** | <img src="git%20images/07_lost_found_hub.jpg" width="240" alt="Lost & Found Hub"/> | Filterable lost/found listings, PostGIS proximity match badge, reward indicators, and high-resolution photo proof gallery. |
+| **Dynamic Handover Pass & Proximity Radar** | <img src="git%20images/08_dynamic_handover_pass.jpg" width="240" alt="Handover Pass"/> | Cryptographic QR code, proximity PIN handshake, real-time mutual peer sync, and Account Ownership verification card. |
+
+### 📊 3. Hyperlocal Community & Real-Time Telemetry
+
+| Screen | Preview | Highlights |
+|---|:---:|---|
+| **Pulse Telemetry & Proximity Radar** | <img src="git%20images/09_pulse_telemetry_radar.jpg" width="240" alt="Pulse Telemetry Radar"/> | Proximity range slider (1km–100km), live telemetry incident counts, and chronological list of confirmed neighborhood issues. |
+| **Neighborhood Feed & Citizen Polls** | <img src="git%20images/10_community_board_feed.jpg" width="240" alt="Community Feed"/> | Anti-fraud neighbourhood voting polls (e.g. water purifier location), community announcements, and local micro-job listings. |
+| **Realtime Push Notification Center** | <img src="git%20images/11_push_notification_center.jpg" width="240" alt="Push Notifications"/> | Cross-role push notification history with worker leave alerts, community broadcast alerts, and unread badge synchronization. |
+| **Citizen Engagement Activity Timeline** | <img src="git%20images/12_my_activity_timeline.jpg" width="240" alt="Activity Timeline"/> | Complete chronological ledger of filed reports, community confirmations, and lost & found recovery events. |
+
+### ♿ 4. Universal Accessibility & Motor Ergonomics
+
+| Screen | Preview | Highlights |
+|---|:---:|---|
+| **Vision & Display Accessibility** | <img src="git%20images/13_accessibility_vision_colors.jpg" width="240" alt="Accessibility Vision"/> | Dynamic text scaling (1.0x–1.5x), high-contrast modes, and 4 color deficiency correction filters (Protanopia, Deuteranopia, Tritanopia, Greyscale). |
+| **Motor Tremor Protection & Audio Alerts** | <img src="git%20images/14_accessibility_motor_touch.jpg" width="240" alt="Accessibility Motor"/> | Configurable tap debouncing slider (0.10s–4.00s), tactile haptic feedback, animation suppression, and device speaker voice alerts. |
+
+### ⚙️ 5. Enterprise Settings, Governance & Workforce
+
+| Screen | Preview | Highlights |
+|---|:---:|---|
+| **Appearance & 8 Accent Palettes** | <img src="git%20images/15_appearance_themes_accents.jpg" width="240" alt="Appearance Customizer"/> | System, Light, and Dark themes with 8 brand accents (Civic Blue, Teal, Indigo, Violet, Magenta, Emerald, Sunset, Crimson). |
+| **Resilient Offline Queue (All Synced)** | <img src="git%20images/16_offline_resilience_synced.jpg" width="240" alt="Offline Resilience"/> | Zero-data-loss SQLite queue with verified *"All synced! No pending items"* state, background sync worker, and retry engine. |
+| **Citizen Profile & Biometric App Lock** | <img src="git%20images/17_profile_civic_standing_xp.jpg" width="240" alt="Profile Console"/> | Level 3 Block Watcher badge, 115 Civic XP progress, native hardware biometric lock toggle, and multi-lingual language selector. |
+| **In-App Software Update Engine** | <img src="git%20images/18_inapp_software_updates.jpg" width="240" alt="In-App Updates"/> | Official GitHub release registry verification (`v1.0.67 • Build 67`), integrity checks, and direct GitHub release notes link. |
+| **Direct Developer Hotline & Diagnostics** | <img src="git%20images/19_developer_hotline_feedback.jpg" width="240" alt="Developer Hotline"/> | Built-in bug report and suggestion hotline with auto-attached diagnostic device state (OS, version, role) and screenshot attachments. |
+| **Work with Nivara Workforce Application** | <img src="git%20images/20_work_with_nivara_workforce.jpg" width="240" alt="Work with Nivara"/> | Municipal field worker application form with department skill selection, shift availability, and equipment readiness. |
 
 ---
 
 # 🎥 Demo Video
 
-### 🎬 Video Link
-```
-https://youtube.com/watch?v=YOUR_DEMO_VIDEO_LINK
-<!-- Placeholder: Replace with your 2-minute unlisted YouTube or Google Drive video URL -->
-```
+### 🎬 Video Walkthrough & Screen Recordings
+The complete physical device demo recordings showcasing real-time SensorWatch road telemetry, NVIDIA NIM AI camera inference, multilingual voice dictation, PostGIS Lost & Found dynamic handover, and municipal closed-loop dispatch are included directly in the repository:
+- **Comprehensive End-to-End Walkthrough**: [`git images/Record_2026-09-15-07-18-41.mp4`](git%20images/Record_2026-09-15-07-18-41.mp4)
+- **Live SensorWatch & Dynamic Handover Pass**: [`git images/Record_2026-09-15-07-20-27.mp4`](git%20images/Record_2026-09-15-07-20-27.mp4)
+
 
 ### ⏱️ 2-Minute Video Structure & Presentation Guide
 

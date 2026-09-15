@@ -62,10 +62,11 @@ class _AdminCommunityTabState extends ConsumerState<AdminCommunityTab> {
     var votes = <String, Set<String>>{};
 
     try {
-      final rows = await supabase.rpc(
-        'community_posts_near',
-        params: {'p_lat': _lat, 'p_lng': _lng, 'p_limit': 200},
-      );
+      final rows = await supabase
+          .from(kTableCommunityPosts)
+          .select()
+          .order('created_at', ascending: false)
+          .limit(200);
       posts = (rows as List)
           .map((e) => CommunityPost.fromMap(e as Map<String, dynamic>))
           .toList();

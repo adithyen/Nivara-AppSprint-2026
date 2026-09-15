@@ -81,32 +81,55 @@ This guide specifies the exact real-world in-app screenshots needed across the *
 
 ---
 
-### Slide 12: Technology Stack & Hardware Biometric Security
-* **Filename**: `pptimgs/real_slide_12_biometric_lock_screen.png`
-* **Screen Route**: App Launch / App Resume with Biometric Lock Enabled
+### Slide 12: Offline-First Resilience & Distributed Sync Architecture
+* **Filename**: `pptimgs/real_slide_12_offline_resilience.png`
+* **Screen Route**: `/profile` $\rightarrow$ Tap **"Pending Offline Queue"**
 * **What to Show**:
-  - The sleek, high-security **Nivara Biometric Lock Shield**.
-  - System fingerprint / face recognition prompt overlay.
-  - Fallback button: *"Use Device PIN / Pattern"*.
-  - Dark glassmorphic background with subtitle: *"Nivara is locked for your security"*.
-* **Why it matters**: Proves enterprise-grade hardware biometric security protecting sensitive municipal dispatch logs and citizen identity claims.
+  - The clean, high-confidence **Pending Sync Console**.
+  - Vibrant green cloud status icon with message: *"All synced! No pending items. Everything has been submitted."*
+  - Bottom action button: *"Refresh"*.
+* **Why it matters**: Proves resilient local caching, zero lost reports, and automatic background synchronization across civic hazards, lost & found, and community posts.
 
 ---
 
-### Slide 13: Accessibility, Taste & Regional Inclusivity
-* **Filename**: `pptimgs/real_slide_13_language_accessibility.png`
-* **Screen Route**: `/settings/language` or `/settings/accessibility`
+### Slide 13: Universal Accessibility, Adaptive Ergonomics & Regional Inclusivity
+* **Filename**: `pptimgs/real_slide_13_accessibility.png`
+* **Screen Route**: `/profile` $\rightarrow$ Tap **"Accessibility"**
 * **What to Show**:
-  - Interactive language switcher showing instant one-tap switching between **English**, **हिंदी (Hindi)**, and **മലയാളം (Malayalam)**.
-  - High-contrast WCAG AAA dark interface with luminous neon highlights.
-  - Accessibility settings: Text-to-Speech (TTS) voice readout toggle, dynamic font scaling preview, and haptic feedback toggles.
-* **Why it matters**: Highlights that Nivara is built from day one for every Indian citizen, regardless of tech literacy or visual abilities.
+  - **Vision & Display**: Text size scaling chips (`1.0x Normal`, `1.15x Large`, `1.3x X-Large`, `1.5x Max`).
+  - High contrast colours toggle switch.
+  - Colour correction preview spectrum with active filter selections: Red-Green (weak green / weak red), Blue-Yellow, and Greyscale.
+  - **Motion & Touch**: Remove animations switch, Haptic feedback toggle, and Ignore repeated taps switch with adjustable debounce slider (`0.30s`).
+* **Why it matters**: Demonstrates WCAG AAA compliance, motor tremor safeguards, and complete regional accessibility for all demographics.
+
+---
+
+### Slide 14: Enterprise Deployment, APK Store Publications & Verifiable Integrity
+* **Filename**: `pptimgs/real_slide_14_profile_biometrics.png`
+* **Screen Route**: `/profile` (Profile Console bottom card) $\rightarrow$ Tap **"Check for Updates"**
+* **What to Show**:
+  - **Nivara v1.0.67 • PROD** badge and Build 67 official status.
+  - Software Updates modal: *"You're Up to Date — Nivara v1.0.67 is the latest release available."*
+  - Integrity verification: *"Release Channel: Official Production"*, *"Integrity Status: Verified Authentic"*.
+  - Action buttons: *"Check Again"* and *"GitHub Notes"*.
+  - Callout for Updraft 1-tap installation link: `https://app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db`.
+* **Why it matters**: Validates production deployment on official enterprise distribution channels with cryptographic signing and automated update verification.
+
+---
+
+### Slide 15: Real-World Impact, Municipal Roadmap & Conclusion
+* **Filename**: `pptimgs/01_hero_civic_network.png` (or presentation QR card)
+* **What to Show**:
+  - Final visionary summary of urban infrastructure transformation.
+  - QR Code pointing directly to the Updraft App Store installation page.
+  - Team Nivara credentials, open GitHub repo, and final closing mission.
+* **Why it matters**: Delivers an unforgettable closing impact call to action for hackathon judges.
 
 ---
 
 ## 📋 Summary Table of All Presentation Assets
 
-| Slide # | Slide Topic | Primary Visual in `pptimgs/` | Real Screenshot Reference in `realimg.md` |
+| Slide # | Slide Topic | Primary Visual in `pptimgs/` | Real Screenshot in `pptimgs/` |
 |:---:|---|---|---|
 | **Slide 1** | Title & Overview | `01_hero_civic_network.png` *(AI 3D Hero)* | App Icon / Banner (`assets/banner.jpeg`) |
 | **Slide 2** | The Urban Crisis | `02_urban_crisis_infographic.png` *(Editorial Infographic)* | Photo montage of Indian road potholes |
@@ -115,10 +138,11 @@ This guide specifies the exact real-world in-app screenshots needed across the *
 | **Slide 5** | System Architecture | `05_system_architecture.png` *(4-Tier Architectural Diagram)* | Architecture flowchart |
 | **Slide 6** | SensorWatch Telemetry | `06_sensorwatch_telemetry.png` *(50Hz Waveform & SHA-256)* | Live SensorWatch screen with 50Hz readout |
 | **Slide 7** | Multilingual Voice AI | `03_solution_overview.png` *(Voice Pillar)* | `real_slide_07_voice_assistant_sheet.png` |
-| **Slide 8** | Steady-Lock Vision AI | `08_steady_lock_vision_ai.png` *(HUD Gyro Camera)* | Live Vision AI Camera Viewfinder |
+| **Slide 8** | Steady-Lock Vision AI | `08_steady_lock_vision_ai.png` *(HUD Gyro Camera)* | `real_slide_08_ai_camera.png` |
 | **Slide 9** | Proximity Lost & Found | `01_hero_civic_network.png` *(Security Shield)* | `real_slide_09_handover_pass_qr_pin.png` |
 | **Slide 10** | Closed-Loop Governance | `03_solution_overview.png` *(Pillar 3: Worker)* | `real_slide_10_worker_dashboard_proof.png` |
 | **Slide 11** | Pulse Tab & Ola Maps | `01_hero_civic_network.png` *(Map Radar)* | `real_slide_11_pulse_and_olamaps.png` |
-| **Slide 12** | Tech Stack & Security | `05_system_architecture.png` | `real_slide_12_biometric_lock_screen.png` |
-| **Slide 13** | Accessibility & Taste | `03_solution_overview.png` *(Multilingual)* | `real_slide_13_language_accessibility.png` |
-| **Slide 14** | Future Roadmap & Conclusion| `01_hero_civic_network.png` *(Futuristic City)* | Final Team / APK QR code slide |
+| **Slide 12** | Offline-First Resilience | `real_slide_12_offline_resilience.png` | `real_slide_12_offline_resilience.png` |
+| **Slide 13** | Accessibility & Ergonomics | `real_slide_13_accessibility.png` | `real_slide_13_accessibility.png` |
+| **Slide 14** | Production APK & Updraft | `real_slide_14_profile_biometrics.png` | `real_slide_14_profile_biometrics.png` |
+| **Slide 15** | Roadmap & Conclusion | `01_hero_civic_network.png` *(Futuristic City)* | Updraft & GitHub Release QR card |

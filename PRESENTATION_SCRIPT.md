@@ -434,132 +434,180 @@
 
 ---
 
-## SLIDE 12: Technology Stack & Cryptographic Security
+## SLIDE 12: Offline-First Resilience & Distributed Sync Architecture
 
-**Slide Title:** Technology Stack & Security Architecture
-**Subtitle:** Production-Grade Engineering Across Every Layer of the Application
-**Visual Layout:** 2-Column Technical Grid (Technology Stack Table on Left, Security Protocols on Right)
-**Visual Asset:** `pptimgs/05_system_architecture.png` (or `pptimgs/real_slide_12_biometric_lock_screen.png`)
+**Slide Title:** Offline-First Resilience & Zero Data Loss Architecture
+**Subtitle:** Full Civic Participation in Low-Connectivity Zones, Rural Wards & Underground Transit
+**Visual Layout:** 2-Column Split (Local Queue Pipeline on Left, Real In-App Sync Screen on Right)
+**Visual Asset:** `pptimgs/real_slide_12_offline_resilience.png` (Real in-app Pending Sync & Status Screen)
 
 ### On-Slide Content:
+* **The Ground-Reality Connectivity Problem:**
+  - Urban blind spots, metro tunnels, basement basements, and rural panchayats often suffer from zero or intermittent mobile coverage.
+  - Traditional grievance apps crash or discard user input if network drops during form submission, causing severe user frustration.
+* **Full Offline Support Across 3 Core Civic Modules:**
+  - **1. Civic Hazard Reports:** Citizens can file reports completely offline—capturing photos, pinning GPS coordinates, picking severity, and writing descriptions with zero network connectivity.
+  - **2. Lost & Found Radar:** Register lost personal documents or found items with photos and contact details while entirely off the grid.
+  - **3. Community Board Postings:** Draft neighborhood announcements, community polls, and micro-job postings without an active internet connection.
+* **Local Disk & SQLite Caching Engine (`OfflineQueueService`):**
+  - High-resolution photographic proof and JSON payloads are immediately serialized and stored in an encrypted local queue on device storage.
+  - Zero RAM leaks and zero risk of accidental data loss even if the app process is terminated or the phone reboots.
+* **Intelligent Auto-Upload & Synchronization:**
+  - **Active Connectivity Listener:** Subscribes to `Connectivity().onConnectivityChanged` and app resume lifecycle events.
+  - **Automatic Sync Check:** The moment 4G/5G or Wi-Fi reconnects, Nivara conducts an automatic sync check in the background.
+  - **Sequential Processing with Retry:** Flushes pending items in chronological order with exponential backoff retry. Once confirmed by Supabase, local queue displays an **"All Synced! No pending items"** green badge.
+* **Manual Verification:** One-tap *"Refresh & Check Sync"* button gives citizens manual control and total peace of mind.
 
-| Layer | Technologies Used | Key Purpose |
-|---|---|---|
-| **Mobile Core** | Flutter 3.x · Dart 3.12 · Riverpod 3.4.2 | 60fps Native UI, Unidirectional Reactive State |
-| **Routing** | GoRouter 17.4 | Declarative Routing, Role-Based Route Guards |
-| **Backend & DB** | Supabase · PostgreSQL 15 · PostGIS | Relational Storage, Spatial Math, Realtime WS |
-| **Vision AI** | NVIDIA NIM API · Meta Llama-3.2-11B Vision | Automated Zero-Shot Hazard Categorization |
-| **Maps & GIS** | MapLibre GL · Ola Maps Platform API | Custom Dark Vector Styling, Geocoding |
-| **Hardware** | Sensors Plus · Geolocator · Local Auth | 50Hz Accelerometer, GPS, Native Biometrics |
-
-### Enterprise Security & Reliability:
-* **Hardware-Backed Biometric App Lock:** Fingerprint and Face Unlock via `local_auth` with device PIN fallback and lifecycle resume guards.
-* **Row Level Security (RLS):** Strict PostgreSQL policies ensuring citizens, field workers, and admins access only authorized records.
-* **Atomic `SECURITY DEFINER` RPCs:** Server-side transactional integrity for claim handovers and status updates.
-* **Resilient Offline-First Queue:** `OfflineQueueService` caches reports and photos on disk; flushes automatically with exponential backoff on reconnect.
-
-> **Quality Gate:** *"Zero Dart Analyzer Warnings · 63/63 Automated Tests Passing · Fully Tree-Shaken Release Build"*
+> **Architecture Pillar:** *"Zero Lost Complaints · Isolated Local Media Caching · Autonomous Background Sync on Reconnection"*
 
 ---
 
 ### Speaker Script (Slide 12):
-*"Nivara is not a prototype—it is an enterprise-grade, production-engineered mobile application.*
+*"Let's talk about a major reality in India: network connectivity is rarely perfect everywhere.*
 
-*Our tech stack brings together the best of modern mobile and cloud architecture. On the client, **Flutter 3.x and Dart 3.12** deliver a silky-smooth 60 frames per second interface, managed by **Riverpod** for compile-safe, reactive state handling.*
+*Whether you are commuting through an underground metro tunnel, driving along a rural highway between districts, or standing in a crowded marketplace where cellular bandwidth drops to zero, civic emergencies do not wait for a strong 5G signal.*
 
-*Our database layer runs on **Supabase PostgreSQL 15 with PostGIS**. Every single table is protected by strict **Row Level Security (RLS)**. An ordinary user cannot read another citizen's private phone number or tamper with an administrative ticket.*
+*Most conventional government apps fail catastrophically here. If your connection drops while uploading a photo, the app throws a network error and wipes out everything you typed. Citizens simply give up.*
 
-*For security, we built **Native Biometric App Lock** into the core lifecycle. Whether you are an administrator handling emergency dispatches or a citizen verifying a lost item, sensitive screens are shielded with hardware fingerprint or face authentication.*
+*In Nivara, we engineered an uncompromising **Offline-First Architecture** powered by our local `OfflineQueueService`. This capability covers all three core modules: **Civic Hazard Reports**, **Lost & Found Listings**, and **Community Board Postings**.*
 
-*And because civic hazards frequently occur in rural zones, tunnels, or areas with poor cellular coverage, Nivara is built **Offline-First**. Reports, photos, and sensor telemetry are saved to an encrypted local queue on device, and synchronized automatically the moment internet connectivity returns.*
+*When you take a photo and hit submit while offline, Nivara does not fail. It immediately saves the photo, GPS coordinates, and details into a secure local queue on your device. You receive instant confirmation that your report is safely stored.*
 
-*Every single line of code complies with strict quality standards: zero analyzer warnings and 63 out of 63 automated tests passing."*
+*Then, our engine monitors your device's network state. The second your phone reconnects to a Wi-Fi hotspot or cellular tower, Nivara automatically runs a sync check in the background. It uploads your photos, syncs the records with Supabase PostgreSQL, and updates your status to 'All Synced!' without you ever having to open the form again.*
+
+*Your data is never lost. Your voice is never silenced by a dead cell tower."*
 
 ---
 
-## SLIDE 13: Accessibility, Taste & Regional Inclusivity
+## SLIDE 13: Universal Accessibility, Adaptive Ergonomics & Regional Inclusivity
 
-**Slide Title:** Accessibility, Taste & Human-Centric Design
-**Subtitle:** Built for Every Citizen Across All 28 States and 8 Union Territories
-**Visual Layout:** 3-Feature Showcase Grid (Accessibility, Design System, Multilingual)
-**Visual Asset:** `pptimgs/real_slide_13_language_accessibility.png` (or `pptimgs/03_solution_overview.png`)
+**Slide Title:** Universal Accessibility, Ergonomics & Regional Inclusivity
+**Subtitle:** Engineered for Every Citizen Across All 28 States, All Ages & All Physical Abilities
+**Visual Layout:** 3-Feature Ergonomic Showcase (Vision & Display, Interaction & Motor, Screen Reader Semantics)
+**Visual Asset:** `pptimgs/real_slide_13_accessibility.png` (Real in-app Accessibility Settings Screen)
 
 ### On-Slide Content:
-* **True Tri-Lingual Experience:**
-  - One-tap seamless switching between **English**, **हिंदी (Hindi)**, and **മലയാളം (Malayalam)**.
-  - Zero app restarts required; full localization covering all 19 civic categories, forms, and dialogs.
-  - Extended support portal with native typography for all 22 official scheduled languages of India.
-* **WCAG AAA Dark Glassmorphic Aesthetics:**
-  - Deep dark background tones (`#0B0F17`, `#162032`) with luminous neon accents (`#00FFCC`, `#3ECF8E`, `#F59E0B`).
-  - Ultra-high contrast ratio guarantees effortless legibility under harsh Indian sunlight or nighttime transit.
-* **Emil Kowalski Physical Spring Dynamics:**
-  - Natural spring dynamics: buttons scale down on tap (`0.92x`) and bounce back physically.
-  - Synchronized tactile haptic pulses (`mediumImpact()`, `heavyImpact()`) upon sensor triggers, steady-lock confirmation, and form submission.
-* **Full Screen Reader & Accessibility Semantics:**
-  - Complete `Semantics(...)` metadata across every interactive control, map layer, and camera viewfinder for visually impaired citizens.
-  - Built-in Text-to-Speech (TTS) readout for emergency alerts and hazard status updates.
-  - Fluid typography that respects system-level accessibility font scaling without UI clipping.
+* **Vision & Display Customization:**
+  - **Dynamic Text Scaling:** 4 progressive scaling presets—`1.0x (Normal)`, `1.15x (Large)`, `1.3x (X-Large)`, and `1.5x (Max)`—with zero layout breakage or text clipping.
+  - **High-Contrast Dark Mode:** Enforces solid dark surfaces (`#0B0F17`) and high-luminance radiant borders for maximum readability under blazing afternoon sunlight or in complete darkness.
+  - **Medical Color Vision Correction:** 4 dedicated filters for colorblind citizens:
+    - **Red-Green (Green Weak / Deuteranomaly)**
+    - **Red-Green (Red Weak / Protanomaly)**
+    - **Blue-Yellow (Tritanomaly)**
+    - **Greyscale (Monochromacy / Complete Achromatopsia)**
+* **Motion, Touch & Motor Protection:**
+  - **Reduced Animations Toggle:** Instantly strips away all spring dynamics, visual transforms, and orbital pulses for users sensitive to vestibular motion sickness.
+  - **Ignore Repeated Taps (Tremor Filter):** Treat rapid consecutive taps as a single clean event. Features an adjustable tap debounce duration slider (`0.10s to 4.00s` in `0.05s` precision steps) to eliminate accidental double-submits for citizens with shaky hands or motor tremors.
+* **Tactile Haptic Feedback & TalkBack Semantics:**
+  - **Tactile Micro-Interactions:** Subtle, physical haptic vibrations (`lightImpact`, `mediumImpact`, `heavyImpact`) confirm button presses, category selections, and hazard captures without looking at the screen.
+  - **Complete Screen Reader & TalkBack Semantics:** Full `Semantics(...)` coverage on all interactive cards, bottom sheets, camera viewfinders, and Ola Maps hazard pins.
+  - **Built-In Voice Alerts (TTS):** Integrated Text-to-Speech announces live road warnings and task updates through the device speaker.
+* **True Tri-Lingual Experience:** Instant 1-tap language switching between **English**, **हिंदी (Hindi)**, and **മലയാളം (Malayalam)**, plus typography support for all 22 official scheduled languages of India.
 
-> **Design Creed:** *"Accessible to the grandmother in rural Kerala, the commuter in Delhi, and the municipal worker in Bengaluru."*
+> **Design Creed:** *"Accessible to the elderly grandmother in rural Kerala, the colorblind commuter in Mumbai, and the visually impaired student in Delhi."*
 
 ---
 
 ### Speaker Script (Slide 13):
-*"Technology is meaningless if it cannot be used by the people who need it most.*
+*"Technology is truly smart only when it is accessible to everyone.*
 
-*From day one, Nivara was designed with deep human empathy and uncompromising design taste.*
+*From the very beginning, Nivara was built with deep empathy for the diverse needs of Indian citizens.*
 
-*Our interface is fully tri-lingual in **English, Hindi, and Malayalam**. With one tap, every menu, dialog, and category label switches instantly without restarting the app. Furthermore, our language directory provides native typography support for all 22 official languages of India.*
+*First, we addressed visual accessibility. Many senior citizens struggle with tiny fonts on modern phones. Nivara provides dynamic text scaling up to 1.5x without any overlapping text or broken layouts. We also built medical-grade color correction filters directly into the app, supporting Red-Green, Blue-Yellow, and Greyscale modes so colorblind citizens can easily identify category colors and status badges.*
 
-*Visually, we crafted a high-contrast dark aesthetic that meets **WCAG AAA standards**. The deep dark glassmorphic surfaces combined with radiant neon cyan and amber accents ensure crystal-clear visibility whether you are riding under the blazing afternoon sun or walking down a dark street at night.*
+*Second, we tackled physical and motor challenges. For citizens with Parkinson's, motor tremors, or unsteady hands, accidental multiple taps can accidentally submit forms twice or cancel actions. Our 'Ignore Repeated Taps' engine lets users customize a tap debounce buffer from 0.1 to 4.0 seconds, merging jittery taps into one clean action. And for users prone to motion sickness, our 'Remove Animations' switch instantly eliminates all visual spring physics.*
 
-*Inspired by Emil Kowalski's motion design principles, every button press, sheet expansion, and camera lock is governed by physical spring dynamics and subtle haptic vibrations. When your phone detects a pothole or locks focus, you physically feel the confirmation in your hand.*
+*Third, we integrated rich tactile haptics. Every button press, camera steady-lock, and sensor alert gives a subtle physical vibration, allowing commuters to feel confirmations even in loud street environments.*
 
-*And for visually impaired citizens, every interactive element is wrapped in declarative TalkBack semantics with built-in voice readouts.*
+*And for visually impaired citizens, every screen, map pin, and button is annotated with complete Android TalkBack semantics and voice readouts.*
 
-*Nivara belongs to every Indian citizen."*
+*Nivara leaves no citizen behind."*
 
 ---
 
-## SLIDE 14: Real-World Impact, Roadmap & Conclusion
+## SLIDE 14: Enterprise Deployment, APK Store Publications & Verifiable Integrity
 
-**Slide Title:** Real-World Impact & The Road Ahead
-**Subtitle:** From a Hackathon Prototype to Nationwide Civic Infrastructure
-**Visual Layout:** 2-Column Split (Impact Milestones on Left, Future Roadmap & Download on Right)
-**Visual Asset:** `pptimgs/01_hero_civic_network.png` (Futuristic panoramic smart city with safe roads)
+**Slide Title:** Production Deployment & Official Distribution Channels
+**Subtitle:** Instant 1-Tap Installation, Enterprise App Stores & Automated In-App Updates
+**Visual Layout:** 2-Column Split (Public Distribution Links & QR on Left, App Integrity on Right)
+**Visual Asset:** `pptimgs/real_slide_14_profile_biometrics.png` (In-App Production Build 67 and GitHub Release Verification card)
 
 ### On-Slide Content:
-* **Immediate Tangible Impact:**
-  - **Accident Prevention:** Early passive mapping of road sinkholes and potholes before fatal crashes occur.
-  - **Zero Ghost Closures:** 100% of completed tickets backed by immutable after-repair photos and 3 citizen confirmations.
-  - **Faster Municipal Response:** Reduces complaint filing time from 5 minutes to **0 seconds passive capture**.
-* **Future Expansion Roadmap:**
-  - 🚗 **Dashcam & Fleet Telemetry:** Integrating SensorWatch algorithms into public bus fleets and delivery networks.
-  - 🛰️ **Municipal ERP Integration:** Direct API connectors to city municipal bodies (BBMP, BMC, Smart City Mission).
-  - 🤖 **Predictive Infrastructure Maintenance:** AI forecasting of road deterioration before potholes form.
-* **Ready for Immediate Deployment:**
-  - Signed release APK available for instant installation (**v1.0.65**).
-  - Complete open codebase with comprehensive documentation and schema migrations.
+* **Primary Public Distribution Channels:**
+  - 🚀 **Updraft Enterprise App Store (Recommended 1-Tap Install):**
+    Direct, frictionless enterprise installation for hackathon judges, municipal evaluators, and pilot testers:
+    👉 **Live Updraft App URL:** `https://app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db`
+  - 📦 **Official GitHub Releases Registry:**
+    Cryptographically signed release binaries hosted on GitHub:
+    👉 **Release Repository:** `github.com/adithyen/Nivara-AppSprint-2026/releases`
+  - 📲 **BetaDrop & InstallOnAir Over-The-Air Channels:**
+    Seamless wireless test distribution across diverse Android device configurations.
+* **Automated In-App Software Updater:**
+  - **Live Registry Polling:** In-app update checker queries GitHub Release API on launch and via the Profile Console.
+  - **Non-Intrusive Update Modal:** Displays installed version (`v1.0.67 • Build 67`), release channel (`Official Production`), integrity status (`Verified Authentic`), and direct download buttons.
+* **Production Integrity & Security Standards:**
+  - **Release Signing:** Production keystore signed with Android v2/v3 signature schemes.
+  - **Tamper-Proof Binaries:** Pre-compiled SHA-256 binary checksums verify code authenticity before installation.
+  - **Clean Code Quality Gate:** Zero Dart analyzer errors or warnings, tree-shaken assets, and full automated test suite coverage.
 
-> **Closing Thought:** *"Nivara transforms passive commuters into active city guardians. Your City. Your Proof. Your Voice."*
-
-### Key Links & Contacts:
-* **GitHub Repository:** `github.com/adithyen/Nivara-AppSprint-2026`
-* **Direct APK Download:** `github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.65`
-* **Developer:** Adithyan H · Team Nivara · AppSprint 2026
+> **Ready to Test:** *"Install in 10 Seconds via Updraft · Built & Signed for Production · Self-Updating In-App Engine"*
 
 ---
 
 ### Speaker Script (Slide 14):
-*"As we conclude, let us look at what Nivara means for the future of our cities.*
+*"Nivara is not an abstract concept or a slideshow prototype. It is a fully built, signed, and tested Android production app that you can install on your personal smartphone right now.*
 
-*By turning everyday smartphones into passive infrastructure sensors, we can map entire city road networks without spending crores of taxpayers' money on dedicated inspection vehicles. By requiring photographic proof and decentralized citizen verification, we restore trust between citizens and local government.*
+*To make evaluation effortless for our hackathon judges, we have published Nivara directly on the **Updraft Enterprise App Store**. You can visit the link on screen—`app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db`—and install the application with a single tap, exactly like a public app store.*
 
-*Our roadmap includes integrating our sensor algorithms into public municipal bus fleets, auto-rickshaw networks, and delivery services, creating a 24/7 self-healing map of urban infrastructure.*
+*Every build is cryptographically signed using production Android keys, and also published as an official release on our open GitHub repository.*
 
-*Nivara is fully functional, thoroughly tested, and available right now as a production-ready Android APK in version 1.0.65.*
+*Furthermore, we built an **Automated In-App Software Updater**. When a new municipal patch or feature release is published, citizens can check for updates directly inside their profile, review the release notes, and install the verified authentic package safely.*
 
-*Cities belong to the people who walk their streets, ride their buses, and drive their roads. With Nivara, we give every citizen the power to protect their neighborhood.*
+*From code compilation to public distribution, Nivara meets the highest standards of production engineering."*
+
+---
+
+## SLIDE 15: Real-World Impact, Municipal Roadmap & Conclusion
+
+**Slide Title:** Real-World Impact & The Road Ahead
+**Subtitle:** Transforming Indian Cities from Reactive Frustration to Proactive Intelligence
+**Visual Layout:** 2-Column Split (Tangible Impact Metrics on Left, Future Roadmap on Right)
+**Visual Asset:** `pptimgs/01_hero_civic_network.png` (Futuristic panoramic smart city with safe roads)
+
+### On-Slide Content:
+* **Immediate Tangible Impact:**
+  - **Accident Prevention:** Early passive mapping of road sinkholes and potholes before fatal accidents occur.
+  - **Zero Ghost Closures:** 100% of completed tickets backed by immutable after-repair photos and 3 citizen confirmations.
+  - **Faster Municipal Response:** Reduces complaint filing time from 5 minutes of tedious typing down to **zero-second passive telemetry**.
+  - **Inclusive Governance:** 22 Indian languages and medical accessibility features empower every demographic.
+* **Future Expansion Roadmap:**
+  - 🚗 **Dashcam & Fleet Telemetry:** Integrating SensorWatch algorithms into municipal public buses (KSRTC, DTC, BEST) and ride-hailing delivery networks.
+  - 🛰️ **Municipal ERP Integration:** Direct API connectors to city municipal corporations (BBMP, BMC, Smart City Mission portals).
+  - 🤖 **Predictive Infrastructure Maintenance:** AI forecasting of road deterioration using seasonal rainfall patterns and traffic volume.
+* **Ready for Immediate Deployment:**
+  - Signed release APK available for instant installation (**v1.0.67 • Build 67**).
+  - Complete open codebase with comprehensive documentation and schema migrations.
+
+> **Closing Thought:** *"Nivara transforms passive commuters into active city guardians. Your City. Your Proof. Your Voice."*
+
+### Key Links & Verification:
+* **Updraft App Store (1-Tap Install):** `https://app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db`
+* **GitHub Repository:** `github.com/adithyen/Nivara-AppSprint-2026`
+* **Direct Release APK:** `github.com/adithyen/Nivara-AppSprint-2026/releases`
+* **Lead Developer:** Adithyan H · Team Nivara · AppSprint 2026
+
+---
+
+### Speaker Script (Slide 15):
+*"As we conclude, let us reflect on what Nivara means for the future of our cities.*
+
+*By turning everyday smartphones into passive infrastructure sensors, we can map entire city road networks without spending crores of taxpayers' money on specialized inspection vehicles. By enforcing photographic repair proof and citizen confirmation, we restore trust between citizens and municipal authorities.*
+
+*Our roadmap includes integrating our sensor algorithms into public bus fleets, auto-rickshaws, and delivery fleets, creating a 24/7 self-healing map of urban infrastructure.*
+
+*Nivara is fully functional, thoroughly tested, and available right now for installation.*
+
+*Cities belong to the people who walk their streets, ride their buses, and live in their neighborhoods. With Nivara, we give every citizen the power to protect their city.*
 
 ***Your City. Your Proof. Your Voice.***
 
