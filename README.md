@@ -125,35 +125,39 @@ graph TD
 # ✨ Features & Architectural Matrix
 
 ### 🎁 Bonus Point Features Added
-* **App Store Publication Link**:[Click Here :) ](https://app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db)
-* [GitHub Releases (Direct APK Download)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.64) *(Production APK signed and distributed directly for instant installation)*
-* **Native Biometric App Lock & Device Security Failsafe**:
-  * **Hardware-Backed Biometrics**: Native fingerprint and face authentication via `local_auth` with seamless fallback to device PIN / Pattern / Passcode (`biometricOnly: false`) guaranteeing device-agnostic security.
-  * **First-Launch Security Consent**: A person freshly installing the app is seamlessly prompted with an interactive setup dialog to opt into native app security.
-  * **Role-Wide Profile Settings**: Biometric app lock toggle is fully configurable within the Profile settings tab across all 3 user categories: **Citizen**, **Municipal Field Worker**, and **Municipal Admin**.
-  * **App Lifecycle Resume Guard**: Automatically shields sensitive municipal dispatch orders, triage queues, and personal lost-item handover credentials whenever the app is minimized or the screen is locked.
-* **Emil Kowalski Interactive Physical Guidance Sheets**:
-  * **Kinetic Physics & Haptic Micro-Interactions**: Custom modal guidance sheets (`InteractiveInfoGuideSheet`) implemented in **SensorWatch** and **Lost & Found Hub** designed according to Emil Kowalski motion design principles.
-  * **Auto-Discovery Modal Gate**: Automatically surfaces on entry to guide first-time users through complex sensor telemetry and proximity handshakes until acknowledged.
-  * **Interactive Slide-to-Confirm Gesture**: Features a tactile *"I understand how this works"* checkbox which physically expands into a fluid spring-physics slider (*"Understood, don't show again"*), persistent in local storage with permanent AppBar `(i)` access.
-* **Real-World Enterprise Authentication & Google OAuth**:
-  * **Production-Grade Credential Integrity**: Eliminated pre-filled and guided demo credentials across Field Worker and Admin portals to satisfy real-world security evaluation standards.
-  * **"Continue with Google" Integration**: Seamless native Google OAuth sign-in powered by Supabase Auth and Android custom-scheme deep-link redirection (`in.adithyen.nivara://login-callback`).
-* **Dual-Mode Lost & Found Voice Assistant**:
-  * **Physical Segmented Mode Switcher**: Integrated physical segmented toggle (`[ 🔴 I Lost an Item ]` | `[ 🟢 I Found an Item ]`) directly into the Voice Reporting Sheet.
-  * **Multilingual Keyword Auto-Classification**: Dynamic natural speech analysis that automatically detects whether the user is reporting a lost possession or a discovered item across English, Malayalam, and Hindi.
-* **Harmonized Design System & Card Consistency**:
-  * Clean visual hierarchy eliminating duplicate badge tags (`'19 HAZARDS'`, `'VOICE AI'`) and aligning form category cards with the Home screen's dark glassmorphic palette and typography.
-* **Comprehensive Accessibility Features**:
-  * **Screen Reader & TalkBack Semantics**: Every interactive control, status badge, camera HUD overlay, and map layer is equipped with declarative `Semantics(...)` metadata, providing an effortless experience for visually impaired users.
-  * **Dynamic Typography & Fluid Font Scaling**: Fluid responsive layouts that adapt cleanly to system-level font scaling and text accessibility configurations without truncation or layout clipping.
-  * **High-Contrast Dark Aesthetics (WCAG AAA)**: Precision dark theme (`#0B0F17`, `#162032`) designed with luminous neon accents (`#00FFCC`, `#3ECF8E`, `#F59E0B`), guaranteeing high readability and contrast in direct sunlight or during nighttime transit.
-  * **Emil Kowalski Physical Spring Dynamics & Haptics**: Native tactile feedback pulses (`HapticFeedback.mediumImpact()`, `heavyImpact()`) synchronized with camera steady-lock, voice dictation toggle, and form validation, creating a tangible physical interface.
-  * **Multilingual Text-to-Speech (TTS) Guidance**: Built-in voice synthesis prompts (`flutter_tts`) that read out hazard verification statuses, emergency instructions, and voice assistant responses in regional languages.
-* **Resilient Offline-First Support**:
-  * **Zero-Data-Loss Local Queue**: Powered by `OfflineQueueService` with persistent disk storage (`offline_reports_queue.json`) and local media caching.
-  * **Optimistic Local Execution**: When reports, photo evidence, sensor telemetry, or community votes are generated in cellular dead zones or transit tunnels, they are cached instantly on-device and displayed optimistically.
-  * **Autonomous Background Sync**: As soon as internet connectivity is restored, an autonomous synchronization engine automatically flushes the queue with exponential backoff and retries, preserving original capture timestamps and awarding civic XP retroactively.
+
+#### 1. 📦 App Store Publications & Multi-Channel Distribution
+* **Official Updraft App Store Distribution**: [Click Here to Install via Updraft :)](https://app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db) *(Instant Over-The-Air mobile installation with QR code & persistent hosting)*
+* **BetaDrop Public Install Portal**: [Click Here for BetaDrop OTA](https://betadrop.app/install/?i=6pxXG3) *(1-tap browser-based mobile installation without Google Play requirement)*
+* **GitHub Releases (Dual APK Builds)**: [Nivara v1.0.67 GitHub Release](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.67) *(Production signed builds for instant direct download)*
+  * **Compressed Release APK (47.0 MB)**: `nivara-v1.0.67_compressed.apk` — Ultra-compressed lightweight build with legacy packed `.so` native libraries (>55% download bandwidth savings).
+  * **Standard Full APK (106.8 MB)**: `nivara-v1.0.67.apk` — Uncompressed native JNI build for instant zero-overhead installation on high-performance devices.
+
+#### 2. ♿ Comprehensive Accessibility Features (Universal Civic Tech)
+Nivara is engineered from the ground up to ensure every citizen, regardless of visual, auditory, cognitive, or physical limitations, has unrestricted access to city services:
+* **Dynamic Text Scaling**: Responsive typographic hierarchy using fluid font scaling that automatically adapts to device system accessibility font scale preferences without text clipping, truncation, or layout breakage.
+* **High-Contrast Color Filters (WCAG AAA)**: Precision dark glassmorphic palette (`#0B0F17`, `#162032`) paired with luminous neon status accents (`#00FFCC`, `#3ECF8E`, `#F59E0B`), providing exceptional visual contrast under bright direct sunlight or low-light nighttime transit for color-blind and low-vision users.
+* **Reduced Animations Support**: Automatically detects and strictly honors the device's system-level `disable_animations` / Reduced Motion accessibility toggle, disabling spring physics and heavy layout transitions to protect users sensitive to vestibular motion.
+* **Ignore Repeated Taps & Touch Assistance**: Built-in touch debounce thresholds and tap-assist guards prevent accidental double-taps or unintended multiple triggers on critical actions (e.g., Emergency SOS Beacon, report submission, poll voting, and dynamic QR handover).
+* **Haptics Feedback & Physical Confirmation**: Emil Kowalski tactile haptic pulses (`HapticFeedback.mediumImpact()`, `heavyImpact()`) synchronized with camera steady-lock lock-in, voice dictation toggle, and form validation, creating a tangible physical interface.
+* **Screen Reader & TalkBack Semantics**: Every interactive control, status badge, camera HUD overlay, bottom sheet, and map layer is equipped with declarative `Semantics(...)` metadata and descriptive accessibility labels, providing an effortless navigation experience for visually impaired citizens.
+* **Multilingual Text-to-Speech (TTS) Guidance**: Built-in voice synthesis prompts (`flutter_tts`) that read out hazard verification statuses, emergency instructions, and voice assistant responses in regional languages (Malayalam, Hindi, English).
+
+#### 3. 🛡️ Resilient Offline-First Support & Autonomous Sync Engine
+Engineered for zero data loss in remote areas, transit tunnels, and rural cellular dead zones:
+* **How It Works**:
+  * Powered by `OfflineQueueService` with robust persistent disk storage (`offline_reports_queue.json`) and local media file management.
+  * Captures full payloads, GPS coordinates, sensor evidence, and photographic proof directly on the local filesystem.
+* **Cross-Module Offline Availability**:
+  * **🏛️ Civic Infrastructure Reports**: Potholes, broken street lights, pipe leaks, and passive SensorWatch shock telemetry are queued with tamper-proof SHA-256 evidence packages.
+  * **🔍 Lost & Found Listings**: Both Lost and Found item submissions, including attached photos and proximity coordinates, can be created offline.
+  * **🗳️ Community Postings & Polls**: Neighborhood discussions, local job requests, and anti-fraud civic poll votes are recorded locally without an active internet connection.
+* **Intelligent Offline Caching**:
+  * Recent activity feeds, nearby municipal service markers, user profiles, and active task queues are permanently cached on-device for seamless browsing while completely disconnected.
+* **Autonomous Auto-Upload & Sync Check when Back Online**:
+  * Continuously listens for network connectivity changes via real-time network state monitors.
+  * **Instant Online Sync Check**: The moment network access is restored, an autonomous synchronization engine awakens, verifies server reachability, and flushes the queue in FIFO order with exponential backoff retries.
+  * **Timestamp & Integrity Preservation**: Media photos are uploaded to Supabase Storage, database records are inserted preserving original offline capture timestamps, and civic XP points are awarded retroactively with instant visual sync notifications.
 
 ---
 
@@ -219,6 +223,9 @@ Transparent end-to-end lifecycle tracking for every reported civic hazard:
 
 ### 🔍 6. Proximity Lost & Found Network
 * **PostGIS Spatial Matching**: Automatically pairs opposite-type reports (`LOST` vs. `FOUND`) within a 2,000-metre radius and a 14-day temporal window.
+* **Dual-Mode Lost & Found Voice Assistant**:
+  * **Physical Segmented Mode Switcher**: Integrated physical segmented toggle (`[ 🔴 I Lost an Item ]` | `[ 🟢 I Found an Item ]`) directly into the Voice Reporting Sheet.
+  * **Multilingual Keyword Auto-Classification**: Dynamic natural speech analysis that automatically detects whether the user is reporting a lost possession or a discovered item across English, Malayalam, and Hindi.
 * **Dynamic Handover Pass (QR / PIN Verification)**:
   * Eliminates risky public exchanges with mutual in-person cryptographic verification.
   * Generates a dynamic single-use QR token (`NIVARA-LF-...`) and a random 6-digit PIN.
@@ -237,6 +244,29 @@ Transparent end-to-end lifecycle tracking for every reported civic hazard:
 ### 🔔 8. Real-Time Cross-Role Notifications
 * Native Android notification channels (`civic_alerts`, `work_dispatch`, `community_updates`) with sound and vibration.
 * Automated PostgreSQL database triggers for instant cross-role alerts (admin acknowledgment, worker dispatch, work completion proof, and Lost & Found matches).
+
+---
+
+### 🔒 9. Native Biometric App Lock & Device Security Failsafe
+* **Hardware-Backed Biometrics**: Native fingerprint and face authentication via `local_auth` with seamless fallback to device PIN / Pattern / Passcode (`biometricOnly: false`) guaranteeing device-agnostic security.
+* **First-Launch Security Consent**: A person freshly installing the app is seamlessly prompted with an interactive setup dialog to opt into native app security.
+* **Role-Wide Profile Settings**: Biometric app lock toggle is fully configurable within the Profile settings tab across all 3 user categories: **Citizen**, **Municipal Field Worker**, and **Municipal Admin**.
+* **App Lifecycle Resume Guard**: Automatically shields sensitive municipal dispatch orders, triage queues, and personal lost-item handover credentials whenever the app is minimized or the screen is locked.
+
+---
+
+### 🎨 10. Emil Kowalski Interactive Guidance & Modern Design System
+* **Kinetic Physics & Haptic Micro-Interactions**: Custom modal guidance sheets (`InteractiveInfoGuideSheet`) implemented in **SensorWatch** and **Lost & Found Hub** designed according to Emil Kowalski motion design principles.
+* **Auto-Discovery Modal Gate**: Automatically surfaces on entry to guide first-time users through complex sensor telemetry and proximity handshakes until acknowledged.
+* **Interactive Slide-to-Confirm Gesture**: Features a tactile *"I understand how this works"* checkbox which physically expands into a fluid spring-physics slider (*"Understood, don't show again"*), persistent in local storage with permanent AppBar `(i)` access.
+* **Harmonized Design System & Card Consistency**: Clean visual hierarchy eliminating duplicate badge tags (`'19 HAZARDS'`, `'VOICE AI'`) and aligning form category cards with the Home screen's dark glassmorphic palette and typography.
+
+---
+
+### 🔑 11. Enterprise Authentication & Google OAuth Integration
+* **Production-Grade Credential Integrity**: Eliminated pre-filled and guided demo credentials across Field Worker and Admin portals to satisfy real-world security evaluation standards.
+* **"Continue with Google" Integration**: Seamless native Google OAuth sign-in powered by Supabase Auth and Android custom-scheme deep-link redirection (`in.adithyen.nivara://login-callback`).
+* **Google Account Avatar Synchronization**: Automatically pulls and synchronizes user avatars from Google OAuth metadata (`avatar_url`, `picture`, `photoURL`) upon login and background sync, accompanied by a 1-tap manual sync button in the Profile Console.
 
 ---
 
@@ -287,20 +317,24 @@ https://youtube.com/watch?v=YOUR_DEMO_VIDEO_LINK
 
 # 📦 APK Download
 
-The production-ready, signed release APK is built and hosted directly on GitHub Releases:
+The production-ready, signed release APK is built and hosted across official channels:
 
-🔗 **[Download Nivara v1.0.64 Release APK (nivara-v1.0.64.apk)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/download/v1.0.64/nivara-v1.0.64.apk)**
+* 🚀 **[Updraft App Store (Instant Mobile Install)](https://app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db)**
+* 🌐 **[BetaDrop Direct Install](https://betadrop.app/install/?i=6pxXG3)**
+* 📦 **[GitHub Releases v1.0.67 Release Assets](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.67)**:
+  * 🔗 **[Download Compressed Release APK — 47.0 MB (`nivara-v1.0.67_compressed.apk`)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/download/v1.0.67/nivara-v1.0.67_compressed.apk)**
+  * 🔗 **[Download Full Native Release APK — 106.8 MB (`nivara-v1.0.67.apk`)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/download/v1.0.67/nivara-v1.0.67.apk)**
 
 ```
-Release Version : 1.0.64 (Build 64)
-Artifact Name   : nivara-v1.0.64.apk
+Release Version : 1.0.67 (Build 67)
+Artifacts       : nivara-v1.0.67_compressed.apk (47.0 MB) | nivara-v1.0.67.apk (106.8 MB)
 Target Platform : Android 7.0+ (API Level 24 to 34)
 Architecture    : arm64-v8a, armeabi-v7a, x86_64
-Verification    : Fully signed, tree-shaken release build with zero analyzer warnings
+Verification    : Fully signed, tree-shaken production release build with zero analyzer warnings
 ```
 
 ### Installation Steps:
-1. Download `nivara-v1.0.64.apk` from the direct download link above on your Android device.
+1. Download `nivara-v1.0.67_compressed.apk` (or open the Updraft / BetaDrop link) on your Android device.
 2. Tap the downloaded file in your Notification Drawer or Downloads folder.
 3. If prompted, allow *"Install from unknown sources"* for your browser or file manager.
 4. Launch **Nivara** and grant Location, Camera, and Microphone permissions when requested.
