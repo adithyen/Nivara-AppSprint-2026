@@ -125,7 +125,8 @@ graph TD
 # ✨ Features & Architectural Matrix
 
 ### 🎁 Bonus Point Features Added
-* **App Store Publication Link**: [GitHub Releases (Direct APK Download)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.64) *(Production APK signed and distributed directly for instant installation)*
+* **App Store Publication Link**:[Click Here :) ](https://app.getupdraft.com/getapp/c82001860c054d70b59fb766788538db)
+* [GitHub Releases (Direct APK Download)](https://github.com/adithyen/Nivara-AppSprint-2026/releases/tag/v1.0.64) *(Production APK signed and distributed directly for instant installation)*
 * **Native Biometric App Lock & Device Security Failsafe**:
   * **Hardware-Backed Biometrics**: Native fingerprint and face authentication via `local_auth` with seamless fallback to device PIN / Pattern / Passcode (`biometricOnly: false`) guaranteeing device-agnostic security.
   * **First-Launch Security Consent**: A person freshly installing the app is seamlessly prompted with an interactive setup dialog to opt into native app security.
