@@ -274,51 +274,55 @@ Transparent end-to-end lifecycle tracking for every reported civic hazard:
 
 > Below is the visual showcase of Nivara captured directly on physical Android hardware across Citizen, Field Worker, and Municipal Admin workflows. All high-resolution captures are sourced from the [`git images`](git%20images/) repository directory.
 
-### 🏙️ 1. Core Navigation & AI Autonomous Sensing
+### 🏙️ 1. Home Dashboard & AI Quick-Actions
 
 | Screen | Preview | Highlights |
 |---|:---:|---|
-| **Home Dashboard (Adaptive Light Theme)** | <img src="git%20images/01_home_dashboard.jpg" width="240" alt="Home Dashboard"/> | Curated quick-action banners for AI Vision & AI Voice Reporting, 4 core civic module entrypoints, and bottom navigation bar. |
-| **Live Civic Map (With Hazard Sheet)** | <img src="git%20images/02_live_civic_map.jpg" width="240" alt="Live Civic Map"/> | Ola Maps dark vector tiles, category-coded hazard pins, user location marker, and instant report bottom sheet. |
-| **SensorWatch Autonomous Pothole HUD** | <img src="git%20images/03_sensorwatch_active.jpg" width="240" alt="SensorWatch HUD"/> | Real-time 50Hz accelerometer readout, g-force shock threshold meter, speed deadband indicator, and SHA-256 evidence package logger. |
-| **Multilingual AI Voice Assistant** | <img src="git%20images/04_ai_voice_assistant.jpg" width="240" alt="AI Voice Assistant"/> | Continuous speech listening visualizer, editable transcript box, auto-extracted slot chips (Category, Severity, Landmark), and 1-Tap Submit. |
-| **NVIDIA NIM Vision Camera (Steady-Lock)** | <img src="git%20images/05_ai_vision_camera.jpg" width="240" alt="NVIDIA Vision Camera"/> | Physical gyro steady-lock ring, Llama-3.2-90B inference console, auto-shutter lock, detected bounding box (`ROAD SIGN 80%`), and auto-filled report drawer. |
-| **Civic Report Detail & Street View** | <img src="git%20images/06_civic_report_detail.jpg" width="240" alt="Civic Report Detail"/> | High-resolution photo proof, citizen community verification count, 360° street view, and turn-by-turn navigation CTA. |
+| **Home Dashboard — AI Quick-Actions & Civic Modules** | <img src="git%20images/01_home_dashboard.jpg" width="240" alt="Home Dashboard"/> | AI Civic Auto-Capture and AI Voice Reporting quick-action banners, plus SensorWatch, Report Issue, Civic Map, and Lost & Found module entrypoints with bottom nav bar. |
+| **Home Dashboard — Civic Standing & XP Card** | <img src="git%20images/03_sensorwatch_active.jpg" width="240" alt="Home Dashboard XP Card"/> | Citizen greeting with Level 3 Block Watcher badge, 115 Civic XP progress bar, 2 Reports / 2 Confirms / 3 Finds stats, and AI capture and voice banners below. |
 
-### 🔍 2. Proximity Lost & Found & Verification Radar
+### 🗂️ 2. Reporting — Category Picker, Form & AI Tools
 
 | Screen | Preview | Highlights |
 |---|:---:|---|
-| **Lost & Found Hub & Proof Gallery** | <img src="git%20images/07_lost_found_hub.jpg" width="240" alt="Lost & Found Hub"/> | Filterable lost/found listings, PostGIS proximity match badge, reward indicators, and high-resolution photo proof gallery. |
-| **Dynamic Handover Pass & Proximity Radar** | <img src="git%20images/08_dynamic_handover_pass.jpg" width="240" alt="Handover Pass"/> | Cryptographic QR code, proximity PIN handshake, real-time mutual peer sync, and Account Ownership verification card. |
+| **Report Issue — Category Picker (19 Civic Categories)** | <img src="git%20images/02_live_civic_map.jpg" width="240" alt="Issue Category Picker"/> | Searchable grid of all 19 civic categories (Pothole, Broken Footpath, Open Manhole, Waterlogging, Road Sign, etc.) with AI Camera and AI Voice shortcuts pinned at the top. |
+| **Civic Report Form (GPS Auto-Fill & Voice Dictate)** | <img src="git%20images/06_civic_report_detail.jpg" width="240" alt="Civic Report Form"/> | Waterlogging category selected, GPS auto-filled to 8.47006, 76.98027, landmark pre-filled from reverse geocode (Ganga Studio, Sree Chitra Thirunal College), Voice Dictate shortcut, and photo slots. |
+| **Multilingual AI Voice Assistant** | <img src="git%20images/04_ai_voice_assistant.jpg" width="240" alt="AI Voice Assistant"/> | Continuous listening visualizer (dark sheet), editable spoken transcript, auto-extracted Parsed Slots (Road Sign, Medium, East Fort crossing bridge), and 1-Tap Submit. |
+| **AI Auto-Capture Vision Camera (Steady-Lock)** | <img src="git%20images/05_ai_vision_camera.jpg" width="240" alt="AI Vision Camera"/> | HOLD STEADY gyro lock ring, ROAD SIGN 80% bounding box detected, AI Auto-Capture Verified at 80% confidence, and auto-filled report drawer with 1-Tap Submit Report. |
 
-### 📊 3. Hyperlocal Community & Real-Time Telemetry
-
-| Screen | Preview | Highlights |
-|---|:---:|---|
-| **Pulse Telemetry & Proximity Radar** | <img src="git%20images/09_pulse_telemetry_radar.jpg" width="240" alt="Pulse Telemetry Radar"/> | Proximity range slider (1km–100km), live telemetry incident counts, and chronological list of confirmed neighborhood issues. |
-| **Neighborhood Feed & Citizen Polls** | <img src="git%20images/10_community_board_feed.jpg" width="240" alt="Community Feed"/> | Anti-fraud neighbourhood voting polls (e.g. water purifier location), community announcements, and local micro-job listings. |
-| **Realtime Push Notification Center** | <img src="git%20images/11_push_notification_center.jpg" width="240" alt="Push Notifications"/> | Cross-role push notification history with worker leave alerts, community broadcast alerts, and unread badge synchronization. |
-| **Citizen Engagement Activity Timeline** | <img src="git%20images/12_my_activity_timeline.jpg" width="240" alt="Activity Timeline"/> | Complete chronological ledger of filed reports, community confirmations, and lost & found recovery events. |
-
-### ♿ 4. Universal Accessibility & Motor Ergonomics
+### 🗺️ 3. Live Civic Map
 
 | Screen | Preview | Highlights |
 |---|:---:|---|
-| **Vision & Display Accessibility** | <img src="git%20images/13_accessibility_vision_colors.jpg" width="240" alt="Accessibility Vision"/> | Dynamic text scaling (1.0x–1.5x), high-contrast modes, and 4 color deficiency correction filters (Protanopia, Deuteranopia, Tritanopia, Greyscale). |
-| **Motor Tremor Protection & Audio Alerts** | <img src="git%20images/14_accessibility_motor_touch.jpg" width="240" alt="Accessibility Motor"/> | Configurable tap debouncing slider (0.10s–4.00s), tactile haptic feedback, animation suppression, and device speaker voice alerts. |
+| **Live Civic Map (Ola Maps Light Vector Tiles)** | <img src="git%20images/07_lost_found_hub.jpg" width="240" alt="Live Civic Map"/> | Ola Maps light vector tiles, red civic hazard pin near Sree Chitra Thirunal College Thiruvananthapuram, Nearby Services bar (Hospitals, Police, Transit and Metro), and user location dot. |
+| **Civic Map — Hazard Report Bottom Sheet** | <img src="git%20images/08_dynamic_handover_pass.jpg" width="240" alt="Civic Map Hazard Sheet"/> | Tapping a hazard pin reveals an instant bottom sheet: Knee-deep water stagnation blocking service road, Submitted badge, Pappanamcode Service Road location, and View Full Details and Proof CTA. |
 
-### ⚙️ 5. Enterprise Settings, Governance & Workforce
+### 📋 4. Report Detail & Community Engagement
 
 | Screen | Preview | Highlights |
 |---|:---:|---|
-| **Appearance & 8 Accent Palettes** | <img src="git%20images/15_appearance_themes_accents.jpg" width="240" alt="Appearance Customizer"/> | System, Light, and Dark themes with 8 brand accents (Civic Blue, Teal, Indigo, Violet, Magenta, Emerald, Sunset, Crimson). |
-| **Resilient Offline Queue (All Synced)** | <img src="git%20images/16_offline_resilience_synced.jpg" width="240" alt="Offline Resilience"/> | Zero-data-loss SQLite queue with verified *"All synced! No pending items"* state, background sync worker, and retry engine. |
-| **Citizen Profile & Biometric App Lock** | <img src="git%20images/17_profile_civic_standing_xp.jpg" width="240" alt="Profile Console"/> | Level 3 Block Watcher badge, 115 Civic XP progress, native hardware biometric lock toggle, and multi-lingual language selector. |
-| **In-App Software Update Engine** | <img src="git%20images/18_inapp_software_updates.jpg" width="240" alt="In-App Updates"/> | Official GitHub release registry verification (`v1.0.67 • Build 67`), integrity checks, and direct GitHub release notes link. |
-| **Direct Developer Hotline & Diagnostics** | <img src="git%20images/19_developer_hotline_feedback.jpg" width="240" alt="Developer Hotline"/> | Built-in bug report and suggestion hotline with auto-attached diagnostic device state (OS, version, role) and screenshot attachments. |
-| **Work with Nivara Workforce Application** | <img src="git%20images/20_work_with_nivara_workforce.jpg" width="240" alt="Work with Nivara"/> | Municipal field worker application form with department skill selection, shift availability, and equipment readiness. |
+| **Civic Report Detail (Community Verify & Street View)** | <img src="git%20images/09_pulse_telemetry_radar.jpg" width="240" alt="Civic Report Detail"/> | High-resolution flood photo proof, 0/5 community confirmations with I Saw This Too button, full stormwater description, GPS coordinates (8.47027, 76.97952), and Street View 360 and Directions CTAs. |
+| **Neighborhood Feed & Citizen Polls** | <img src="git%20images/10_community_board_feed.jpg" width="240" alt="Community Feed"/> | Anti-fraud neighbourhood voting polls (Preferred Location for new Water Purifier), micro-job listings (New Shopkeeper for Photostat shop, 736 m away), and Post/Poll/Announcement compose bar. |
+| **Realtime Push Notification Center** | <img src="git%20images/11_push_notification_center.jpg" width="240" alt="Push Notifications"/> | System notification tray showing Nivara cross-role push notifications: Worker On Leave alert and New Community Post alerts delivered simultaneously. |
+| **Citizen Engagement Activity Timeline** | <img src="git%20images/12_my_activity_timeline.jpg" width="240" alt="Activity Timeline"/> | Chronological ledger of Confirmed a report, Community Posts, and Lost/Found events dated back to August 2026, grouped by date with event-type icons. |
 
+### ♿ 5. Universal Accessibility & Motor Ergonomics
+
+| Screen | Preview | Highlights |
+|---|:---:|---|
+| **Vision & Display Accessibility** | <img src="git%20images/13_accessibility_vision_colors.jpg" width="240" alt="Accessibility Vision"/> | Dynamic text scaling (1.0x Normal to 1.5x Max), high-contrast colour toggle, and 4 colour deficiency correction modes (Red-green green weak, Red-green red weak, Blue-yellow, Greyscale) with live colour swatch preview. |
+| **Motor Tremor Protection & Audio Alerts** | <img src="git%20images/14_accessibility_motor_touch.jpg" width="240" alt="Accessibility Motor"/> | Interaction and Touch: Ignore Repeated Taps enabled, configurable tap debounce slider at 0.30s (range 0.10s to 4.00s), Haptic feedback toggle, Motion suppress, and Voice Alerts via device speaker. |
+
+### ⚙️ 6. Enterprise Settings, Governance & Profile
+
+| Screen | Preview | Highlights |
+|---|:---:|---|
+| **Appearance & 8 Accent Palettes** | <img src="git%20images/15_appearance_themes_accents.jpg" width="240" alt="Appearance Customizer"/> | System, Light (active), and Dark theme modes with 8 brand accent colours: Civic Blue, Teal, Indigo, Violet, Magenta, Emerald (selected), Sunset, and Crimson. |
+| **Resilient Offline Queue (All Synced)** | <img src="git%20images/16_offline_resilience_synced.jpg" width="240" alt="Offline Resilience"/> | Pending Sync screen showing All synced! No pending items. Everything has been submitted — zero-data-loss SQLite offline queue with background sync worker. |
+| **Citizen Profile & Biometric App Lock** | <img src="git%20images/17_profile_civic_standing_xp.jpg" width="240" alt="Profile Console"/> | Adithyan H / Citizen, 115 XP Level 3 Block Watcher 35 pts to Level 4, Native Biometric App Lock toggle (Fingerprint / Face ID), Appearance, Accessibility, App Language, and Activity Timeline links. |
+| **In-App Software Update Engine** | <img src="git%20images/18_inapp_software_updates.jpg" width="240" alt="In-App Updates"/> | GitHub Release Registry sheet: You are Up to Date — Nivara v1.0.67 (Build 67), Release Channel: Official Production, Integrity Status: Verified Authentic, with GitHub Notes link. |
+| **Direct Developer Hotline & Diagnostics** | <img src="git%20images/19_developer_hotline_feedback.jpg" width="240" alt="Developer Hotline"/> | Feedback and Contact Dev screen with Report a Bug / Suggest Feature / Contact Developer tabs, summary and description fields, screenshot attachments (0/4), and Auto-Attached Diagnostic Data (App Version, Role, OS). |
+| **App Language & 22 Indian Languages** | <img src="git%20images/20_work_with_nivara_workforce.jpg" width="240" alt="App Language"/> | Multilingual Civic Access: English, Hindi, and Malayalam fully supported with instant UI adaptation, plus searchable selector for all 22 official Eighth Schedule languages of India (Kannada coming soon). |
 ---
 
 # 🎥 Demo Video
